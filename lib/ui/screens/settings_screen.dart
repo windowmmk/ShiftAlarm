@@ -170,10 +170,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 12),
                     Text(
                       isUrlMode
-                          ? '相機、微信或瀏覽器掃描後，打開網址可 1 秒一鍵套用'
-                          : '僅供 ShiftAlarm App 內辨識讀取之極簡 Base58 口令',
+                          ? '相機、微信或瀏覽器掃描後，打開網址可一鍵套用'
+                          : '供 App 內快速辨識讀取的分享口令',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 12.5,
                         color: parentContext.tokens.neutralFg2,
                       ),
                       textAlign: TextAlign.center,
@@ -185,7 +185,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('關閉'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: const Text('關閉', style: TextStyle(fontSize: 14)),
               ),
               FilledButton.icon(
                 onPressed: () async {
@@ -196,8 +200,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   }
                 },
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
                 icon: const Icon(Icons.link, size: 16),
-                label: const Text('複製網址連結'),
+                label: const Text('複製網址連結',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -289,32 +298,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '採用 Base58 報文協議，發給同事或換機貼上即可 1 秒還原排班：',
+                      '發給同事或換新手機貼上，即可一秒還原排班：',
                       style: TextStyle(
-                          fontSize: 12, color: context.tokens.neutralFg2),
+                          fontSize: 13, color: context.tokens.neutralFg),
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: context.tokens.neutralBg2,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: context.tokens.neutralStroke),
                       ),
                       child: SelectableText(
                         code,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12.5,
                           fontFamily: 'monospace',
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '長度：${code.length} 字元（$byteLen 字節）',
-                      style: TextStyle(
-                          fontSize: 11, color: context.tokens.neutralFg2),
-                      textAlign: TextAlign.right,
                     ),
                   ],
                 ),
@@ -323,7 +325,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('關閉'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: const Text('關閉', style: TextStyle(fontSize: 14)),
               ),
               OutlinedButton.icon(
                 onPressed: () {
@@ -336,8 +342,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shareUrl: url,
                   );
                 },
-                icon: const Icon(Icons.qr_code, size: 16),
-                label: const Text('二維碼 / 連結'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                icon: const Icon(Icons.qr_code, size: 17),
+                label: const Text('二維碼 / 連結',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
               ),
               FilledButton.icon(
                 onPressed: () async {
@@ -348,8 +359,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   }
                 },
-                icon: const Icon(Icons.copy, size: 16),
-                label: const Text('複製口令'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                icon: const Icon(Icons.copy, size: 17),
+                label: const Text('複製口令',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -417,7 +433,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('關閉'),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: const Text('關閉', style: TextStyle(fontSize: 14)),
           ),
           OutlinedButton.icon(
             onPressed: () {
@@ -430,8 +450,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shareUrl: url,
               );
             },
-            icon: const Icon(Icons.qr_code, size: 16),
-            label: const Text('二維碼 / 連結'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+            icon: const Icon(Icons.qr_code, size: 17),
+            label: const Text('二維碼 / 連結',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
           FilledButton.icon(
             onPressed: () async {
@@ -446,8 +471,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.pop(ctx);
               }
             },
-            icon: const Icon(Icons.copy, size: 16),
-            label: const Text('複製口令'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            icon: const Icon(Icons.copy, size: 17),
+            label: const Text('複製口令',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

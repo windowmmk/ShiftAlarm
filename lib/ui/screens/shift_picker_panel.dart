@@ -380,106 +380,124 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 第一行：日期切換、場所膠囊、備註膠囊、完成按鈕
+            // 第一行：日期切換、場所按鈕、備註按鈕、完成按鈕（大尺寸、好操作）
             Row(
               children: [
+                // 左箭頭
                 InkWell(
                   onTap: _saving ? null : () => _goDay(-1),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.chevron_left,
-                        size: 20, color: t.neutralFg),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: t.neutralBg2,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: t.neutralStroke),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.chevron_left, size: 22, color: t.neutralFg),
                   ),
                 ),
+                const SizedBox(width: 6),
                 Text(
                   _dateLabel,
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                     color: t.neutralFg,
                   ),
                 ),
+                const SizedBox(width: 6),
+                // 右箭頭
                 InkWell(
                   onTap: _saving ? null : () => _goDay(1),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.chevron_right,
-                        size: 20, color: t.neutralFg),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: t.neutralBg2,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: t.neutralStroke),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.chevron_right, size: 22, color: t.neutralFg),
                   ),
                 ),
-                const SizedBox(width: 4),
-                // 場所快選膠囊
+                const SizedBox(width: 8),
+                // 場所按鈕（同等重要，大尺寸按鈕）
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        ActionChip(
-                          avatar: Icon(Icons.location_on_outlined,
-                              size: 14,
+                        FilledButton.tonalIcon(
+                          onPressed: () => _openVenueDialog(context),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            minimumSize: const Size(0, 38),
+                            backgroundColor: note.isNotEmpty
+                                ? t.brand.withValues(alpha: 0.15)
+                                : t.neutralBg2,
+                            foregroundColor: note.isNotEmpty ? t.brand : t.neutralFg,
+                          ),
+                          icon: Icon(Icons.location_on,
+                              size: 16,
                               color: note.isNotEmpty ? t.brand : t.neutralFg2),
                           label: Text(
                             note.isNotEmpty ? note : '場所',
                             style: TextStyle(
-                              fontSize: 11,
-                              color: note.isNotEmpty ? t.brand : t.neutralFg2,
+                              fontSize: 13,
                               fontWeight: note.isNotEmpty
-                                  ? FontWeight.w600
+                                  ? FontWeight.bold
                                   : FontWeight.normal,
                             ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _openVenueDialog(context),
                         ),
-                        const SizedBox(width: 4),
-                        ActionChip(
-                          avatar: Icon(Icons.edit_note,
-                              size: 14,
-                              color:
-                                  remark.isNotEmpty ? t.brand : t.neutralFg2),
+                        const SizedBox(width: 6),
+                        OutlinedButton.icon(
+                          onPressed: () => _openRemarkDialog(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            minimumSize: const Size(0, 38),
+                          ),
+                          icon: Icon(Icons.edit_note,
+                              size: 18,
+                              color: remark.isNotEmpty ? t.brand : t.neutralFg2),
                           label: Text(
                             remark.isNotEmpty ? '有備註' : '備註',
                             style: TextStyle(
-                              fontSize: 11,
-                              color:
-                                  remark.isNotEmpty ? t.brand : t.neutralFg2,
+                              fontSize: 13,
                               fontWeight: remark.isNotEmpty
-                                  ? FontWeight.w600
+                                  ? FontWeight.bold
                                   : FontWeight.normal,
+                              color: remark.isNotEmpty ? t.brand : t.neutralFg2,
                             ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => _openRemarkDialog(context),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                // 完成退出按鈕
-                TextButton(
+                const SizedBox(width: 8),
+                // 完成退出按鈕（實心大按鈕，清晰好按）
+                FilledButton(
                   onPressed: widget.onClose,
-                  style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    minimumSize: const Size(0, 38),
                   ),
                   child: const Text('完成',
-                      style:
-                          TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             // 第二行：橫向排班卡片（點更即排，自動保存）
             SizedBox(
-              height: 48,
+              height: 54,
               child: defs.length <= 4
                   ? Row(
                       children: [
@@ -501,7 +519,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                           for (int i = 0; i < defs.length; i++) ...[
                             if (i > 0) const SizedBox(width: 6),
                             SizedBox(
-                              width: 80,
+                              width: 88,
                               child: _compactShiftButton(
                                   t, defs[i], defs[i].id == currentId),
                             ),
@@ -541,7 +559,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 ]
               : null,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -550,19 +568,20 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
               child: Text(
                 def.code.isNotEmpty ? '${def.code} ${def.name}' : def.name,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                   color: slot.fg,
                 ),
               ),
             ),
-            const SizedBox(height: 1),
+            const SizedBox(height: 2),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 '${def.startTime}–${def.endTime}',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                   color: slot.fg.withValues(alpha: 0.85),
                 ),
               ),
@@ -575,8 +594,8 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   Widget _clearButton(ShiftTokens t, String? currentId) {
     return SizedBox(
-      width: 44,
-      height: 48,
+      width: 50,
+      height: 54,
       child: Tooltip(
         message: '清除此日排更（設為放假）',
         child: OutlinedButton(
@@ -591,7 +610,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 borderRadius: BorderRadius.circular(8)),
           ),
           child: Icon(Icons.clear,
-              size: 18,
+              size: 22,
               color: currentId != null ? t.danger : t.neutralFg2),
         ),
       ),
