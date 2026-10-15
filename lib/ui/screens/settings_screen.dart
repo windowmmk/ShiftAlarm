@@ -251,26 +251,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── 配置導出／導入 ──────────────────────────────
-  // 班次定義＋場所清單，JSON 格式。重裝／更新後導入即可還原。
+  // 班次定義＋場所清單，Base64 口令碼格式（相容 JSON）。重裝／換機導入即可還原。
 
-  /// 導出配置：生成 JSON 並複製到剪貼簿（保持輕便，不加分享依賴）。
+  /// 導出配置：生成 Base64 口令碼，彈窗展示並複製到剪貼簿。
   Future<void> _exportConfig() async {
-    final json = exportConfigJson(widget.store);
-    await Clipboard.setData(ClipboardData(text: json));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '配置已複製（${widget.store.defs.length} 個班次、'
-            '${widget.store.venues.length} 個場所），貼到備忘錄保存',
-          ),
-          duration: const Duration(seconds: 4),
+    final code = exportConfigCode(widget.store);
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('導出配置口令'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '口令已自動複製到剪貼簿！可直接貼到備忘錄或發送給同事：',
+              style: TextStyle(
+                  fontSize: 13, color: context.tokens.neutralFg2),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: context.tokens.neutralBg2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: context.tokens.neutralStroke),
+              ),
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  code,
+                  style: const TextStyle(
+                      fontSize: 11, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '包含 ${widget.store.defs.length} 個班次、${widget.store.venues.length} 個場所',
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
         ),
-      );
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('關閉'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: code));
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('配置口令已重新複製到剪貼簿！'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                Navigator.pop(ctx);
+              }
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('再複製一次'),
+          ),
+        ],
+      ),
+    );
   }
 
-  /// 導入配置：貼上 JSON → 預覽 → 確認寫入（清空現有班次／場所）。
+  /// 導入配置：貼上 Base64 口令或 JSON → 預覽 → 確認寫入（清空現有班次／場所）。
   Future<void> _openConfigImport() async {
     final ctrl = TextEditingController();
     ({int shifts, int venues, List<String> names})? preview;
@@ -281,7 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: const Text('導入配置'),
+          title: const Text('導入配置口令'),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
@@ -290,23 +343,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '貼上之前導出的配置 JSON。\n注意：會清空現有班次和場所！',
+                    '貼上之前導出的配置口令（亦相容 JSON 格式）。\n注意：會清空現有班次和場所！',
                     style: TextStyle(
                         fontSize: 12, color: context.tokens.neutralFg2),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: ctrl,
-                    maxLines: 8,
-                    minLines: 4,
+                    maxLines: 6,
+                    minLines: 3,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '貼上配置 JSON…',
+                      hintText: '貼上配置口令（SHIFTALARM:…）或 JSON…',
                     ),
                     style: const TextStyle(
                         fontSize: 11, fontFamily: 'monospace'),
                     onChanged: (_) {
-                      // 貼上後自動預覽
                       setD(() {
                         error = null;
                         preview = null;
@@ -316,7 +368,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         } on ConfigImportException catch (e) {
                           error = e.message;
                         } catch (_) {
-                          error = 'JSON 格式唔啱';
+                          error = '口令格式無效';
                         }
                       });
                     },
@@ -366,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : () async {
                       setD(() => importing = true);
                       try {
-                        await importConfigJson(
+                        await importConfigText(
                             widget.store, ctrl.text);
                         if (ctx.mounted) Navigator.pop(ctx);
                         if (mounted) {
@@ -496,17 +548,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(height: 1),
           const _SectionHeader('配置'),
           ListTile(
-            leading: const Icon(Icons.file_download_outlined),
-            title: const Text('導出配置'),
-            subtitle: const Text('班次＋場所，複製 JSON 備份'),
+            leading: const Icon(Icons.key_outlined),
+            title: const Text('導出配置口令'),
+            subtitle: const Text('班次＋場所，一鍵複製口令碼'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _exportConfig,
           ),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.file_upload_outlined),
-            title: const Text('導入配置'),
-            subtitle: const Text('貼上配置 JSON 還原'),
+            title: const Text('導入配置口令'),
+            subtitle: const Text('貼上口令碼一秒還原'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _openConfigImport,
           ),
