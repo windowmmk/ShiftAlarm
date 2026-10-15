@@ -4,7 +4,7 @@ import '../../domain/shift_store.dart';
 import '../../domain/stats.dart';
 import '../../theme/app_theme.dart';
 
-/// 統計頁：區間切換＋總覽＋班次分佈＋場所分佈。
+/// 統計頁：區間切換＋總覽＋班次分佈＋地點分佈。
 /// 只讀 ShiftStore；唔掂鬧鐘。
 class StatsScreen extends StatefulWidget {
   final ShiftStore store;
@@ -93,7 +93,7 @@ class _StatsScreenState extends State<StatsScreen> {
           const SizedBox(height: 4),
           _slotBars(t, r),
           const SizedBox(height: 12),
-          _sectionTitle(t, '場所分佈'),
+          _sectionTitle(t, '地點分佈'),
           const SizedBox(height: 4),
           _venueBars(t, r),
           const SizedBox(height: 16),
@@ -288,7 +288,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  /// 場所橫條：按次數降序，長度按最高次數佔比。
+  /// 地點橫條：按次數降序，長度按最高次數佔比。
   Widget _venueBars(ShiftTokens t, StatsResult r) {
     if (r.venueCounts.isEmpty) {
       return Card(
@@ -296,7 +296,7 @@ class _StatsScreenState extends State<StatsScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Center(
-            child: Text('呢段時間未有場所紀錄',
+            child: Text('呢段時間未有地點紀錄',
                 style:
                     TextStyle(fontSize: t.fontCaption, color: t.neutralFg2)),
           ),

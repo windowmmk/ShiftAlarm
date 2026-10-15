@@ -117,7 +117,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         final preview = previewConfig(clean);
         setState(() {
           _configPreview = preview;
-          _detectedType = '班次與場所設定';
+          _detectedType = '班次與地點設定';
           if (fromClipboard) _clipboardAutoDetected = true;
         });
         return;
@@ -184,7 +184,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
             SnackBar(
               content: Text(
                 '配置導入成功：${_configPreview!.shifts} 個班次、'
-                '${_configPreview!.venues} 個場所',
+                '${_configPreview!.venues} 個地點',
               ),
               backgroundColor: const Color(0xFF2E7D32),
             ),
@@ -515,7 +515,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         children: [
           Row(
             children: [
-              Text('${p.shifts} 個班次、${p.venues} 個場所',
+              Text('${p.shifts} 個班次、${p.venues} 個地點',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               const Spacer(),
               if (p.crcVerified)
@@ -550,7 +550,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
           ],
           const SizedBox(height: 4),
           const Text(
-            '⚠️ 注意：導入新配置將更新現有班次與場所清單。',
+            '⚠️ 注意：導入新配置將更新現有班次與地點清單。',
             style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
           ),
         ],
