@@ -165,6 +165,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (_editingRemark) {
       _saveInlineRemark();
     }
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _schedPanelOpen = true);
   }
 
@@ -316,16 +317,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             icon: const Icon(Icons.file_download_outlined, size: 17),
             label: const Text('導入',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 4),
-          FilledButton.tonal(
-            onPressed: _openPanel,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: const Size(0, 36),
-            ),
-            child: const Text('排班',
                 style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 4),
@@ -536,7 +527,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   : const SizedBox.shrink(),
             ),
           ),
-          // 第三行：場所（放大 17.0px 粗體，與班次同等權重；無場所佔位對齊）
+          // 第三行：地點（放大 17.0px 粗體，與班次同等權重；無地點佔位對齊）
           Expanded(
             child: Center(
               child: (def != null && note.isNotEmpty)
@@ -610,7 +601,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 第一行：日期、班次、場所、排班按鈕
+          // 第一行：日期、班次、地點、排班按鈕
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -658,7 +649,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ],
               ),
               const SizedBox(width: 10),
-              // 班次與場所標籤
+              // 班次與地點標籤
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -689,7 +680,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-                      // 場所徽章（重要性與班次同等，醒目展示）
+                      // 地點徽章（重要性與班次同等，醒目展示）
                       if (note.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -741,17 +732,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          // 第二行：專屬兩行備註欄（可容納 10x2 個中文字，好點好編輯）
+          // 第二行：備註欄（簡約現代設計）
           _editingRemark
               ? SizedBox(
-                  height: 54,
+                  height: 48,
                   child: TextField(
                     controller: _remarkCtrl,
                     focusNode: _remarkFocus,
                     maxLines: 2,
-                    minLines: 2,
+                    minLines: 1,
                     maxLength: ShiftStore.maxRemarkLength,
-                    style: const TextStyle(fontSize: 13.5),
+                    style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: t.neutralBg2,
@@ -763,7 +754,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           horizontal: 10, vertical: 6),
                       counterText: '',
                       isDense: true,
-                      hintText: '輸入今日備忘（支援兩行，如換班、交代事項）…',
+                      hintText: '新增備註…',
+                      prefixIcon: Icon(Icons.notes_rounded,
+                          size: 17, color: t.neutralFg2),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.check, size: 18),
                         onPressed: _saveInlineRemark,
@@ -785,46 +778,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    height: 54,
+                    height: 44,
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
+                        horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: t.neutralBg2,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: t.neutralStroke),
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 1),
-                          child: Icon(Icons.edit_note,
-                              size: 19, color: Colors.blueGrey),
-                        ),
+                        Icon(Icons.notes_rounded,
+                            size: 17, color: t.neutralFg2),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            remark.isEmpty
-                                ? '點此新增今日備註（支援兩行輸入，可填寫換班或交代事項）…'
-                                : remark,
+                            remark.isEmpty ? '新增備註…' : remark,
                             style: TextStyle(
-                              fontSize: 13.5,
+                              fontSize: 13,
                               color: remark.isEmpty ? t.neutralFg2 : t.neutralFg,
-                              fontStyle: remark.isEmpty
-                                  ? FontStyle.italic
-                                  : FontStyle.normal,
-                              height: 1.25,
+                              height: 1.2,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Icon(Icons.edit_outlined,
-                              size: 15, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -927,7 +905,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('檢測到網址分享的班次與場所配置：'),
+              const Text('檢測到網址分享的班次與地點配置：'),
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(10),
@@ -942,14 +920,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     Text('• 班次數量：${p.shifts} 個 (${p.names.join('、')})',
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
-                    Text('• 常用場所：${p.venues} 個',
+                    Text('• 常用地點：${p.venues} 個',
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
               const Text(
-                '注意：導入後將覆蓋現有班次與場所設定。是否立即導入？',
+                '注意：導入後將覆蓋現有班次與地點設定。是否立即導入？',
                 style: TextStyle(fontSize: 12, color: Colors.red),
               ),
             ],

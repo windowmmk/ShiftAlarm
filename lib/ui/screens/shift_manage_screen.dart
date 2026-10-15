@@ -125,7 +125,7 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
           controller: _tabCtrl,
           tabs: const [
             Tab(text: '班次'),
-            Tab(text: '場所'),
+            Tab(text: '地點'),
           ],
         ),
       ),
@@ -175,13 +175,13 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
     );
   }
 
-  /// 場所清單 Tab：列出／新增／改名／刪除
+  /// 地點清單 Tab：列出／新增／改名／刪除
   Widget _venueList(ShiftTokens t) {
     final venues = widget.store.venues;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('排班時打字會自動補全；打咗新場所會自動加入呢度。',
+        Text('排班時打字會自動補全；打咗新地點會自動加入呢度。',
             style: TextStyle(fontSize: 12, color: t.neutralFg2)),
         const SizedBox(height: 12),
         for (final v in venues)
@@ -211,7 +211,7 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
         OutlinedButton.icon(
           onPressed: _addVenue,
           icon: const Icon(Icons.add),
-          label: const Text('新增場所'),
+          label: const Text('新增地點'),
         ),
       ],
     );
@@ -222,13 +222,14 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('新增場所'),
+        title: const Text('新增地點'),
         content: TextField(
           controller: ctrl,
-          maxLength: 12,
+          inputFormatters: const [AbbrUnitLengthFormatter(4)],
+          maxLength: 4,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
-            hintText: '如 總部 / A棟',
+            hintText: '如 總部、A1（最多 4 單位）',
             counterText: '',
           ),
         ),
@@ -258,9 +259,11 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
         title: Text('改名「$oldV」'),
         content: TextField(
           controller: ctrl,
-          maxLength: 12,
+          inputFormatters: const [AbbrUnitLengthFormatter(4)],
+          maxLength: 4,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
+            hintText: '最多 4 單位',
             counterText: '',
           ),
         ),
@@ -288,7 +291,7 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('刪除「$v」？'),
-        content: const Text('之後打字唔會再補全呢個場所（已排嘅日子唔受影響）。'),
+        content: const Text('之後打字唔會再補全呢個地點（已排嘅日子唔受影響）。'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -705,7 +708,7 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '場所',
+                  '地點',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

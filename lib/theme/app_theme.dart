@@ -309,6 +309,18 @@ ThemeData buildAppTheme() {
       side: BorderSide.none,
       showCheckmark: false,
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(milliseconds: 1500),
+      backgroundColor: t.neutralFg,
+      contentTextStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 3,
+    ),
     extensions: const [ShiftTokens()],
   );
 }

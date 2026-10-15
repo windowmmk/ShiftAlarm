@@ -387,7 +387,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── 配置導出／導入 ──────────────────────────────
-  // 班次定義＋場所清單，Base64 口令碼格式（相容 JSON）。重裝／換機導入即可還原。
+  // 班次定義＋地點清單，Base64 口令碼格式（相容 JSON）。重裝／換機導入即可還原。
 
   /// 導出配置：生成 Base64 口令碼，彈窗展示並複製到剪貼簿。
   Future<void> _exportConfig() async {
@@ -427,7 +427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '包含 ${widget.store.defs.length} 個班次、${widget.store.venues.length} 個場所',
+              '包含 ${widget.store.defs.length} 個班次、${widget.store.venues.length} 個地點',
               style:
                   const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
@@ -542,7 +542,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 Text(
-                  '版本 3.3.5 (Build 21)',
+                  '版本 3.3.6 (Build 22)',
                   style: TextStyle(
                     fontSize: 12,
                     color: t.neutralFg2,
@@ -718,7 +718,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.key_outlined),
             title: const Text('導出配置口令'),
-            subtitle: const Text('班次＋場所，一鍵複製 SA2: 口令碼'),
+            subtitle: const Text('班次＋地點，一鍵複製 SA2: 口令碼'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _exportConfig,
           ),

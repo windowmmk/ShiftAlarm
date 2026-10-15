@@ -7,7 +7,7 @@ import '../../theme/app_theme.dart';
 
 /// 緊湊型自適應排班操作列（Shift Toolbar Dock）：
 /// 擺在日曆下方，高度僅約 100px，絕不擠壓日曆空間，保證日曆 5~6 行 100% 完整可見。
-/// - 頂部：日期標籤（可切換上一日／下一日）、場所快選膠囊、備註膠囊、完成關閉按鈕。
+/// - 頂部：日期標籤（可切換上一日／下一日）、地點快選膠囊、備註膠囊、完成關閉按鈕。
 /// - 底部：各班次按鈕橫排一字展示（點更即排，自動保存），附帶清除排班／放假按鈕。
 class ShiftPickerPanel extends StatefulWidget {
   final DateTime initialDate;
@@ -42,7 +42,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   String get _key => ShiftStore.ymd(_currentDate);
   String get _dateLabel =>
-      '${_currentDate.month}月${_currentDate.day}日（${'日一二三四五六'[_currentDate.weekday % 7]}）';
+      '${_currentDate.month}月${_currentDate.day}日(${'日一二三四五六'[_currentDate.weekday % 7]})';
 
   @override
   void initState() {
@@ -55,6 +55,9 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     _noteCtrl = TextEditingController();
     _remarkCtrl = TextEditingController();
     _loadDay();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+    });
   }
 
   void _loadDay() {
@@ -83,8 +86,9 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   bool _checkNoteOk() {
     if (abbrUnits(_noteCtrl.text.trim()) > 4) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('場所請唔超過 4 單位（2 中文字／4 英文字母）')),
+        const SnackBar(content: Text('地點請唔超過 4 單位（2 中文字／4 英文字母）')),
       );
       return false;
     }
@@ -124,6 +128,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 跳去指定日期（上一日／下一日／點擊日曆格）
   Future<void> goToDate(DateTime date) async {
     if (_saving) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _saving = true);
     try {
       await _persistCurrent();
@@ -144,6 +149,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 點更即排：立即指派該班次並持久化
   Future<void> _pick(String shiftId) async {
     if (_saving) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
     HapticFeedback.selectionClick();
     setState(() {
       _selectedId = shiftId;
@@ -160,6 +166,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 取消排更 / 放假
   Future<void> _unassign() async {
     if (_saving) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
     try {
@@ -197,8 +204,9 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     return matches;
   }
 
-  /// 彈出場地選擇與輸入對話框
+  /// 彈出地點選擇與輸入對話框
   Future<void> _openVenueDialog(BuildContext context) async {
+    ScaffoldMessenger.of(context).clearSnackBars();
     final t = context.tokens;
     final ctrl = TextEditingController(text: _noteCtrl.text);
     await showDialog<void>(
@@ -210,7 +218,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           final isNew = q.isNotEmpty &&
               !widget.store.venues.any((v) => v.toLowerCase() == q);
           return AlertDialog(
-            title: Text('設置 $_dateLabel 場所'),
+            title: Text('設置 $_dateLabel 地點'),
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
@@ -221,9 +229,12 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                     TextField(
                       controller: ctrl,
                       autofocus: true,
+                      inputFormatters: const [AbbrUnitLengthFormatter(4)],
+                      maxLength: 4,
                       decoration: InputDecoration(
-                        labelText: '場所（≤4 單位）',
-                        hintText: '如 A1、B2、ROOM_1',
+                        labelText: '地點（最多 4 單位）',
+                        hintText: '如 總部、A1（2全形/4半形）',
+                        counterText: '',
                         border: const OutlineInputBorder(),
                         suffixIcon: ctrl.text.isNotEmpty
                             ? IconButton(
@@ -235,12 +246,11 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                               )
                             : null,
                       ),
-                      maxLength: 12,
                       onChanged: (_) => setD(() {}),
                     ),
                     if (matches.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      const Text('快速選擇現有場所：',
+                      const Text('快速選擇現有地點：',
                           style: TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
@@ -267,7 +277,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
                         icon: const Icon(Icons.add, size: 14),
-                        label: Text('新增「${ctrl.text.trim()}」到場所清單'),
+                        label: Text('新增「${ctrl.text.trim()}」到地點清單'),
                         onPressed: () async {
                           await widget.store.addVenue(ctrl.text.trim());
                           setD(() {});
@@ -288,14 +298,15 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   Navigator.pop(ctx);
                   setState(() {});
                 },
-                child: const Text('清除場所'),
+                child: const Text('清除地點'),
               ),
               FilledButton(
                 onPressed: () {
                   if (abbrUnits(ctrl.text.trim()) > 4) {
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text('場所請唔超過 4 單位（2 中文字／4 英文字母）')),
+                          content: Text('地點請唔超過 4 單位（2 中文字／4 英文字母）')),
                     );
                     return;
                   }
@@ -316,6 +327,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   /// 彈出備註輸入對話框
   Future<void> _openRemarkDialog(BuildContext context) async {
+    ScaffoldMessenger.of(context).clearSnackBars();
     final ctrl = TextEditingController(text: _remarkCtrl.text);
     await showDialog<void>(
       context: context,
@@ -380,117 +392,115 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 第一行：日期切換、場所按鈕、備註按鈕、完成按鈕（大尺寸、好操作）
+            // 第一行：日期切換、地點按鈕、備註按鈕、完成按鈕（自適應緊湊排版，絕不擠爆）
             Row(
               children: [
-                // 左箭頭
+                // 左切日按鈕
                 InkWell(
                   onTap: _saving ? null : () => _goDay(-1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    width: 38,
-                    height: 38,
+                    width: 28,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: t.neutralBg2,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: t.neutralStroke),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.chevron_left, size: 22, color: t.neutralFg),
+                    child: Icon(Icons.chevron_left, size: 18, color: t.neutralFg),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Text(
                   _dateLabel,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.bold,
                     color: t.neutralFg,
                   ),
                 ),
-                const SizedBox(width: 6),
-                // 右箭頭
+                const SizedBox(width: 4),
+                // 右切日按鈕
                 InkWell(
                   onTap: _saving ? null : () => _goDay(1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    width: 38,
-                    height: 38,
+                    width: 28,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: t.neutralBg2,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: t.neutralStroke),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.chevron_right, size: 22, color: t.neutralFg),
+                    child: Icon(Icons.chevron_right, size: 18, color: t.neutralFg),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // 場所按鈕（同等重要，大尺寸按鈕）
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FilledButton.tonalIcon(
-                          onPressed: () => _openVenueDialog(context),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            minimumSize: const Size(0, 38),
-                            backgroundColor: note.isNotEmpty
-                                ? t.brand.withValues(alpha: 0.15)
-                                : t.neutralBg2,
-                            foregroundColor: note.isNotEmpty ? t.brand : t.neutralFg,
-                          ),
-                          icon: Icon(Icons.location_on,
-                              size: 16,
-                              color: note.isNotEmpty ? t.brand : t.neutralFg2),
-                          label: Text(
-                            note.isNotEmpty ? note : '場所',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: note.isNotEmpty
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        OutlinedButton.icon(
-                          onPressed: () => _openRemarkDialog(context),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            minimumSize: const Size(0, 38),
-                          ),
-                          icon: Icon(Icons.edit_note,
-                              size: 18,
-                              color: remark.isNotEmpty ? t.brand : t.neutralFg2),
-                          label: Text(
-                            remark.isNotEmpty ? '有備註' : '備註',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: remark.isNotEmpty
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: remark.isNotEmpty ? t.brand : t.neutralFg2,
-                            ),
-                          ),
-                        ),
-                      ],
+                const SizedBox(width: 6),
+                // 地點按鈕
+                Flexible(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _openVenueDialog(context),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: note.isNotEmpty
+                          ? t.brand.withValues(alpha: 0.15)
+                          : t.neutralBg2,
+                      foregroundColor: note.isNotEmpty ? t.brand : t.neutralFg,
+                    ),
+                    icon: Icon(Icons.location_on,
+                        size: 14,
+                        color: note.isNotEmpty ? t.brand : t.neutralFg2),
+                    label: Text(
+                      note.isNotEmpty ? note : '地點',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: note.isNotEmpty
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // 完成退出按鈕（實心大按鈕，清晰好按）
+                const SizedBox(width: 4),
+                // 備註按鈕
+                OutlinedButton.icon(
+                  onPressed: () => _openRemarkDialog(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: Icon(Icons.notes_rounded,
+                      size: 15,
+                      color: remark.isNotEmpty ? t.brand : t.neutralFg2),
+                  label: Text(
+                    remark.isNotEmpty ? '備註✓' : '備註',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: remark.isNotEmpty
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: remark.isNotEmpty ? t.brand : t.neutralFg2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // 完成退出按鈕
                 FilledButton(
                   onPressed: widget.onClose,
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    minimumSize: const Size(0, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text('完成',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

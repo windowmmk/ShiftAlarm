@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
@@ -13,17 +14,38 @@ int abbrUnits(String s) {
   return units;
 }
 
-/// 按單位截到 ≤4（即 2 全形／4 半形）
-String truncateAbbr(String s) {
+/// 按單位截到 ≤ maxUnits（預設 ≤4，即 2 全形／4 半形）
+String truncateAbbr(String s, [int maxUnits = 4]) {
   var units = 0;
   final buf = StringBuffer();
   for (final rune in s.runes) {
     final u = rune > 0xFF ? 2 : 1;
-    if (units + u > 4) break;
+    if (units + u > maxUnits) break;
     units += u;
     buf.writeCharCode(rune);
   }
   return buf.toString();
+}
+
+/// 輸入過濾器：限制輸入內容不超過指定單位（全形＝2，半形＝1，預設 ≤4）
+class AbbrUnitLengthFormatter extends TextInputFormatter {
+  final int maxUnits;
+  const AbbrUnitLengthFormatter([this.maxUnits = 4]);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (abbrUnits(newValue.text) <= maxUnits) {
+      return newValue;
+    }
+    final truncated = truncateAbbr(newValue.text, maxUnits);
+    return TextEditingValue(
+      text: truncated,
+      selection: TextSelection.collapsed(offset: truncated.length),
+    );
+  }
 }
 
 /// 單個鬧鐘設定（一個班次可有多個）。
@@ -563,9 +585,9 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 場所清單管理：新增（去重）、刪除、改名
+  /// 地點清單管理：新增（去重、≤4 單位）、刪除、改名
   Future<void> addVenue(String v) async {
-    v = v.trim();
+    v = truncateAbbr(v.trim(), 4);
     if (v.isEmpty || venues.contains(v)) return;
     venues = [...venues, v];
     await prefs.setStringList(_kVenues, venues);
@@ -580,7 +602,7 @@ class ShiftStore extends ChangeNotifier {
   }
 
   Future<void> renameVenue(String oldV, String newV) async {
-    newV = newV.trim();
+    newV = truncateAbbr(newV.trim(), 4);
     final i = venues.indexOf(oldV);
     if (i < 0 || newV.isEmpty || venues.contains(newV)) return;
     venues = [...venues]..[i] = newV;
@@ -597,9 +619,13 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 配置導入用：整批替換場所清單。
+  /// 配置導入用：整批替換地點清單（自動規範至 ≤4 單位）。
   Future<void> replaceAllVenues(List<String> newVenues) async {
-    venues = List<String>.from(newVenues);
+    venues = newVenues
+        .map((v) => truncateAbbr(v.trim(), 4))
+        .where((v) => v.isNotEmpty)
+        .toSet()
+        .toList();
     await prefs.setStringList(_kVenues, venues);
     notifyListeners();
   }
