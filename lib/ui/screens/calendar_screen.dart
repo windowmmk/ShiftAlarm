@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/alarm_service.dart';
+import '../../domain/config_io.dart';
 import '../../domain/holidays.dart';
+import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import 'shift_picker_panel.dart';
@@ -96,6 +98,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _checkAlarmPermission();
       _checkFullScreenIntent();
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUrlHashImport();
+    });
   }
 
   @override
@@ -420,14 +426,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  /// 一個月的 5 或 6 週自適應網格（根據當月實際跨週數動態決定 5 行或 6 行）
+  /// 一個月固定 6 週（42 格）標準網格：保證每個月單元格高度完全對齊，翻月絕不抖動
   Widget _monthGrid(ShiftTokens t, int year, int month) {
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
     final firstSunday = DateTime(year, month, 1 - firstWeekday);
-    final daysInMonth = DateUtils.getDaysInMonth(year, month);
-    final totalCellsNeeded = firstWeekday + daysInMonth;
-    final weekCount = (totalCellsNeeded / 7).ceil(); // 動態 5 行或 6 行
+    const weekCount = 6; // 永遠固定 6 行（42 格），消除跨月高度撕裂與抖動
     final today = DateTime.now();
 
     return Column(
@@ -830,5 +834,218 @@ class _CalendarScreenState extends State<CalendarScreen> {
             .toList(),
       ),
     );
+  }
+
+  bool _urlHashHandled = false;
+
+  /// 自動檢查網址 Hash（支援 #c=SA2:... 配置導入 或 #r=SR2:... 排班導入）
+  void _checkUrlHashImport() {
+    if (_urlHashHandled) return;
+    final fragment = Uri.base.fragment;
+    if (fragment.isEmpty) return;
+    _urlHashHandled = true;
+
+    String? configCode;
+    String? rosterCode;
+
+    if (fragment.startsWith('c=')) {
+      configCode = Uri.decodeComponent(fragment.substring(2));
+    } else if (fragment.startsWith('r=')) {
+      rosterCode = Uri.decodeComponent(fragment.substring(2));
+    } else if (isConfigPacket(fragment)) {
+      configCode = Uri.decodeComponent(fragment);
+    } else if (isRosterPacket(fragment)) {
+      rosterCode = Uri.decodeComponent(fragment);
+    }
+
+    if (configCode != null && mounted) {
+      _promptImportConfigFromUrl(configCode);
+    } else if (rosterCode != null && mounted) {
+      _promptImportRosterFromUrl(rosterCode);
+    }
+  }
+
+  Future<void> _promptImportConfigFromUrl(String code) async {
+    try {
+      final p = previewConfig(code);
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.link, color: Color(0xFF2E7D32)),
+              SizedBox(width: 8),
+              Text('網址配置導入'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('檢測到網址分享的班次與場所配置：'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F8E9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFA5D6A7)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• 班次數量：${p.shifts} 個 (${p.names.join('、')})',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text('• 常用場所：${p.venues} 個',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (p.crcVerified) ...[
+                      const SizedBox(height: 4),
+                      const Text('• 報文校驗：CRC32 驗證通過 ✓',
+                          style: TextStyle(
+                              color: Color(0xFF2E7D32), fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '注意：導入後將覆蓋現有班次與場所設定。是否立即導入？',
+                style: TextStyle(fontSize: 12, color: Colors.red),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('確定導入'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && mounted) {
+        await importConfigText(widget.store, code);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('配置已成功導入！')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('網址配置解析失敗: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _promptImportRosterFromUrl(String code) async {
+    try {
+      final decoded = decodeRosterText(code, widget.store.defs);
+      if (decoded.importResult.valid.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(decoded.importResult.errors.isNotEmpty
+                  ? decoded.importResult.errors.first
+                  : '排班數據無效'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final count = decoded.importResult.valid.length;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.link, color: Color(0xFF1565C0)),
+              SizedBox(width: 8),
+              Text('網址排班導入'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('檢測到網址分享的排班表（共 $count 天排班）：'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF90CAF9)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• 待導入排班天數：$count 天',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (decoded.crcVerified) ...[
+                      const SizedBox(height: 4),
+                      const Text('• 報文校驗：CRC32 驗證通過 ✓',
+                          style: TextStyle(
+                              color: Color(0xFF1565C0), fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('是否將此排班表套用至日曆？', style: TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('套用排班'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && mounted) {
+        await widget.store.assignBatch([
+          for (final r in decoded.importResult.valid)
+            (ymd: r.date, shiftId: r.shiftId, note: r.venue, remark: r.remark)
+        ]);
+        if (isNativeAlarmSupported) {
+          for (final r in decoded.importResult.valid) {
+            final def = widget.store.defs[r.shiftId];
+            if (def == null) continue;
+            try {
+              await widget.alarms.onAssigned(
+                r.date,
+                def,
+                note: r.venue,
+              );
+            } catch (_) {}
+          }
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('成功導入 $count 天排班！')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('網址排班解析失敗: $e')),
+        );
+      }
+    }
   }
 }

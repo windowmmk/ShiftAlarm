@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../domain/alarm_service.dart';
 import '../../domain/config_io.dart';
@@ -105,6 +106,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
       const ShiftTokens().slotForTime(def.startTime).bg.toARGB32();
   static int _accentFg(ShiftDef def) =>
       const ShiftTokens().slotForTime(def.startTime).fg.toARGB32();
+
+  Future<void> _showQrDialog({
+    required BuildContext parentContext,
+    required String title,
+    required String code,
+    required String shareUrl,
+  }) async {
+    var isUrlMode = true;
+
+    await showDialog<void>(
+      context: parentContext,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final currentData = isUrlMode ? shareUrl : code;
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.qr_code_2, color: Color(0xFF2E7D32)),
+                const SizedBox(width: 8),
+                Text(title),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: true,
+                          label: Text('網址連結'),
+                          icon: Icon(Icons.link, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text('純口令碼'),
+                          icon: Icon(Icons.key, size: 16),
+                        ),
+                      ],
+                      selected: {isUrlMode},
+                      onSelectionChanged: (s) =>
+                          setD(() => isUrlMode = s.first),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: QrImageView(
+                        data: currentData,
+                        version: QrVersions.auto,
+                        size: 200.0,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isUrlMode
+                          ? '相機、微信或瀏覽器掃描後，打開網址可 1 秒一鍵套用'
+                          : '僅供 ShiftAlarm App 內辨識讀取之極簡 Base58 口令',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: parentContext.tokens.neutralFg2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('關閉'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: shareUrl));
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(content: Text('已複製分享網址連結！')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.link, size: 16),
+                label: const Text('複製網址連結'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _exportRoster() async {
     final now = DateTime.now();
@@ -225,6 +324,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('關閉'),
               ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final url =
+                      'https://windowmmk.github.io/ShiftAlarm/#r=$code';
+                  _showQrDialog(
+                    parentContext: context,
+                    title: '排班分享二維碼',
+                    code: code,
+                    shareUrl: url,
+                  );
+                },
+                icon: const Icon(Icons.qr_code, size: 16),
+                label: const Text('二維碼 / 連結'),
+              ),
               FilledButton.icon(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: code));
@@ -235,7 +348,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
                 icon: const Icon(Icons.copy, size: 16),
-                label: const Text('再複製一次'),
+                label: const Text('複製口令'),
               ),
             ],
           );
@@ -304,7 +417,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   Text(
-                    '支援貼上 Base58 排班口令碼，或每行「YYYY-MM-DD,代號,場所」CSV。',
+                    '支援貼上 SR2: 極簡排班口令，或每行「YYYY-MM-DD,代號,場所」純 CSV 文字。',
                     style: TextStyle(
                         fontSize: 12, color: context.tokens.neutralFg2),
                   ),
@@ -350,7 +463,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     minLines: 3,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '貼上 SHIFTROSTER:v1:... 或 CSV…',
+                      hintText: '貼上 SR2: 極簡排班口令或純 CSV 文字…',
                     ),
                     style: const TextStyle(
                         fontSize: 12, fontFamily: 'monospace'),
@@ -571,6 +684,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: const Text('關閉'),
           ),
+          OutlinedButton.icon(
+            onPressed: () {
+              final url =
+                  'https://windowmmk.github.io/ShiftAlarm/#c=$code';
+              _showQrDialog(
+                parentContext: context,
+                title: '配置分享二維碼',
+                code: code,
+                shareUrl: url,
+              );
+            },
+            icon: const Icon(Icons.qr_code, size: 16),
+            label: const Text('二維碼 / 連結'),
+          ),
           FilledButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: code));
@@ -585,7 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
             icon: const Icon(Icons.copy, size: 16),
-            label: const Text('再複製一次'),
+            label: const Text('複製口令'),
           ),
         ],
       ),
@@ -654,7 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   Text(
-                    '貼上之前導出的配置口令（亦相容 JSON 格式）。\n注意：會清空現有班次和場所！',
+                    '貼上 SA2: 極簡配置口令。\n注意：會清空現有班次和場所！',
                     style: TextStyle(
                         fontSize: 12, color: context.tokens.neutralFg2),
                   ),
@@ -707,7 +834,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     minLines: 3,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '貼上配置口令（SHIFTALARM:v1:…）…',
+                      hintText: '貼上配置口令（SA2:…）…',
                     ),
                     style: const TextStyle(
                         fontSize: 11, fontFamily: 'monospace'),
@@ -853,7 +980,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
-            const Text('版本 3.2.1', style: TextStyle(fontSize: 12)),
+            const Text('版本 3.3.1', style: TextStyle(fontSize: 12)),
             const SizedBox(height: 4),
             const SelectableText(
               'https://github.com/windowmmk/ShiftAlarm',
@@ -923,7 +1050,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.calendar_month_outlined),
             title: const Text('導出排班口令'),
-            subtitle: const Text('當月或全部排班，一鍵複製 Base58 口令'),
+            subtitle: const Text('當月或全部排班，一鍵複製 SR2: 極簡口令'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _exportRoster,
           ),
@@ -931,7 +1058,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.upload_outlined),
             title: const Text('導入排班（口令 / CSV）'),
-            subtitle: const Text('支援 Base58 口令碼或 CSV 文字'),
+            subtitle: const Text('支援 SR2: 口令碼或純 CSV 文字'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _openImport,
           ),
@@ -940,7 +1067,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.key_outlined),
             title: const Text('導出配置口令'),
-            subtitle: const Text('班次＋場所，一鍵複製口令碼'),
+            subtitle: const Text('班次＋場所，一鍵複製 SA2: 口令碼'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _exportConfig,
           ),
@@ -948,7 +1075,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.file_upload_outlined),
             title: const Text('導入配置口令'),
-            subtitle: const Text('貼上口令碼一秒還原'),
+            subtitle: const Text('貼上 SA2: 口令碼一秒還原'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _openConfigImport,
           ),

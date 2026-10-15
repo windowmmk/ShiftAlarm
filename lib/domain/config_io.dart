@@ -1,8 +1,7 @@
 /// 配置導入導出：班次定義＋場所清單。
-/// 採用標準工業級協議報文結構：
-/// - 外部協議報文頭：魔數（SHIFTALARM）:版本（v1）:CRC32校驗碼:報文長度:時間戳:Payload
-/// - 內部數據報文頭：魔數、版本、班次數、場所數、生成時間
-/// 支援多層容錯（自動清除換行、自動補齊Padding、相容舊版與 iOS 彎引號修正）。
+/// 支援最新極簡 SA2 Base58 報文協議：
+/// - 外部協議報文頭：SA2:<Base58>（CRC32 與時間戳內嵌二進制，長度僅 90-115 字元）
+/// - 支援多層容錯（自動清除換行、空格）。
 library;
 
 import 'dart:convert';
@@ -13,16 +12,12 @@ import 'shift_store.dart';
 
 /// 報文頭協議標識與快速檢查（用於剪貼簿自動比對與監聽）
 class ConfigPacketHeader {
-  static const String protocol = 'SHIFTALARM';
-  static const String version = 'v2';
-  static const String prefix = '$protocol:$version:';
+  static const String prefix = 'SA2:';
 
   /// 快速檢查文字是否符合配置報文頭（用於剪貼簿快速監聽與比對，零成本避免誤報）
   static bool matches(String text) {
     final clean = text.trim().replaceAll(RegExp(r'\s+'), '');
-    return clean.startsWith('SHIFTALARM:v2:') ||
-        clean.startsWith('SHIFTALARM:v1:') ||
-        clean.startsWith('$protocol:');
+    return clean.startsWith('SA2:');
   }
 }
 
@@ -291,16 +286,26 @@ Map<String, dynamic> decodeCompactConfig(Uint8List bytes) {
   };
 }
 
-/// 導出為帶有完整協議報文頭（魔數、版本、CRC32、長度、時間戳）的極速 Base58 緊湊預編碼口令碼：
-/// 採用二進制預編碼打包（v2），完全去除 JSON 重複鍵名，長度由 2000+ 字元壓縮至 120-180 字元！
-/// 格式：`SHIFTALARM:v2:crc=<CRC32>:len=<長度>:ts=<時間戳>:<Base58>`
+/// 導出為帶有極簡協議報文頭（SA2:<Base58>）的極速 Base58 緊湊預編碼口令碼：
+/// 報文頭內化打包：CRC32（4 字節）與時間戳（4 字節）直接嵌入二進制數據體中，
+/// 外部前綴僅 4 字元（SA2:），長度直接壓至 90~115 字元以內！
 String exportConfigCode(ShiftStore store) {
-  final bytes = encodeCompactConfig(store);
-  final crcHex = computeCrc32(bytes).toRadixString(16).padLeft(8, '0');
-  final byteLen = bytes.length;
+  final dataBytes = encodeCompactConfig(store);
+  final crc = computeCrc32(dataBytes);
   final nowTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final b58 = base58Encode(bytes);
-  return 'SHIFTALARM:v2:crc=$crcHex:len=$byteLen:ts=$nowTs:$b58';
+
+  final bb = BytesBuilder();
+  final crcBd = ByteData(4)..setUint32(0, crc, Endian.big);
+  bb.add(crcBd.buffer.asUint8List());
+
+  final tsBd = ByteData(4)..setUint32(0, nowTs, Endian.big);
+  bb.add(tsBd.buffer.asUint8List());
+
+  bb.add(dataBytes);
+
+  final packetBytes = bb.toBytes();
+  final b58 = base58Encode(packetBytes);
+  return 'SA2:$b58';
 }
 
 /// 導出為 JSON 字符串（pretty print，方便人讀）。
@@ -326,7 +331,7 @@ class DecodedConfigPayload {
   });
 }
 
-/// 解碼配置字串：支援 v2 緊湊二進制 Base58 預編碼、v1 冗長 JSON 協議、舊版口令與純 JSON
+/// 解碼配置字串：僅支援最新極簡 SA2 協議（Base58 緊湊二進制預編碼）
 DecodedConfigPayload decodeConfigText(String text) {
   final rawTrimmed = text.trim();
   if (rawTrimmed.isEmpty) {
@@ -336,228 +341,47 @@ DecodedConfigPayload decodeConfigText(String text) {
   // 1. 去除所有內部空白與換行符號（針對通訊軟體或備忘錄折行貼上的容錯）
   final cleanText = rawTrimmed.replaceAll(RegExp(r'\s+'), '');
 
-  // 2. 判斷帶報文頭的標準協議：SHIFTALARM:v2:...（最新緊湊預編碼）
-  if (cleanText.startsWith('SHIFTALARM:v2:')) {
-    final parts = cleanText.split(':');
-    if (parts.length >= 4) {
-      String? expectedCrc;
-      int? expectedLen;
-      DateTime? exportTime;
-      String payload = '';
-
-      for (int i = 2; i < parts.length - 1; i++) {
-        final p = parts[i];
-        if (p.startsWith('crc=')) {
-          expectedCrc = p.substring(4).toLowerCase();
-        } else if (p.startsWith('len=')) {
-          expectedLen = int.tryParse(p.substring(4));
-        } else if (p.startsWith('ts=')) {
-          final sec = int.tryParse(p.substring(3));
-          if (sec != null) {
-            exportTime = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
-          }
-        }
-      }
-      payload = parts.last;
-
-      List<int>? bytes;
-      try {
-        bytes = base58Decode(payload);
-      } catch (_) {}
-
-      if (bytes == null || bytes.isEmpty) {
-        throw const ConfigImportException('緊湊報文頭校驗失敗：口令數據損壞');
-      }
-
-      if (expectedLen != null && bytes.length != expectedLen) {
-        throw ConfigImportException(
-            '報文長度校驗失敗（預期 $expectedLen 字節，實測 ${bytes.length} 字節），內容被截斷');
-      }
-
-      var crcOk = false;
-      if (expectedCrc != null) {
-        final actualCrc = computeCrc32(bytes).toRadixString(16).padLeft(8, '0');
-        if (actualCrc != expectedCrc) {
-          throw const ConfigImportException('報文校驗碼不符（內容不完整或被截斷），請重新複製完整口令');
-        }
-        crcOk = true;
-      }
-
-      try {
-        final decoded = decodeCompactConfig(Uint8List.fromList(bytes));
-        _validateConfigStructure(decoded);
-        return DecodedConfigPayload(
-          data: decoded,
-          crcHex: expectedCrc,
-          byteLen: bytes.length,
-          exportTime: exportTime,
-          crcVerified: crcOk,
-        );
-      } catch (e) {
-        if (e is ConfigImportException) rethrow;
-        throw const ConfigImportException('緊湊報文數據內容損壞，無法解析');
-      }
-    }
+  // 2. 嚴格支援極簡 SA2 協議：SA2:<Base58>
+  if (!cleanText.startsWith('SA2:')) {
+    throw const ConfigImportException('口令無效（請使用 SA2: 極簡配置口令）');
   }
 
-  // 3. 判斷帶報文頭的標準協議：SHIFTALARM:v1:...（舊版 JSON Base58/Base64）
-  if (cleanText.startsWith('SHIFTALARM:v1:')) {
-    final parts = cleanText.split(':');
-    if (parts.length >= 4) {
-      String? expectedCrc;
-      int? expectedLen;
-      DateTime? exportTime;
-      String payload = '';
-
-      if (parts[2].startsWith('crc=')) {
-        for (int i = 2; i < parts.length - 1; i++) {
-          final p = parts[i];
-          if (p.startsWith('crc=')) {
-            expectedCrc = p.substring(4).toLowerCase();
-          } else if (p.startsWith('len=')) {
-            expectedLen = int.tryParse(p.substring(4));
-          } else if (p.startsWith('ts=')) {
-            final sec = int.tryParse(p.substring(3));
-            if (sec != null) {
-              exportTime = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
-            }
-          }
-        }
-        payload = parts.last;
-      } else {
-        expectedCrc = parts[2].toLowerCase();
-        payload = parts.sublist(3).join(':');
-      }
-
-      List<int>? bytes;
-      try {
-        bytes = base58Decode(payload);
-      } catch (_) {}
-
-      if (bytes == null || bytes.isEmpty) {
-        try {
-          var b64Payload = payload.replaceAll('-', '+').replaceAll('_', '/');
-          while (b64Payload.length % 4 != 0) {
-            b64Payload += '=';
-          }
-          bytes = base64Decode(b64Payload);
-        } catch (_) {}
-      }
-
-      if (bytes == null || bytes.isEmpty) {
-        throw const ConfigImportException('報文頭校驗失敗：口令數據損壞');
-      }
-
-      if (expectedLen != null && bytes.length != expectedLen) {
-        throw ConfigImportException(
-            '報文長度校驗失敗（預期 $expectedLen 字節，實測 ${bytes.length} 字節），內容被截斷');
-      }
-
-      var crcOk = false;
-      if (expectedCrc != null) {
-        final actualCrc = computeCrc32(bytes).toRadixString(16).padLeft(8, '0');
-        if (actualCrc != expectedCrc) {
-          throw const ConfigImportException('報文校驗碼不符（內容不完整或被截斷），請重新複製完整口令');
-        }
-        crcOk = true;
-      }
-
-      try {
-        final jsonStr = utf8.decode(bytes);
-        final decoded = jsonDecode(jsonStr);
-        if (decoded is Map<String, dynamic>) {
-          _validateConfigStructure(decoded);
-          return DecodedConfigPayload(
-            data: decoded,
-            crcHex: expectedCrc,
-            byteLen: bytes.length,
-            exportTime: exportTime,
-            crcVerified: crcOk,
-          );
-        }
-      } catch (e) {
-        if (e is ConfigImportException) rethrow;
-        throw const ConfigImportException('報文數據內容損壞，無法解析');
-      }
-    }
-  }
-
-  // 3. 判斷無完整報文頭的舊版前綴：SHIFTALARM:<payload>
-  if (cleanText.startsWith('SHIFTALARM:')) {
-    final payload = cleanText.substring('SHIFTALARM:'.length);
-    List<int>? bytes;
-    try {
-      bytes = base58Decode(payload);
-    } catch (_) {}
-    if (bytes == null || bytes.isEmpty) {
-      try {
-        var b64Payload = payload.replaceAll('-', '+').replaceAll('_', '/');
-        while (b64Payload.length % 4 != 0) {
-          b64Payload += '=';
-        }
-        bytes = base64Decode(b64Payload);
-      } catch (_) {}
-    }
-    if (bytes != null && bytes.isNotEmpty) {
-      try {
-        final jsonStr = utf8.decode(bytes);
-        final decoded = jsonDecode(jsonStr);
-        if (decoded is Map<String, dynamic>) {
-          _validateConfigStructure(decoded);
-          return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
-        }
-      } catch (e) {
-        if (e is ConfigImportException) rethrow;
-        throw const ConfigImportException('配置口令無效或已損壞');
-      }
-    }
-  }
-
-  // 4. 純 Base58 / Base64 字串判斷（無前綴）
-  if (!cleanText.startsWith('{') && !cleanText.startsWith('[')) {
-    List<int>? bytes;
-    try {
-      bytes = base58Decode(cleanText);
-    } catch (_) {}
-    if (bytes == null || bytes.isEmpty) {
-      try {
-        var b64Payload = cleanText.replaceAll('-', '+').replaceAll('_', '/');
-        while (b64Payload.length % 4 != 0) {
-          b64Payload += '=';
-        }
-        bytes = base64Decode(b64Payload);
-      } catch (_) {}
-    }
-    if (bytes != null && bytes.isNotEmpty) {
-      try {
-        final jsonStr = utf8.decode(bytes);
-        final decoded = jsonDecode(jsonStr);
-        if (decoded is Map<String, dynamic>) {
-          _validateConfigStructure(decoded);
-          return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
-        }
-      } catch (e) {
-        if (e is ConfigImportException) rethrow;
-      }
-    }
-  }
-
-  // 5. 備用回退：相容舊版純 JSON，並自動修正 iOS 智慧彎引號（“ ” ‘ ’）
+  final payload = cleanText.substring(4);
+  List<int>? bytes;
   try {
-    final sanitized = rawTrimmed
-        .replaceAll('“', '"')
-        .replaceAll('”', '"')
-        .replaceAll('‘', "'")
-        .replaceAll('’', "'");
-    final decoded = jsonDecode(sanitized);
-    if (decoded is Map<String, dynamic>) {
-      _validateConfigStructure(decoded);
-      return DecodedConfigPayload(data: decoded);
-    }
-    throw const ConfigImportException('配置格式唔啱');
+    bytes = base58Decode(payload);
+  } catch (_) {}
+
+  if (bytes == null || bytes.length < 10) {
+    throw const ConfigImportException('極簡報文數據損壞或長度不足');
+  }
+
+  final u8 = Uint8List.fromList(bytes);
+  final expectedCrc =
+      ByteData.sublistView(u8, 0, 4).getUint32(0, Endian.big);
+  final tsSec =
+      ByteData.sublistView(u8, 4, 8).getUint32(0, Endian.big);
+  final exportTime = DateTime.fromMillisecondsSinceEpoch(tsSec * 1000);
+  final dataBytes = Uint8List.sublistView(u8, 8);
+
+  final actualCrc = computeCrc32(dataBytes);
+  if (actualCrc != expectedCrc) {
+    throw const ConfigImportException('報文校驗碼不符（內容不完整或被截斷），請重新複製完整口令');
+  }
+
+  try {
+    final decoded = decodeCompactConfig(dataBytes);
+    _validateConfigStructure(decoded);
+    return DecodedConfigPayload(
+      data: decoded,
+      crcHex: expectedCrc.toRadixString(16).padLeft(8, '0'),
+      byteLen: bytes.length,
+      exportTime: exportTime,
+      crcVerified: true,
+    );
   } catch (e) {
     if (e is ConfigImportException) rethrow;
-    throw const ConfigImportException('口令或 JSON 格式無效');
+    throw const ConfigImportException('極簡報文數據內容損壞，無法解析');
   }
 }
 

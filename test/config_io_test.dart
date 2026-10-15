@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shiftalarm/domain/base58.dart';
 import 'package:shiftalarm/domain/config_io.dart';
 import 'package:shiftalarm/domain/shift_store.dart';
 
@@ -21,20 +22,17 @@ Future<ShiftStore> _storeWithPreset() async {
 
 void main() {
   group('export/import round-trip', () {
-    test('導出→清空→導入，還原班次和場所', () async {
+    test('Map 結構導出與導入還原', () async {
       final store = await _storeWithPreset();
       expect(store.defs.length, 4);
       expect(store.venues.length, 8);
 
-      // 導出
+      // 導出 Map
       final json = exportConfig(store);
       expect(json['app'], 'ShiftAlarm');
       expect(json['version'], 1);
       expect((json['shifts'] as List).length, 4);
       expect((json['venues'] as List).length, 8);
-
-      final jsonStr = exportConfigJson(store);
-      expect(jsonStr.contains('凌晨更'), isTrue);
 
       // 清空
       await store.replaceAllDefs({});
@@ -42,8 +40,8 @@ void main() {
       expect(store.defs, isEmpty);
       expect(store.venues, isEmpty);
 
-      // 導入
-      await importConfigJson(store, jsonStr);
+      // 導入 Map
+      await importConfig(store, json);
       expect(store.defs.length, 4);
       expect(store.venues.length, 8);
       expect(store.defs['s00']!.name, '凌晨更');
@@ -59,8 +57,8 @@ void main() {
 
     test('preview 解析出數量和名稱', () async {
       final store = await _storeWithPreset();
-      final jsonStr = exportConfigJson(store);
-      final p = previewConfig(jsonStr);
+      final code = exportConfigCode(store);
+      final p = previewConfig(code);
       expect(p.shifts, 4);
       expect(p.venues, 8);
       expect(p.names, contains('凌晨更'));
@@ -74,12 +72,12 @@ void main() {
       await store.load();
       await store.replaceAllDefs(ShiftStore.samplePresetDefs());
       await store.replaceAllVenues(ShiftStore.samplePresetVenues());
-      final jsonStr = exportConfigJson(store);
+      final code = exportConfigCode(store);
 
       // 新 store（同一個 prefs）導入
       final store2 = ShiftStore(prefs);
       await store2.load();
-      await importConfigJson(store2, jsonStr);
+      await importConfigText(store2, code);
       expect(store2.defs.length, 4);
 
       // 再開一個 store 讀返（驗持久化）
@@ -89,19 +87,17 @@ void main() {
       expect(store3.venues.length, 8);
     });
 
-    test('帶協議報文頭的 v2 緊湊二進制 Base58 口令碼導出、長度壓減、校驗與導入還原', () async {
+    test('帶協議報文頭的 SA2: 極簡二進制 Base58 口令碼導出、長度壓減、校驗與導入還原', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
 
       // 1. 報文頭格式與剪貼簿快速偵測檢查
       expect(isConfigPacket(code), isTrue);
-      expect(code.startsWith('SHIFTALARM:v2:crc='), isTrue);
-      expect(code.contains(':len='), isTrue);
-      expect(code.contains(':ts='), isTrue);
-      final payload = code.split(':').last;
+      expect(code.startsWith('SA2:'), isTrue);
+      final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
 
-      // 2. 長度壓減檢驗：由原本 2000+ 字元壓縮至 200 字元以內！
+      // 2. 極簡長度壓減檢驗：由原本 2000+ 字元壓縮至 200 字元以內！
       expect(code.length, lessThan(200));
 
       // 3. 報文頭預覽與 CRC32 校驗
@@ -129,80 +125,77 @@ void main() {
       expect(store.defs['s00']!.name, '凌晨更');
     });
 
-    test('舊版 Base64 口令向下相容測試', () async {
-      final store = await _storeWithPreset();
-      // 舊版格式 SHIFTALARM:<b64>
-      const legacyToken = 'SHIFTALARM:eyJhcHAiOiJTaGlmdEFsYXJtIiwidmVyc2lvbiI6MSwic2hpZnRzIjpbeyJpZCI6InMwMCIsIm5hbWUiOiLph4zmmajmm7QiLCJzdGFydFRpbWUiOiIwMDowMCIsImVuZFRpbWUiOiIwNjowMCIsImFsYXJtcyI6W119XSwidmVudWVzIjpbIkExIl19';
-      expect(isConfigPacket(legacyToken), isTrue);
-      final p = previewConfig(legacyToken);
-      expect(p.shifts, 1);
-      expect(p.venues, 1);
-      expect(p.names, contains('凌晨更'));
-    });
-
     test('報文頭校驗碼防篡改與防截斷驗證', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
 
-      // 篡改 CRC 校驗碼
-      final tamperedCrc = code.replaceFirst('crc=', 'crc=ffffffff_');
-      expect(() => previewConfig(tamperedCrc),
+      // 篡改 Base58 數據內容（模擬資料損壞或惡意竄改）
+      final payload = code.substring(4);
+      final tamperedPayload =
+          (payload.startsWith('1') ? '2' : '1') + payload.substring(1);
+      final tamperedCode = 'SA2:$tamperedPayload';
+      expect(() => previewConfig(tamperedCode),
           throwsA(isA<ConfigImportException>()));
 
-      // 截斷 Base64 數據（模擬複製不全）
+      // 截斷 Base58 數據（模擬複製不全）
       final truncated = code.substring(0, code.length - 15);
       expect(() => previewConfig(truncated),
           throwsA(isA<ConfigImportException>()));
     });
 
-    test('iOS 智慧標點（中文引號）自動容錯修正', () async {
+    test('網址 Hash 參數提取與還原', () async {
       final store = await _storeWithPreset();
-      final jsonStr = exportConfigJson(store);
-      // 模擬 iOS 鍵盤自動替換雙引號為中文字型彎引號
-      final smartQuoted = jsonStr.replaceAll('"', '“');
-      final p = previewConfig(smartQuoted);
+      final code = exportConfigCode(store);
+      final shareUrl = 'https://windowmmk.github.io/ShiftAlarm/#c=$code';
+      final uri = Uri.parse(shareUrl);
+      final fragment = uri.fragment;
+      expect(fragment.startsWith('c='), isTrue);
+      final extracted = Uri.decodeComponent(fragment.substring(2));
+      expect(extracted, equals(code));
+      final p = previewConfig(extracted);
       expect(p.shifts, 4);
       expect(p.venues, 8);
     });
   });
 
-  group('爛數據', () {
+  group('爛數據與非 SA2 格式拒絕', () {
     test('空字符串拋錯', () async {
       final store = await _freshStore();
-      expect(() => importConfigJson(store, ''),
+      expect(() => importConfigText(store, ''),
           throwsA(isA<ConfigImportException>()));
-      expect(() => importConfigJson(store, '   '),
+      expect(() => importConfigText(store, '   '),
           throwsA(isA<ConfigImportException>()));
     });
 
-    test('唔係 JSON 拋錯', () async {
+    test('非 SA2 前綴字串拋錯', () async {
       final store = await _freshStore();
-      expect(() => importConfigJson(store, 'not json{{'),
+      expect(() => importConfigText(store, 'not json{{'),
+          throwsA(isA<ConfigImportException>()));
+      expect(() => importConfigText(store, '{"app":"ShiftAlarm"}'),
+          throwsA(isA<ConfigImportException>()));
+      expect(() => importConfigText(store, 'SHIFTALARM:old_token'),
           throwsA(isA<ConfigImportException>()));
     });
 
-    test('錯 app 標記拋錯', () async {
-      final store = await _freshStore();
-      expect(
-          () => importConfigJson(
-              store, '{"app":"Other","version":1,"shifts":[],"venues":[]}'),
-          throwsA(isA<ConfigImportException>()));
-    });
-
-    test('冇有效班次拋錯', () async {
+    test('Map 導入：錯 app 標記拋錯', () async {
       final store = await _freshStore();
       expect(
-          () => importConfigJson(store,
-              '{"app":"ShiftAlarm","version":1,"shifts":[],"venues":[]}'),
+          () => importConfig(
+              store, {'app': 'Other', 'version': 1, 'shifts': [], 'venues': []}),
           throwsA(isA<ConfigImportException>()));
     });
 
-    test('preview 爛 JSON 拋錯', () {
+    test('Map 導入：冇有效班次拋錯', () async {
+      final store = await _freshStore();
+      expect(
+          () => importConfig(store,
+              {'app': 'ShiftAlarm', 'version': 1, 'shifts': [], 'venues': []}),
+          throwsA(isA<ConfigImportException>()));
+    });
+
+    test('preview 非 SA2 口令拋錯', () {
       expect(
           () => previewConfig('{{{'), throwsA(isA<ConfigImportException>()));
-    });
-
-    test('preview 缺字段拋錯', () {
       expect(() => previewConfig('{"app":"ShiftAlarm"}'),
           throwsA(isA<ConfigImportException>()));
     });
