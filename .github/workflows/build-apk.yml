@@ -32,23 +32,29 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Run Tests
+        run: flutter test
+
       - name: Build Release APK
         run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Prepare APK Asset
-        run: cp build/app/outputs/flutter-apk/app-release.apk ShiftAlarm-v3.1.0.apk
+        run: |
+          TAG_OR_NAME="${{ github.ref_name }}"
+          [ -z "$TAG_OR_NAME" ] && TAG_OR_NAME="latest"
+          cp build/app/outputs/flutter-apk/app-release.apk "ShiftAlarm-${TAG_OR_NAME}.apk"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShiftAlarm-v3.1.0-APK
-          path: ShiftAlarm-v3.1.0.apk
+          name: ShiftAlarm-APK
+          path: ShiftAlarm-*.apk
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ShiftAlarm-v3.1.0.apk
+          files: ShiftAlarm-*.apk
           name: ShiftAlarm ${{ github.ref_name }} - 極致隱私純離線排班鬧鐘
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

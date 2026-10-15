@@ -851,7 +851,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
-            const Text('版本 3.2.0', style: TextStyle(fontSize: 12)),
+            const Text('版本 3.2.1', style: TextStyle(fontSize: 12)),
             const SizedBox(height: 4),
             const SelectableText(
               'https://github.com/windowmmk/ShiftAlarm',
