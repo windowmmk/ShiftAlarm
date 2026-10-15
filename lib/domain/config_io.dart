@@ -7,6 +7,7 @@ library;
 
 import 'dart:convert';
 
+import 'base58.dart';
 import 'shift_store.dart';
 
 /// 報文頭協議標識與快速檢查（用於剪貼簿自動比對與監聽）
@@ -62,8 +63,8 @@ Map<String, dynamic> exportConfig(ShiftStore store) {
   };
 }
 
-/// 導出為帶有完整協議報文頭（魔數、版本、CRC32、長度、時間戳）的 Base64 口令碼：
-/// 格式：`SHIFTALARM:v1:crc=<CRC32>:len=<字節數>:ts=<時間戳>:<Base64>`
+/// 導出為帶有完整協議報文頭（魔數、版本、CRC32、長度、時間戳）的 Base58 口令碼：
+/// 格式：`SHIFTALARM:v1:crc=<CRC32>:len=<字節數>:ts=<時間戳>:<Base58>`
 String exportConfigCode(ShiftStore store) {
   final map = exportConfig(store);
   final jsonStr = jsonEncode(map);
@@ -71,8 +72,8 @@ String exportConfigCode(ShiftStore store) {
   final crcHex = computeCrc32(bytes).toRadixString(16).padLeft(8, '0');
   final byteLen = bytes.length;
   final ts = (map['header'] as Map)['timestamp'];
-  final b64 = base64Encode(bytes);
-  return 'SHIFTALARM:v1:crc=$crcHex:len=$byteLen:ts=$ts:$b64';
+  final b58 = base58Encode(bytes);
+  return 'SHIFTALARM:v1:crc=$crcHex:len=$byteLen:ts=$ts:$b58';
 }
 
 /// 導出為 JSON 字符串（pretty print，方便人讀）。
@@ -111,12 +112,11 @@ DecodedConfigPayload decodeConfigText(String text) {
   // 2. 判斷帶報文頭的標準協議：SHIFTALARM:v1:...
   if (cleanText.startsWith('SHIFTALARM:v1:')) {
     final parts = cleanText.split(':');
-    // 可能是 SHIFTALARM:v1:crc=...:len=...:ts=...:<b64> 或 SHIFTALARM:v1:<crc>:<b64>
     if (parts.length >= 4) {
       String? expectedCrc;
       int? expectedLen;
       DateTime? exportTime;
-      String b64Payload = '';
+      String payload = '';
 
       if (parts[2].startsWith('crc=')) {
         // 標準完整報文頭格式
@@ -133,24 +133,31 @@ DecodedConfigPayload decodeConfigText(String text) {
             }
           }
         }
-        b64Payload = parts.last;
+        payload = parts.last;
       } else {
         // 簡易版 SHIFTALARM:v1:<crc>:<payload>
         expectedCrc = parts[2].toLowerCase();
-        b64Payload = parts.sublist(3).join(':');
+        payload = parts.sublist(3).join(':');
       }
 
-      // 容錯：URL-safe 與末尾補齊 '='
-      b64Payload = b64Payload.replaceAll('-', '+').replaceAll('_', '/');
-      while (b64Payload.length % 4 != 0) {
-        b64Payload += '=';
-      }
-
-      final List<int> bytes;
+      // 優先嘗試 Base58 解碼，若失敗嘗試 Base64（向下相容舊版）
+      List<int>? bytes;
       try {
-        bytes = base64Decode(b64Payload);
-      } catch (_) {
-        throw const ConfigImportException('報文頭校驗失敗：Base64 數據損壞');
+        bytes = base58Decode(payload);
+      } catch (_) {}
+
+      if (bytes == null || bytes.isEmpty) {
+        try {
+          var b64Payload = payload.replaceAll('-', '+').replaceAll('_', '/');
+          while (b64Payload.length % 4 != 0) {
+            b64Payload += '=';
+          }
+          bytes = base64Decode(b64Payload);
+        } catch (_) {}
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        throw const ConfigImportException('報文頭校驗失敗：口令數據損壞');
       }
 
       // 長度檢驗
@@ -191,41 +198,61 @@ DecodedConfigPayload decodeConfigText(String text) {
 
   // 3. 判斷無完整報文頭的舊版前綴：SHIFTALARM:<payload>
   if (cleanText.startsWith('SHIFTALARM:')) {
-    var b64Payload = cleanText.substring('SHIFTALARM:'.length);
-    b64Payload = b64Payload.replaceAll('-', '+').replaceAll('_', '/');
-    while (b64Payload.length % 4 != 0) {
-      b64Payload += '=';
-    }
+    final payload = cleanText.substring('SHIFTALARM:'.length);
+    List<int>? bytes;
     try {
-      final bytes = base64Decode(b64Payload);
-      final jsonStr = utf8.decode(bytes);
-      final decoded = jsonDecode(jsonStr);
-      if (decoded is Map<String, dynamic>) {
-        _validateConfigStructure(decoded);
-        return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
+      bytes = base58Decode(payload);
+    } catch (_) {}
+    if (bytes == null || bytes.isEmpty) {
+      try {
+        var b64Payload = payload.replaceAll('-', '+').replaceAll('_', '/');
+        while (b64Payload.length % 4 != 0) {
+          b64Payload += '=';
+        }
+        bytes = base64Decode(b64Payload);
+      } catch (_) {}
+    }
+    if (bytes != null && bytes.isNotEmpty) {
+      try {
+        final jsonStr = utf8.decode(bytes);
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          _validateConfigStructure(decoded);
+          return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
+        }
+      } catch (e) {
+        if (e is ConfigImportException) rethrow;
+        throw const ConfigImportException('配置口令無效或已損壞');
       }
-    } catch (e) {
-      if (e is ConfigImportException) rethrow;
-      throw const ConfigImportException('配置口令無效或已損壞');
     }
   }
 
-  // 4. 純 Base64 字串判斷（無前綴）
+  // 4. 純 Base58 / Base64 字串判斷（無前綴）
   if (!cleanText.startsWith('{') && !cleanText.startsWith('[')) {
-    var b64Payload = cleanText.replaceAll('-', '+').replaceAll('_', '/');
-    while (b64Payload.length % 4 != 0) {
-      b64Payload += '=';
-    }
+    List<int>? bytes;
     try {
-      final bytes = base64Decode(b64Payload);
-      final jsonStr = utf8.decode(bytes);
-      final decoded = jsonDecode(jsonStr);
-      if (decoded is Map<String, dynamic>) {
-        _validateConfigStructure(decoded);
-        return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
+      bytes = base58Decode(cleanText);
+    } catch (_) {}
+    if (bytes == null || bytes.isEmpty) {
+      try {
+        var b64Payload = cleanText.replaceAll('-', '+').replaceAll('_', '/');
+        while (b64Payload.length % 4 != 0) {
+          b64Payload += '=';
+        }
+        bytes = base64Decode(b64Payload);
+      } catch (_) {}
+    }
+    if (bytes != null && bytes.isNotEmpty) {
+      try {
+        final jsonStr = utf8.decode(bytes);
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          _validateConfigStructure(decoded);
+          return DecodedConfigPayload(data: decoded, byteLen: bytes.length);
+        }
+      } catch (e) {
+        if (e is ConfigImportException) rethrow;
       }
-    } catch (_) {
-      // 嘗試回退到 JSON
     }
   }
 
