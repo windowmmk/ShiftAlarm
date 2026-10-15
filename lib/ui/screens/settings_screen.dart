@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -250,7 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // 開啟時自動檢查剪貼簿
     try {
-      final clip = await Clipboard.getData(ClipboardData.textPlain);
+      final clip = await Clipboard.getData(Clipboard.kTextPlain);
       final clipText = clip?.text?.trim() ?? '';
       if (clipText.isNotEmpty && isRosterPacket(clipText)) {
         ctrl.text = clipText;
@@ -319,7 +321,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onPressed: () async {
                           try {
                             final clip = await Clipboard.getData(
-                                ClipboardData.textPlain);
+                                Clipboard.kTextPlain);
                             final text = clip?.text?.trim() ?? '';
                             if (text.isNotEmpty) {
                               ctrl.text = text;
@@ -600,7 +602,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // 依據報文頭自動檢查剪貼簿（如符合 SHIFTALARM: 報文頭則自動預填並校驗）
     try {
-      final clipData = await Clipboard.getData(ClipboardData.textPlain);
+      final clipData = await Clipboard.getData(Clipboard.kTextPlain);
       final clipText = clipData?.text?.trim();
       if (clipText != null && isConfigPacket(clipText)) {
         ctrl.text = clipText;
@@ -669,7 +671,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onPressed: () async {
                           try {
                             final clip = await Clipboard.getData(
-                                ClipboardData.textPlain);
+                                Clipboard.kTextPlain);
                             final text = clip?.text?.trim() ?? '';
                             if (text.isNotEmpty) {
                               ctrl.text = text;
