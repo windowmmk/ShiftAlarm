@@ -239,7 +239,7 @@ ThemeData buildAppTheme() {
         );
       }),
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: Colors.white,
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -252,7 +252,7 @@ ThemeData buildAppTheme() {
         color: t.neutralFg,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(

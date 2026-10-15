@@ -626,7 +626,7 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const ShiftTokens().danger,
+              backgroundColor: const Color(0xFFCF222E),
               foregroundColor: Colors.white,
             ),
             child: const Text('刪除'),
