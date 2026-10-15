@@ -88,6 +88,37 @@ void main() {
       expect(store3.defs.length, 4);
       expect(store3.venues.length, 8);
     });
+
+    test('Base64 口令碼導出與導入還原', () async {
+      final store = await _storeWithPreset();
+      final code = exportConfigCode(store);
+      expect(code.startsWith('SHIFTALARM:'), isTrue);
+
+      // preview 支援口令碼
+      final p = previewConfig(code);
+      expect(p.shifts, 4);
+      expect(p.venues, 8);
+
+      // 清空
+      await store.replaceAllDefs({});
+      await store.replaceAllVenues([]);
+
+      // 口令碼導入
+      await importConfigText(store, code);
+      expect(store.defs.length, 4);
+      expect(store.venues.length, 8);
+      expect(store.defs['s00']!.name, '凌晨更');
+    });
+
+    test('iOS 智慧標點（中文引號）自動容錯修正', () async {
+      final store = await _storeWithPreset();
+      final jsonStr = exportConfigJson(store);
+      // 模擬 iOS 鍵盤自動替換雙引號為中文字型彎引號
+      final smartQuoted = jsonStr.replaceAll('"', '“');
+      final p = previewConfig(smartQuoted);
+      expect(p.shifts, 4);
+      expect(p.venues, 8);
+    });
   });
 
   group('爛數據', () {

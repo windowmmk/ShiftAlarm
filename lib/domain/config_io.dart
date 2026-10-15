@@ -1,23 +1,5 @@
-/// 配置導入導出：班次定義＋場所清單，JSON 格式。
-///
-/// 格式（可讀、方便備份）：
-/// ```json
-/// {
-///   "app": "ShiftAlarm",
-///   "version": 1,
-///   "shifts": [
-///     {
-///       "id": "s00",
-///       "name": "凌晨更",
-///       "abbr": "凌晨",
-///       "startTime": "00:00",
-///       "endTime": "06:00",
-///       "alarms": [...]
-///     }
-///   ],
-///   "venues": ["A1", "B1", ...]
-/// }
-/// ```
+/// 配置導入導出：班次定義＋場所清單。
+/// 支援 Base64 口令碼（SHIFTALARM:開頭）與標準 JSON，徹底杜絕 iOS 智慧標點引號問題。
 library;
 
 import 'dart:convert';
@@ -37,14 +19,71 @@ Map<String, dynamic> exportConfig(ShiftStore store) {
   };
 }
 
+/// 導出為 Base64 口令碼（無換行、無雙引號，iOS / 微信 / 備忘錄複製 100% 不損壞）
+String exportConfigCode(ShiftStore store) {
+  final map = exportConfig(store);
+  final jsonStr = jsonEncode(map);
+  final bytes = utf8.encode(jsonStr);
+  final b64 = base64Encode(bytes);
+  return 'SHIFTALARM:$b64';
+}
+
 /// 導出為 JSON 字符串（pretty print，方便人讀）。
 String exportConfigJson(ShiftStore store) {
   const encoder = JsonEncoder.withIndent('  ');
   return encoder.convert(exportConfig(store));
 }
 
+/// 解碼配置字串：自動相容 Base64 口令碼與普通 JSON（並修正 iOS 彎引號 “ ”）
+Map<String, dynamic> decodeConfigText(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) {
+    throw const ConfigImportException('內容係空嘅');
+  }
+
+  // 1. 若以 SHIFTALARM: 或 SHIFTALARM:v1: 開頭，或無 JSON 括號，優先按 Base64 解碼
+  String payload = trimmed;
+  final hasPrefix = payload.startsWith('SHIFTALARM:');
+  if (payload.startsWith('SHIFTALARM:v1:')) {
+    payload = payload.substring('SHIFTALARM:v1:'.length).trim();
+  } else if (hasPrefix) {
+    payload = payload.substring('SHIFTALARM:'.length).trim();
+  }
+
+  if (hasPrefix || (!payload.startsWith('{') && !payload.startsWith('['))) {
+    try {
+      final bytes = base64Decode(payload);
+      final jsonStr = utf8.decode(bytes);
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      if (hasPrefix) {
+        throw const ConfigImportException('配置口令無效或已損壞');
+      }
+    }
+  }
+
+  // 2. 備用語法：相容舊版 JSON，並修正 iOS 智慧標點（中文引號替換）
+  try {
+    final sanitized = trimmed
+        .replaceAll('“', '"')
+        .replaceAll('”', '"')
+        .replaceAll('‘', "'")
+        .replaceAll('’', "'");
+    final decoded = jsonDecode(sanitized);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    throw const ConfigImportException('配置格式唔啱');
+  } catch (e) {
+    if (e is ConfigImportException) rethrow;
+    throw const ConfigImportException('口令或 JSON 格式無效');
+  }
+}
+
 /// 從 Map 導入配置：清空現有班次／場所，寫入導入的。
-/// 格式錯誤拋 [ConfigImportException]。
 Future<void> importConfig(ShiftStore store, Map<String, dynamic> json) async {
   // 驗證格式
   if (json['app'] != 'ShiftAlarm') {
@@ -91,36 +130,19 @@ Future<void> importConfig(ShiftStore store, Map<String, dynamic> json) async {
   await store.replaceAllVenues(venues);
 }
 
-/// 從 JSON 字符串導入。
-Future<void> importConfigJson(ShiftStore store, String text) async {
-  final trimmed = text.trim();
-  if (trimmed.isEmpty) {
-    throw const ConfigImportException('內容係空嘅');
-  }
-  dynamic decoded;
-  try {
-    decoded = jsonDecode(trimmed);
-  } catch (_) {
-    throw const ConfigImportException('JSON 格式唔啱');
-  }
-  if (decoded is! Map<String, dynamic>) {
-    throw const ConfigImportException('JSON 頂層要係 object');
-  }
+/// 從任意文字（Base64 口令碼或 JSON 字符串）導入。
+Future<void> importConfigText(ShiftStore store, String text) async {
+  final decoded = decodeConfigText(text);
   await importConfig(store, decoded);
 }
 
-/// 預覽：從 JSON 字符串解析出班次／場所數量（唔寫入）。
-/// 回 (shiftCount, venueCount, shiftNames)。
+/// 兼容舊呼叫
+Future<void> importConfigJson(ShiftStore store, String text) =>
+    importConfigText(store, text);
+
+/// 預覽：從口令碼或 JSON 解析出班次／場所數量與名稱（唔寫入）。
 ({int shifts, int venues, List<String> names}) previewConfig(String text) {
-  dynamic decoded;
-  try {
-    decoded = jsonDecode(text.trim());
-  } catch (_) {
-    throw const ConfigImportException('JSON 格式唔啱');
-  }
-  if (decoded is! Map<String, dynamic>) {
-    throw const ConfigImportException('JSON 格式唔啱');
-  }
+  final decoded = decodeConfigText(text);
   final shiftsRaw = decoded['shifts'];
   final venuesRaw = decoded['venues'];
   if (shiftsRaw is! List || venuesRaw is! List) {
