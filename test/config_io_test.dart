@@ -95,14 +95,12 @@ void main() {
 
       // 1. 報文頭格式與剪貼簿快速偵測檢查
       expect(isConfigPacket(code), isTrue);
-      expect(code.startsWith('SHIFTALARM:v2:crc='), isTrue);
-      expect(code.contains(':len='), isTrue);
-      expect(code.contains(':ts='), isTrue);
-      final payload = code.split(':').last;
+      expect(code.startsWith('SA2:'), isTrue);
+      final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
 
-      // 2. 長度壓減檢驗：由原本 2000+ 字元壓縮至 200 字元以內！
-      expect(code.length, lessThan(200));
+      // 2. 極簡長度壓減檢驗：由原本 2000+ 字元壓縮至 125 字元以內（直逼 100 字元）！
+      expect(code.length, lessThan(125));
 
       // 3. 報文頭預覽與 CRC32 校驗
       final p = previewConfig(code);

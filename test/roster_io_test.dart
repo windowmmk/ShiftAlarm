@@ -56,16 +56,12 @@ void main() {
       final code = exportRosterCode(store);
 
       expect(isRosterPacket(code), isTrue);
-      expect(code.startsWith('SHIFTROSTER:v2:crc='), isTrue);
-      expect(code.contains(':len='), isTrue);
-      expect(code.contains(':days=4:'), isTrue);
-      expect(code.contains(':ts='), isTrue);
+      expect(code.startsWith('SR2:'), isTrue);
 
-      // 緊湊預編碼長度檢驗：整月排班由 3500+ 字元壓縮至 300 字元以內
-      expect(code.length, lessThan(200));
+      // 極簡緊湊預編碼長度檢驗：4天排班壓縮至 100 字元以內
+      expect(code.length, lessThan(100));
 
-      final parts = code.split(':');
-      final payload = parts.last;
+      final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
     });
 
