@@ -117,7 +117,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         final preview = previewConfig(clean);
         setState(() {
           _configPreview = preview;
-          _detectedType = '配置口令 (SA2)';
+          _detectedType = '班次與場所設定';
           if (fromClipboard) _clipboardAutoDetected = true;
         });
         return;
@@ -128,19 +128,19 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         return;
       } catch (e) {
         setState(() {
-          _parseError = '配置口令解析失敗：$e';
+          _parseError = '設定內容解析失敗：$e';
         });
         return;
       }
     }
 
-    // 2. 檢查排班報文（SR2:）或 CSV 排班文字
+    // 2. 檢查排班報文或 CSV 排班文字
     try {
       final decoded = decodeRosterText(clean, widget.store.defs);
       if (decoded.importResult.valid.isNotEmpty) {
         setState(() {
           _rosterResult = decoded;
-          _detectedType = decoded.isPacket ? '排班口令 (SR2)' : 'CSV 純文字排班';
+          _detectedType = decoded.isPacket ? '排班表分享碼' : '文字排班表';
           if (fromClipboard) _clipboardAutoDetected = true;
         });
         return;
@@ -158,7 +158,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
     }
 
     setState(() {
-      _parseError = '未辨識為有效排班或配置口令，請檢查內容';
+      _parseError = '未能辨識出排班或設定內容，請檢查輸入';
     });
   }
 
@@ -299,18 +299,18 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                   ),
                 ),
               Text(
-                '支援貼上 SR2: 排班口令、SA2: 配置口令、分享網址（?r= / ?c=）或純 CSV 文字。',
-                style: TextStyle(fontSize: 12, color: t.neutralFg2),
+                '支援貼上分享連結、口令碼或 CSV 排班文字。',
+                style: TextStyle(fontSize: 13, color: t.neutralFg2),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    '粘貼口令碼或排班內容：',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    '貼上排班內容：',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
-                  TextButton.icon(
+                  FilledButton.tonalIcon(
                     onPressed: () async {
                       try {
                         final clip =
@@ -322,25 +322,27 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                         }
                       } catch (_) {}
                     },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      minimumSize: const Size(0, 34),
                     ),
                     icon: const Icon(Icons.paste, size: 14),
-                    label: const Text('貼上剪貼簿', style: TextStyle(fontSize: 12)),
+                    label: const Text('貼上剪貼簿',
+                        style: TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               TextField(
                 controller: _ctrl,
                 maxLines: 5,
                 minLines: 3,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: '貼上 SR2:... / SA2:... / 網址或每行「YYYY-MM-DD,代號,場所」…',
-                  hintStyle: const TextStyle(fontSize: 12),
+                  hintText: '在此貼上分享連結、排班文字或代碼…',
+                  hintStyle: const TextStyle(fontSize: 13),
                   suffixIcon: _ctrl.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 16),
@@ -351,7 +353,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                         )
                       : null,
                 ),
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
                 onChanged: (text) => _parseText(text),
               ),
               if (_parseError != null) ...[
@@ -376,11 +378,17 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
       actions: [
         TextButton(
           onPressed: _importing ? null : () => Navigator.pop(context),
-          child: const Text('取消'),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 42),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+          ),
+          child: const Text('取消', style: TextStyle(fontSize: 14)),
         ),
         FilledButton.icon(
           onPressed: (canConfirm && !_importing) ? _executeImport : null,
           style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 42),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             backgroundColor: const Color(0xFF0078D4),
             foregroundColor: Colors.white,
           ),
@@ -394,7 +402,9 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                   ),
                 )
               : const Icon(Icons.check, size: 16),
-          label: Text(_importing ? '導入中…' : '確認導入'),
+          label: Text(_importing ? '導入中…' : '確認導入',
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -430,13 +440,13 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
-                      const SizedBox(width: 3),
-                      Text('CRC32 通過 (${res.crcHex})',
-                          style: const TextStyle(
+                      Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 3),
+                      Text('校驗通過 ✓',
+                          style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF2E7D32))),
@@ -515,13 +525,13 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
-                      const SizedBox(width: 3),
-                      Text('CRC32 通過 (${p.crcHex})',
-                          style: const TextStyle(
+                      Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 3),
+                      Text('校驗通過 ✓',
+                          style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF2E7D32))),

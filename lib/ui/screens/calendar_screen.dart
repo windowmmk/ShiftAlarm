@@ -292,47 +292,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ),
         actions: [
-          TextButton.icon(
+          FilledButton.tonalIcon(
             onPressed: () => showUnifiedImportDialog(
               context: context,
               store: widget.store,
               alarms: widget.alarms,
               onImportDone: () => setState(() {}),
             ),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: const Size(0, 36),
             ),
-            icon: const Icon(Icons.file_download_outlined, size: 16),
-            label: const Text('導入'),
+            icon: const Icon(Icons.file_download_outlined, size: 17),
+            label: const Text('導入',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
-          TextButton(
+          const SizedBox(width: 4),
+          FilledButton.tonal(
             onPressed: _openPanel,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: const Size(0, 36),
             ),
-            child: const Text('排班'),
+            child: const Text('排班',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
-          TextButton(
+          const SizedBox(width: 4),
+          OutlinedButton(
             onPressed: _goToToday,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: const Size(0, 36),
             ),
-            child: const Text('今日'),
+            child: const Text('今日',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
           ),
           IconButton(
             onPressed: () => _shiftMonth(-1),
-            icon: const Icon(Icons.chevron_left),
+            icon: const Icon(Icons.chevron_left, size: 24),
             tooltip: '上一月',
           ),
           IconButton(
             onPressed: () => _shiftMonth(1),
-            icon: const Icon(Icons.chevron_right),
+            icon: const Icon(Icons.chevron_right, size: 24),
             tooltip: '下一月',
           ),
         ],
@@ -485,57 +487,60 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 第一行：日期（統一固定 13.0px bold，無論有冇排班均佔相同高度）
+          // 第一行：日期（統一固定放大 17.0px bold，無論有冇排班均佔相同高度）
           Expanded(
             child: Center(
-              child: Text(
-                '$day',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13.0,
-                  fontWeight: FontWeight.bold,
-                  color: dateColor,
-                  height: 1.0,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '$day',
+                  style: TextStyle(
+                    fontSize: 17.0,
+                    fontWeight: FontWeight.bold,
+                    color: dateColor,
+                    height: 1.0,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
-          // 第二行：班次縮寫（固定 13.0px 超粗黑體；無排班佔位對齊）
+          // 第二行：班次縮寫（放大 17.0px 特粗黑體；無排班佔位對齊）
           Expanded(
             child: Center(
               child: def != null
-                  ? Text(
-                      truncateAbbr(def.abbr),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.0,
-                        fontWeight: FontWeight.w900,
-                        color: abbrColor,
-                        height: 1.0,
+                  ? FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        truncateAbbr(def.abbr),
+                        style: TextStyle(
+                          fontSize: 17.0,
+                          fontWeight: FontWeight.w900,
+                          color: abbrColor,
+                          height: 1.0,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     )
                   : const SizedBox.shrink(),
             ),
           ),
-          // 第三行：場所（固定 13.0px 粗體，與班次同等權重；無場所佔位對齊）
+          // 第三行：場所（放大 17.0px 粗體，與班次同等權重；無場所佔位對齊）
           Expanded(
             child: Center(
               child: (def != null && note.isNotEmpty)
-                  ? Text(
-                      truncateAbbr(note),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.0,
-                        fontWeight: FontWeight.w800,
-                        color: noteColor,
-                        height: 1.0,
+                  ? FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        truncateAbbr(note),
+                        style: TextStyle(
+                          fontSize: 17.0,
+                          fontWeight: FontWeight.w800,
+                          color: noteColor,
+                          height: 1.0,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     )
                   : const SizedBox.shrink(),
             ),
@@ -582,155 +587,238 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final holiday = holidayName(_selectedDate);
     const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
     final weekdayName = weekdays[_selectedDate.weekday % 7];
+    final slot = def != null ? t.slotForTime(def.startTime) : null;
 
     return Container(
-      height: 54,
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: t.neutralBg,
         border: Border(top: BorderSide(color: t.neutralStroke)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 左側：選中日期主標籤（加粗突出）
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // 第一行：日期、班次、場所、排班按鈕
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
+              // 日期標籤
+              Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${_selectedDate.month}月${_selectedDate.day}日',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: t.neutralFg,
-                      height: 1.0,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_selectedDate.month}月${_selectedDate.day}日',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: t.neutralFg,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '週$weekdayName',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: t.neutralFg2,
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '週$weekdayName',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: t.neutralFg2,
-                      height: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              if (holiday != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    holiday,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: t.danger,
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          // 中間：排班狀態膠囊（主次分明，點擊可新增／查看備註）
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                _remarkCtrl.text = widget.store.remarks[key] ?? '';
-                setState(() {
-                  _editingRemark = true;
-                  _editingRemarkKey = key;
-                });
-                _remarkFocus.requestFocus();
-              },
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: def != null
-                      ? t.slotForTime(def.startTime).bg
-                      : t.neutralBg2,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: def != null
-                        ? t.slotForTime(def.startTime).border
-                        : t.neutralStroke,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      def != null
-                          ? '${def.name} (${def.startTime}–${def.endTime})'
-                          : '未排班',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: def != null
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: def != null
-                            ? t.slotForTime(def.startTime).fg
-                            : t.neutralFg2,
+                  if (holiday != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        holiday,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: t.danger,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
                       ),
                     ),
-                    if (note.isNotEmpty) ...[
-                      const SizedBox(width: 6),
+                ],
+              ),
+              const SizedBox(width: 10),
+              // 班次與場所標籤
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 班次徽章
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: t.neutralBg,
-                          borderRadius: BorderRadius.circular(3),
+                          color: slot?.bg ?? t.neutralBg2,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: slot?.border ?? t.neutralStroke,
+                          ),
                         ),
                         child: Text(
-                          note,
+                          def != null
+                              ? '${def.name} (${def.startTime}–${def.endTime})'
+                              : '未排班',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: t.neutralFg,
+                            fontSize: 13,
+                            fontWeight: def != null
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: slot?.fg ?? t.neutralFg2,
                           ),
                         ),
                       ),
-                    ],
-                    if (remark.isNotEmpty) ...[
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '📝 $remark',
-                          style: TextStyle(
-                              fontSize: 11, color: t.neutralFg2),
-                          overflow: TextOverflow.ellipsis,
+                      // 場所徽章（重要性與班次同等，醒目展示）
+                      if (note.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: t.brand.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: t.brand.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.location_on,
+                                  size: 15, color: t.brand),
+                              const SizedBox(width: 3),
+                              Text(
+                                note,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: t.brand,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ] else ...[
-                      const Spacer(),
-                      Icon(Icons.edit_note,
-                          size: 15, color: t.neutralFg2),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              // 右側：排班按鈕（加大尺寸，好點擊）
+              FilledButton.icon(
+                onPressed: _openPanel,
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 38),
+                ),
+                icon: const Icon(Icons.edit_calendar, size: 16),
+                label: const Text('排班',
+                    style:
+                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          // 右側：排班按鈕
-          FilledButton.tonal(
-            onPressed: _openPanel,
-            style: FilledButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text('排班',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          ),
+          const SizedBox(height: 8),
+          // 第二行：專屬兩行備註欄（可容納 10x2 個中文字，好點好編輯）
+          _editingRemark
+              ? SizedBox(
+                  height: 54,
+                  child: TextField(
+                    controller: _remarkCtrl,
+                    focusNode: _remarkFocus,
+                    maxLines: 2,
+                    minLines: 2,
+                    maxLength: ShiftStore.maxRemarkLength,
+                    style: const TextStyle(fontSize: 13.5),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: t.neutralBg2,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: t.brand, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      counterText: '',
+                      isDense: true,
+                      hintText: '輸入今日備忘（支援兩行，如換班、交代事項）…',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.check, size: 18),
+                        onPressed: _saveInlineRemark,
+                      ),
+                    ),
+                    onEditingComplete: _saveInlineRemark,
+                  ),
+                )
+              : GestureDetector(
+                  onTap: () {
+                    _remarkCtrl.text = widget.store.remarks[key] ?? '';
+                    setState(() {
+                      _editingRemark = true;
+                      _editingRemarkKey = key;
+                    });
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _remarkFocus.requestFocus();
+                    });
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    height: 54,
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: t.neutralBg2,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: t.neutralStroke),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1),
+                          child: Icon(Icons.edit_note,
+                              size: 19, color: Colors.blueGrey),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            remark.isEmpty
+                                ? '點此新增今日備註（支援兩行輸入，可填寫換班或交代事項）…'
+                                : remark,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: remark.isEmpty ? t.neutralFg2 : t.neutralFg,
+                              fontStyle: remark.isEmpty
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(Icons.edit_outlined,
+                              size: 15, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
         ],
       ),
     );
@@ -845,12 +933,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     const SizedBox(height: 4),
                     Text('• 常用場所：${p.venues} 個',
                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                    if (p.crcVerified) ...[
-                      const SizedBox(height: 4),
-                      const Text('• 報文校驗：CRC32 驗證通過 ✓',
-                          style: TextStyle(
-                              color: Color(0xFF2E7D32), fontSize: 12)),
-                    ],
                   ],
                 ),
               ),
@@ -864,11 +946,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text('取消', style: TextStyle(fontSize: 14)),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('確定導入'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text('確定導入',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -936,12 +1027,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   children: [
                     Text('• 待導入排班天數：$count 天',
                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                    if (decoded.crcVerified) ...[
-                      const SizedBox(height: 4),
-                      const Text('• 報文校驗：CRC32 驗證通過 ✓',
-                          style: TextStyle(
-                              color: Color(0xFF1565C0), fontSize: 12)),
-                    ],
                   ],
                 ),
               ),
@@ -952,11 +1037,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text('取消', style: TextStyle(fontSize: 14)),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('套用排班'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text('套用排班',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
