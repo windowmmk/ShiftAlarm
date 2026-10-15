@@ -1,0 +1,54 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Prepare APK Asset
+        run: cp build/app/outputs/flutter-apk/app-release.apk ShiftAlarm-v3.1.0.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShiftAlarm-v3.1.0-APK
+          path: ShiftAlarm-v3.1.0.apk
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ShiftAlarm-v3.1.0.apk
+          name: ShiftAlarm ${{ github.ref_name }} - 極致隱私純離線排班鬧鐘
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
