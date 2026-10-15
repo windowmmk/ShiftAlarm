@@ -480,44 +480,37 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
             // 第二行：橫向排班卡片（點更即排，自動保存）
             SizedBox(
               height: 48,
-              child: Row(
-                children: [
-                  for (int i = 0; i < defs.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 6),
-                    Expanded(
-                      child: _compactShiftButton(
-                          t, defs[i], defs[i].id == currentId),
-                    ),
-                  ],
-                  const SizedBox(width: 6),
-                  // 取消排更 / 放假按鈕
-                  SizedBox(
-                    width: 44,
-                    height: 48,
-                    child: Tooltip(
-                      message: '清除此日排更',
-                      child: OutlinedButton(
-                        onPressed:
-                            (_saving || currentId == null) ? null : _unassign,
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          side: BorderSide(
-                              color: currentId != null
-                                  ? t.danger.withValues(alpha: 0.5)
-                                  : t.neutralStroke),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: Icon(Icons.clear,
-                            size: 18,
-                            color: currentId != null
-                                ? t.danger
-                                : t.neutralFg2),
+              child: defs.length <= 4
+                  ? Row(
+                      children: [
+                        for (int i = 0; i < defs.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 6),
+                          Expanded(
+                            child: _compactShiftButton(
+                                t, defs[i], defs[i].id == currentId),
+                          ),
+                        ],
+                        const SizedBox(width: 6),
+                        _clearButton(t, currentId),
+                      ],
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (int i = 0; i < defs.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 6),
+                            SizedBox(
+                              width: 80,
+                              child: _compactShiftButton(
+                                  t, defs[i], defs[i].id == currentId),
+                            ),
+                          ],
+                          const SizedBox(width: 6),
+                          _clearButton(t, currentId),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -575,6 +568,31 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _clearButton(ShiftTokens t, String? currentId) {
+    return SizedBox(
+      width: 44,
+      height: 48,
+      child: Tooltip(
+        message: '清除此日排更（設為放假）',
+        child: OutlinedButton(
+          onPressed: (_saving || currentId == null) ? null : _unassign,
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            side: BorderSide(
+                color: currentId != null
+                    ? t.danger.withValues(alpha: 0.5)
+                    : t.neutralStroke),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Icon(Icons.clear,
+              size: 18,
+              color: currentId != null ? t.danger : t.neutralFg2),
         ),
       ),
     );
