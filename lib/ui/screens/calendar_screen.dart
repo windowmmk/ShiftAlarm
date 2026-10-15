@@ -9,6 +9,7 @@ import '../../domain/holidays.dart';
 import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
+import '../dialogs/unified_import_dialog.dart';
 import 'shift_picker_panel.dart';
 
 /// 支援桌面與網頁滑鼠拖曳、觸摸、觸控板左右換月的 ScrollBehavior
@@ -316,6 +317,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => showUnifiedImportDialog(
+              context: context,
+              store: widget.store,
+              alarms: widget.alarms,
+              onImportDone: () => setState(() {}),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.file_download_outlined, size: 16),
+            label: const Text('導入'),
+          ),
           TextButton(
             onPressed: _openPanel,
             style: TextButton.styleFrom(
@@ -405,10 +421,36 @@ class _CalendarScreenState extends State<CalendarScreen> {
           if (_isMonthEmpty(DateTime(_activeYear, _activeMonth)))
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(
-                '呢個月未排更，撳右上「排班」開始',
-                style: TextStyle(fontSize: 13, color: t.neutralFg2),
-                textAlign: TextAlign.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '呢個月未排更，',
+                    style: TextStyle(fontSize: 13, color: t.neutralFg2),
+                  ),
+                  InkWell(
+                    onTap: () => showUnifiedImportDialog(
+                      context: context,
+                      store: widget.store,
+                      alarms: widget.alarms,
+                      onImportDone: () => setState(() {}),
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Text(
+                      '【點此一鍵導入】',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF2A9D8F),
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    ' 或撳右上「排班」',
+                    style: TextStyle(fontSize: 13, color: t.neutralFg2),
+                  ),
+                ],
               ),
             ),
           // 排班面板或詳情板
