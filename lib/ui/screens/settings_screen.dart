@@ -326,7 +326,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// 導入配置：貼上 Base64 口令或 JSON → 預覽 → 確認寫入（清空現有班次／場所）。
   Future<void> _openConfigImport() async {
     final ctrl = TextEditingController();
-    ({int shifts, int venues, List<String> names})? preview;
+    ConfigPreview? preview;
     String? error;
     var importing = false;
     var clipboardAutoDetected = false;

@@ -320,15 +320,18 @@ Future<void> importConfigText(ShiftStore store, String text) async {
 Future<void> importConfigJson(ShiftStore store, String text) =>
     importConfigText(store, text);
 
-/// 預覽：從報文口令碼或 JSON 解析出班次／場所數量、名稱、生成時間與報文頭校驗狀態
-({
+/// 預覽結果結構
+typedef ConfigPreview = ({
   int shifts,
   int venues,
   List<String> names,
   DateTime? exportTime,
   String? crcHex,
   bool crcVerified,
-}) previewConfig(String text) {
+});
+
+/// 預覽：從報文口令碼或 JSON 解析出班次／場所數量、名稱、生成時間與報文頭校驗狀態
+ConfigPreview previewConfig(String text) {
   final payload = decodeConfigText(text);
   final shiftsRaw = payload.data['shifts'] as List;
   final venuesRaw = payload.data['venues'] as List;
