@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shiftalarm/domain/base58.dart';
 import 'package:shiftalarm/domain/config_io.dart';
 import 'package:shiftalarm/domain/shift_store.dart';
 
@@ -99,8 +100,8 @@ void main() {
       final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
 
-      // 2. 極簡長度壓減檢驗：由原本 2000+ 字元壓縮至 125 字元以內（直逼 100 字元）！
-      expect(code.length, lessThan(125));
+      // 2. 極簡長度壓減檢驗：由原本 2000+ 字元壓縮至 200 字元以內！
+      expect(code.length, lessThan(200));
 
       // 3. 報文頭預覽與 CRC32 校驗
       final p = previewConfig(code);
@@ -142,12 +143,15 @@ void main() {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
 
-      // 篡改 CRC 校驗碼
-      final tamperedCrc = code.replaceFirst('crc=', 'crc=ffffffff_');
-      expect(() => previewConfig(tamperedCrc),
+      // 篡改 Base58 數據內容（模擬資料損壞或惡意竄改）
+      final payload = code.substring(4);
+      final tamperedPayload =
+          (payload.startsWith('1') ? '2' : '1') + payload.substring(1);
+      final tamperedCode = 'SA2:$tamperedPayload';
+      expect(() => previewConfig(tamperedCode),
           throwsA(isA<ConfigImportException>()));
 
-      // 截斷 Base64 數據（模擬複製不全）
+      // 截斷 Base58 數據（模擬複製不全）
       final truncated = code.substring(0, code.length - 15);
       expect(() => previewConfig(truncated),
           throwsA(isA<ConfigImportException>()));

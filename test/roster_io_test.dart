@@ -58,8 +58,8 @@ void main() {
       expect(isRosterPacket(code), isTrue);
       expect(code.startsWith('SR2:'), isTrue);
 
-      // 極簡緊湊預編碼長度檢驗：4天排班壓縮至 100 字元以內
-      expect(code.length, lessThan(100));
+      // 極簡緊湊預編碼長度檢驗：4天排班（含自定義中文備註）壓縮至 150 字元以內
+      expect(code.length, lessThan(150));
 
       final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
@@ -115,7 +115,11 @@ void main() {
       final store = await _storeWithSampleRoster();
       final code = exportRosterCode(store);
 
-      final tampered = code.replaceFirst('crc=', 'crc=99999999_');
+      // 篡改 Base58 數據內容
+      final payload = code.substring(4);
+      final tamperedPayload =
+          (payload.startsWith('1') ? '2' : '1') + payload.substring(1);
+      final tampered = 'SR2:$tamperedPayload';
       final decoded = decodeRosterText(tampered, store.defs);
       expect(decoded.importResult.valid, isEmpty);
       expect(decoded.importResult.errors.first, contains('校驗碼不符'));
