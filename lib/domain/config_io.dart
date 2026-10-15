@@ -15,12 +15,13 @@ import 'shift_store.dart';
 class ConfigPacketHeader {
   static const String protocol = 'SHIFTALARM';
   static const String version = 'v2';
-  static const String prefix = '$protocol:$version:';
+  static const String prefix = 'SA2:';
 
   /// 快速檢查文字是否符合配置報文頭（用於剪貼簿快速監聽與比對，零成本避免誤報）
   static bool matches(String text) {
     final clean = text.trim().replaceAll(RegExp(r'\s+'), '');
-    return clean.startsWith('SHIFTALARM:v2:') ||
+    return clean.startsWith('SA2:') ||
+        clean.startsWith('SHIFTALARM:v2:') ||
         clean.startsWith('SHIFTALARM:v1:') ||
         clean.startsWith('$protocol:');
   }
@@ -291,16 +292,26 @@ Map<String, dynamic> decodeCompactConfig(Uint8List bytes) {
   };
 }
 
-/// 導出為帶有完整協議報文頭（魔數、版本、CRC32、長度、時間戳）的極速 Base58 緊湊預編碼口令碼：
-/// 採用二進制預編碼打包（v2），完全去除 JSON 重複鍵名，長度由 2000+ 字元壓縮至 120-180 字元！
-/// 格式：`SHIFTALARM:v2:crc=<CRC32>:len=<長度>:ts=<時間戳>:<Base58>`
+/// 導出為帶有極簡協議報文頭（SA2:<Base58>）的極速 Base58 緊湊預編碼口令碼：
+/// 報文頭內化打包：CRC32（4 字節）與時間戳（4 字節）直接嵌入二進制數據體中，
+/// 外部前綴僅 4 字元（SA2:），長度直接壓至 90~115 字元以內！
 String exportConfigCode(ShiftStore store) {
-  final bytes = encodeCompactConfig(store);
-  final crcHex = computeCrc32(bytes).toRadixString(16).padLeft(8, '0');
-  final byteLen = bytes.length;
+  final dataBytes = encodeCompactConfig(store);
+  final crc = computeCrc32(dataBytes);
   final nowTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final b58 = base58Encode(bytes);
-  return 'SHIFTALARM:v2:crc=$crcHex:len=$byteLen:ts=$nowTs:$b58';
+
+  final bb = BytesBuilder();
+  final crcBd = ByteData(4)..setUint32(0, crc, Endian.big);
+  bb.add(crcBd.buffer.asUint8List());
+
+  final tsBd = ByteData(4)..setUint32(0, nowTs, Endian.big);
+  bb.add(tsBd.buffer.asUint8List());
+
+  bb.add(dataBytes);
+
+  final packetBytes = bb.toBytes();
+  final b58 = base58Encode(packetBytes);
+  return 'SA2:$b58';
 }
 
 /// 導出為 JSON 字符串（pretty print，方便人讀）。
@@ -326,7 +337,7 @@ class DecodedConfigPayload {
   });
 }
 
-/// 解碼配置字串：支援 v2 緊湊二進制 Base58 預編碼、v1 冗長 JSON 協議、舊版口令與純 JSON
+/// 解碼配置字串：支援極簡 SA2 協議、v2 緊湊協議、v1 JSON 協議、舊版口令與純 JSON
 DecodedConfigPayload decodeConfigText(String text) {
   final rawTrimmed = text.trim();
   if (rawTrimmed.isEmpty) {
@@ -336,7 +347,48 @@ DecodedConfigPayload decodeConfigText(String text) {
   // 1. 去除所有內部空白與換行符號（針對通訊軟體或備忘錄折行貼上的容錯）
   final cleanText = rawTrimmed.replaceAll(RegExp(r'\s+'), '');
 
-  // 2. 判斷帶報文頭的標準協議：SHIFTALARM:v2:...（最新緊湊預編碼）
+  // 2. 判斷極簡 v2 協議：SA2:<Base58>（極簡報文頭內化打包，長度 < 115 字元）
+  if (cleanText.startsWith('SA2:')) {
+    final payload = cleanText.substring(4);
+    List<int>? bytes;
+    try {
+      bytes = base58Decode(payload);
+    } catch (_) {}
+
+    if (bytes == null || bytes.length < 10) {
+      throw const ConfigImportException('極簡報文數據損壞或長度不足');
+    }
+
+    final u8 = Uint8List.fromList(bytes);
+    final expectedCrc =
+        ByteData.sublistView(u8, 0, 4).getUint32(0, Endian.big);
+    final tsSec =
+        ByteData.sublistView(u8, 4, 8).getUint32(0, Endian.big);
+    final exportTime = DateTime.fromMillisecondsSinceEpoch(tsSec * 1000);
+    final dataBytes = Uint8List.sublistView(u8, 8);
+
+    final actualCrc = computeCrc32(dataBytes);
+    if (actualCrc != expectedCrc) {
+      throw const ConfigImportException('報文校驗碼不符（內容不完整或被截斷），請重新複製完整口令');
+    }
+
+    try {
+      final decoded = decodeCompactConfig(dataBytes);
+      _validateConfigStructure(decoded);
+      return DecodedConfigPayload(
+        data: decoded,
+        crcHex: expectedCrc.toRadixString(16).padLeft(8, '0'),
+        byteLen: bytes.length,
+        exportTime: exportTime,
+        crcVerified: true,
+      );
+    } catch (e) {
+      if (e is ConfigImportException) rethrow;
+      throw const ConfigImportException('極簡報文數據內容損壞，無法解析');
+    }
+  }
+
+  // 3. 判斷帶報文頭的標準協議：SHIFTALARM:v2:...（相容 v2 過渡版）
   if (cleanText.startsWith('SHIFTALARM:v2:')) {
     final parts = cleanText.split(':');
     if (parts.length >= 4) {
