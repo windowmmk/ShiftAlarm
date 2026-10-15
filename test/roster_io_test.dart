@@ -138,17 +138,27 @@ void main() {
       expect(decoded.importResult.valid[0].venue, 'A1');
     });
 
-    test('網址 Hash 參數提取與還原', () async {
+    test('網址 Hash 與 Query 參數提取與還原', () async {
       final store = await _storeWithSampleRoster();
       final code = exportRosterCode(store);
-      final shareUrl = 'https://windowmmk.github.io/ShiftAlarm/#r=$code';
-      final uri = Uri.parse(shareUrl);
-      final fragment = uri.fragment;
+
+      // 1. Query parameter (?r=) - 微信防標籤誤判格式
+      final queryUrl = 'https://windowmmk.github.io/ShiftAlarm/?r=$code';
+      final queryUri = Uri.parse(queryUrl);
+      final queryExtracted = queryUri.queryParameters['r'];
+      expect(queryExtracted, equals(code));
+      final queryDecoded = decodeRosterText(queryExtracted!, store.defs);
+      expect(queryDecoded.importResult.valid.length, 4);
+
+      // 2. Hash fragment (#r=) - 向下相容
+      final hashUrl = 'https://windowmmk.github.io/ShiftAlarm/#r=$code';
+      final hashUri = Uri.parse(hashUrl);
+      final fragment = hashUri.fragment;
       expect(fragment.startsWith('r='), isTrue);
-      final extracted = Uri.decodeComponent(fragment.substring(2));
-      expect(extracted, equals(code));
-      final decoded = decodeRosterText(extracted, store.defs);
-      expect(decoded.importResult.valid.length, 4);
+      final hashExtracted = Uri.decodeComponent(fragment.substring(2));
+      expect(hashExtracted, equals(code));
+      final hashDecoded = decodeRosterText(hashExtracted, store.defs);
+      expect(hashDecoded.importResult.valid.length, 4);
     });
   });
 }

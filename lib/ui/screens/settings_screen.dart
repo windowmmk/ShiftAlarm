@@ -327,7 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               OutlinedButton.icon(
                 onPressed: () {
                   final url =
-                      'https://windowmmk.github.io/ShiftAlarm/#r=$code';
+                      'https://windowmmk.github.io/ShiftAlarm/?r=$code';
                   _showQrDialog(
                     parentContext: context,
                     title: '排班分享二維碼',
@@ -687,7 +687,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           OutlinedButton.icon(
             onPressed: () {
               final url =
-                  'https://windowmmk.github.io/ShiftAlarm/#c=$code';
+                  'https://windowmmk.github.io/ShiftAlarm/?c=$code';
               _showQrDialog(
                 parentContext: context,
                 title: '配置分享二維碼',

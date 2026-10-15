@@ -143,18 +143,29 @@ void main() {
           throwsA(isA<ConfigImportException>()));
     });
 
-    test('網址 Hash 參數提取與還原', () async {
+    test('網址 Hash 與 Query 參數提取與還原', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
-      final shareUrl = 'https://windowmmk.github.io/ShiftAlarm/#c=$code';
-      final uri = Uri.parse(shareUrl);
-      final fragment = uri.fragment;
+
+      // 1. Query parameter (?c=) - 微信防標籤誤判格式
+      final queryUrl = 'https://windowmmk.github.io/ShiftAlarm/?c=$code';
+      final queryUri = Uri.parse(queryUrl);
+      final queryExtracted = queryUri.queryParameters['c'];
+      expect(queryExtracted, equals(code));
+      final queryP = previewConfig(queryExtracted!);
+      expect(queryP.shifts, 4);
+      expect(queryP.venues, 8);
+
+      // 2. Hash fragment (#c=) - 向下相容
+      final hashUrl = 'https://windowmmk.github.io/ShiftAlarm/#c=$code';
+      final hashUri = Uri.parse(hashUrl);
+      final fragment = hashUri.fragment;
       expect(fragment.startsWith('c='), isTrue);
-      final extracted = Uri.decodeComponent(fragment.substring(2));
-      expect(extracted, equals(code));
-      final p = previewConfig(extracted);
-      expect(p.shifts, 4);
-      expect(p.venues, 8);
+      final hashExtracted = Uri.decodeComponent(fragment.substring(2));
+      expect(hashExtracted, equals(code));
+      final hashP = previewConfig(hashExtracted);
+      expect(hashP.shifts, 4);
+      expect(hashP.venues, 8);
     });
   });
 
