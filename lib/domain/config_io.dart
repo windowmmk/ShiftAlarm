@@ -7,6 +7,8 @@ library;
 
 import 'dart:convert';
 
+import 'shift_store.dart';
+
 /// 報文頭協議標識與快速檢查（用於剪貼簿自動比對與監聽）
 class ConfigPacketHeader {
   static const String protocol = 'SHIFTALARM';
