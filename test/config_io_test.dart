@@ -89,25 +89,54 @@ void main() {
       expect(store3.venues.length, 8);
     });
 
-    test('Base64 口令碼導出與導入還原', () async {
+    test('帶協議報文頭的 Base64 口令碼導出、校驗與導入還原', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
-      expect(code.startsWith('SHIFTALARM:'), isTrue);
 
-      // preview 支援口令碼
+      // 1. 報文頭格式與剪貼簿快速偵測檢查
+      expect(isConfigPacket(code), isTrue);
+      expect(code.startsWith('SHIFTALARM:v1:crc='), isTrue);
+      expect(code.contains(':len='), isTrue);
+      expect(code.contains(':ts='), isTrue);
+
+      // 2. 報文頭預覽與 CRC32 校驗
       final p = previewConfig(code);
       expect(p.shifts, 4);
       expect(p.venues, 8);
+      expect(p.crcVerified, isTrue);
+      expect(p.crcHex, isNotNull);
+      expect(p.exportTime, isNotNull);
 
-      // 清空
+      // 3. 通訊軟體折行與空格容錯（模擬微信/備忘錄自動換行）
+      final wrappedCode = code.replaceRange(30, 30, '\n  \t  ');
+      final pWrapped = previewConfig(wrappedCode);
+      expect(pWrapped.shifts, 4);
+      expect(pWrapped.crcVerified, isTrue);
+
+      // 4. 清空現有資料
       await store.replaceAllDefs({});
       await store.replaceAllVenues([]);
 
-      // 口令碼導入
-      await importConfigText(store, code);
+      // 5. 導入還原
+      await importConfigText(store, wrappedCode);
       expect(store.defs.length, 4);
       expect(store.venues.length, 8);
       expect(store.defs['s00']!.name, '凌晨更');
+    });
+
+    test('報文頭校驗碼防篡改與防截斷驗證', () async {
+      final store = await _storeWithPreset();
+      final code = exportConfigCode(store);
+
+      // 篡改 CRC 校驗碼
+      final tamperedCrc = code.replaceFirst('crc=', 'crc=ffffffff_');
+      expect(() => previewConfig(tamperedCrc),
+          throwsA(isA<ConfigImportException>()));
+
+      // 截斷 Base64 數據（模擬複製不全）
+      final truncated = code.substring(0, code.length - 15);
+      expect(() => previewConfig(truncated),
+          throwsA(isA<ConfigImportException>()));
     });
 
     test('iOS 智慧標點（中文引號）自動容錯修正', () async {

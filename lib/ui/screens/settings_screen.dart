@@ -329,6 +329,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ({int shifts, int venues, List<String> names})? preview;
     String? error;
     var importing = false;
+    var clipboardAutoDetected = false;
+
+    // 依據報文頭自動檢查剪貼簿（如符合 SHIFTALARM: 報文頭則自動預填並校驗）
+    try {
+      final clipData = await Clipboard.getData(ClipboardData.textPlain);
+      final clipText = clipData?.text?.trim();
+      if (clipText != null && isConfigPacket(clipText)) {
+        ctrl.text = clipText;
+        clipboardAutoDetected = true;
+        try {
+          preview = previewConfig(clipText);
+        } catch (_) {}
+      }
+    } catch (_) {}
 
     await showDialog<void>(
       context: context,
@@ -342,19 +356,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (clipboardAutoDetected)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.content_paste_go,
+                              size: 16, color: Color(0xFF2E7D32)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '已自動辨識剪貼簿中的配置報文口令',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF2E7D32),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   Text(
                     '貼上之前導出的配置口令（亦相容 JSON 格式）。\n注意：會清空現有班次和場所！',
                     style: TextStyle(
                         fontSize: 12, color: context.tokens.neutralFg2),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '配置口令：',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          try {
+                            final clip = await Clipboard.getData(
+                                ClipboardData.textPlain);
+                            final text = clip?.text?.trim() ?? '';
+                            if (text.isNotEmpty) {
+                              ctrl.text = text;
+                              setD(() {
+                                error = null;
+                                preview = null;
+                                try {
+                                  preview = previewConfig(text);
+                                } on ConfigImportException catch (e) {
+                                  error = e.message;
+                                } catch (_) {
+                                  error = '口令格式無效';
+                                }
+                              });
+                            }
+                          } catch (_) {}
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.paste, size: 14),
+                        label:
+                            const Text('貼上剪貼簿', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   TextField(
                     controller: ctrl,
-                    maxLines: 6,
+                    maxLines: 5,
                     minLines: 3,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '貼上配置口令（SHIFTALARM:…）或 JSON…',
+                      hintText: '貼上配置口令（SHIFTALARM:v1:…）…',
                     ),
                     style: const TextStyle(
                         fontSize: 11, fontFamily: 'monospace'),
@@ -389,6 +473,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (preview!.crcVerified)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.verified, size: 14, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '報文頭校驗通過 (CRC: ${preview!.crcHex})',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (preview!.exportTime != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                '導出時間：${preview!.exportTime!.year}-${preview!.exportTime!.month.toString().padLeft(2, '0')}-${preview!.exportTime!.day.toString().padLeft(2, '0')} ${preview!.exportTime!.hour.toString().padLeft(2, '0')}:${preview!.exportTime!.minute.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.tokens.neutralFg2),
+                              ),
+                            ),
                           Text(
                             '${preview!.shifts} 個班次、${preview!.venues} 個場所',
                             style:
