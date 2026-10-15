@@ -407,22 +407,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           // 排班面板或詳情板
           _schedPanelOpen
-              ? GestureDetector(
-                  onVerticalDragEnd: (details) {
-                    if ((details.primaryVelocity ?? 0) > 300) {
-                      setState(() => _schedPanelOpen = false);
-                    }
-                  },
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 420),
-                    child: ShiftPickerPanel(
-                      key: _panelKey,
-                      initialDate: _selectedDate,
-                      store: widget.store,
-                      alarms: widget.alarms,
-                      onClose: () => setState(() => _schedPanelOpen = false),
-                    ),
-                  ),
+              ? ShiftPickerPanel(
+                  key: _panelKey,
+                  initialDate: _selectedDate,
+                  store: widget.store,
+                  alarms: widget.alarms,
+                  onClose: () => setState(() => _schedPanelOpen = false),
                 )
               : _detailPanel(t),
         ],
@@ -430,81 +420,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  /// 一個月的 6 週固定網格（42 格）
+  /// 一個月的 5 或 6 週自適應網格（根據當月實際跨週數動態決定 5 行或 6 行）
   Widget _monthGrid(ShiftTokens t, int year, int month) {
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
     final firstSunday = DateTime(year, month, 1 - firstWeekday);
+    final daysInMonth = DateUtils.getDaysInMonth(year, month);
+    final totalCellsNeeded = firstWeekday + daysInMonth;
+    final weekCount = (totalCellsNeeded / 7).ceil(); // 動態 5 行或 6 行
     final today = DateTime.now();
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableHeight = constraints.maxHeight;
-        if (availableHeight >= 300) {
-          return Column(
-            children: [
-              for (int w = 0; w < 6; w++)
-                Expanded(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                    child: Row(
-                      children: [
-                        for (int d = 0; d < 7; d++)
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(right: d < 6 ? 2 : 0),
-                              child: _dayCell(
-                                t,
-                                DateTime(firstSunday.year, firstSunday.month,
-                                    firstSunday.day + w * 7 + d),
-                                today,
-                                year,
-                                month,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        } else {
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                for (int w = 0; w < 6; w++)
-                  SizedBox(
-                    height: 56,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 1.5),
-                      child: Row(
-                        children: [
-                          for (int d = 0; d < 7; d++)
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(right: d < 6 ? 2 : 0),
-                                child: _dayCell(
-                                  t,
-                                  DateTime(firstSunday.year, firstSunday.month,
-                                      firstSunday.day + w * 7 + d),
-                                  today,
-                                  year,
-                                  month,
-                                ),
-                              ),
-                            ),
-                        ],
+    return Column(
+      children: [
+        for (int w = 0; w < weekCount; w++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+              child: Row(
+                children: [
+                  for (int d = 0; d < 7; d++)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: d < 6 ? 2 : 0),
+                        child: _dayCell(
+                          t,
+                          DateTime(firstSunday.year, firstSunday.month,
+                              firstSunday.day + w * 7 + d),
+                          today,
+                          year,
+                          month,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          );
-        }
-      },
+          ),
+      ],
     );
   }
 
@@ -584,8 +536,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // 第一行：日期（澳門公眾假期顯示紅色；非本月淡化）
-          SizedBox(
-            height: 18,
+          Expanded(
+            flex: 12,
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
@@ -602,10 +554,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 1),
           // 第二行：班次縮寫（加粗；無班次固定高度佔位，保持整月嚴格對齊）
-          SizedBox(
-            height: 16,
+          Expanded(
+            flex: 11,
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
@@ -621,10 +572,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 1),
           // 第三行：場所（固定高度佔位）
-          SizedBox(
-            height: 14,
+          Expanded(
+            flex: 9,
             child: Center(
               child: FittedBox(
                 fit: BoxFit.scaleDown,

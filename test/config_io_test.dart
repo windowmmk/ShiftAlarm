@@ -89,7 +89,7 @@ void main() {
       expect(store3.venues.length, 8);
     });
 
-    test('帶協議報文頭的 Base64 口令碼導出、校驗與導入還原', () async {
+    test('帶協議報文頭的 Base58 口令碼導出、校驗與導入還原', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
 
@@ -98,6 +98,8 @@ void main() {
       expect(code.startsWith('SHIFTALARM:v1:crc='), isTrue);
       expect(code.contains(':len='), isTrue);
       expect(code.contains(':ts='), isTrue);
+      final payload = code.split(':').last;
+      expect(isBase58(payload), isTrue);
 
       // 2. 報文頭預覽與 CRC32 校驗
       final p = previewConfig(code);
@@ -122,6 +124,17 @@ void main() {
       expect(store.defs.length, 4);
       expect(store.venues.length, 8);
       expect(store.defs['s00']!.name, '凌晨更');
+    });
+
+    test('舊版 Base64 口令向下相容測試', () async {
+      final store = await _storeWithPreset();
+      // 舊版格式 SHIFTALARM:<b64>
+      const legacyToken = 'SHIFTALARM:eyJhcHAiOiJTaGlmdEFsYXJtIiwidmVyc2lvbiI6MSwic2hpZnRzIjpbeyJpZCI6InMwMCIsIm5hbWUiOiLph4zmmajmm7QiLCJzdGFydFRpbWUiOiIwMDowMCIsImVuZFRpbWUiOiIwNjowMCIsImFsYXJtcyI6W119XSwidmVudWVzIjpbIkExIl19';
+      expect(isConfigPacket(legacyToken), isTrue);
+      final p = previewConfig(legacyToken);
+      expect(p.shifts, 1);
+      expect(p.venues, 1);
+      expect(p.names, contains('凌晨更'));
     });
 
     test('報文頭校驗碼防篡改與防截斷驗證', () async {

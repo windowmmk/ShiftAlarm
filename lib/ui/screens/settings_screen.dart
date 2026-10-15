@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../domain/alarm_service.dart';
 import '../../domain/config_io.dart';
 import '../../domain/csv_import.dart';
+import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import 'permission_check_screen.dart';
@@ -95,25 +96,176 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // ── CSV 導入 ──────────────────────────────────────
-  // 格式：每行 YYYY-MM-DD,slot,venue，例如 2026-10-15,00-06,A1
-  // slot 必須 match 到某個 ShiftDef 嘅時間範圍（HH-HH 或 HH:mm-HH:mm）
+  // ── 排班表導出／導入 ──────────────────────────────
+  // 支援 Base58 口令碼（包含魔數、CRC32、長度與天數驗證）與傳統 CSV 雙模相容。
 
   static int _accentBg(ShiftDef def) =>
       const ShiftTokens().slotForTime(def.startTime).bg.toARGB32();
   static int _accentFg(ShiftDef def) =>
       const ShiftTokens().slotForTime(def.startTime).fg.toARGB32();
 
+  Future<void> _exportRoster() async {
+    final now = DateTime.now();
+    DateTime? selectedMonth = DateTime(now.year, now.month, 1);
+    var exportAll = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final code = exportRosterCode(
+            widget.store,
+            month: exportAll ? null : selectedMonth,
+          );
+          final byteLen = utf8.encode(code).length;
+          final assignmentCount = exportAll
+              ? widget.store.assignments.length
+              : widget.store.assignments.keys.where((k) {
+                  final p =
+                      '${selectedMonth!.year.toString().padLeft(4, '0')}-${selectedMonth!.month.toString().padLeft(2, '0')}';
+                  return k.startsWith(p);
+                }).length;
+
+          return AlertDialog(
+            title: const Text('導出排班口令'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: Text(
+                                '${selectedMonth!.year}年${selectedMonth!.month}月'),
+                            selected: !exportAll,
+                            onSelected: (val) {
+                              if (val) setD(() => exportAll = false);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('全部排班'),
+                            selected: exportAll,
+                            onSelected: (val) {
+                              if (val) setD(() => exportAll = true);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle,
+                              size: 16, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '包含 $assignmentCount 日排班，已自動複製到剪貼簿！',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF2E7D32),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '採用 Base58 報文協議，發給同事或換機貼上即可 1 秒還原排班：',
+                      style: TextStyle(
+                          fontSize: 12, color: context.tokens.neutralFg2),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: context.tokens.neutralBg2,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: context.tokens.neutralStroke),
+                      ),
+                      child: SelectableText(
+                        code,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '長度：${code.length} 字元（$byteLen 字節）',
+                      style: TextStyle(
+                          fontSize: 11, color: context.tokens.neutralFg2),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('關閉'),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: code));
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已再次複製排班口令到剪貼簿')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('再複製一次'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _openImport() async {
     final ctrl = TextEditingController();
-    CsvImportResult? preview;
+    DecodedRosterResult? result;
     var importing = false;
+    var clipboardAutoDetected = false;
+
+    // 開啟時自動檢查剪貼簿
+    try {
+      final clip = await Clipboard.getData(ClipboardData.textPlain);
+      final clipText = clip?.text?.trim() ?? '';
+      if (clipText.isNotEmpty && isRosterPacket(clipText)) {
+        ctrl.text = clipText;
+        clipboardAutoDetected = true;
+        try {
+          result = decodeRosterText(clipText, widget.store.defs);
+        } catch (_) {}
+      }
+    } catch (_) {}
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: const Text('導入排班（CSV）'),
+          title: const Text('導入排班（口令 / CSV）'),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
@@ -121,32 +273,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('每行：YYYY-MM-DD,代號,場所',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: context.tokens.neutralFg2)),
-                  const SizedBox(height: 8),
+                  if (clipboardAutoDetected)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.content_paste_go,
+                              size: 16, color: Color(0xFF2E7D32)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '已自動辨識剪貼簿中的排班報文口令',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF2E7D32),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Text(
+                    '支援貼上 Base58 排班口令碼，或每行「YYYY-MM-DD,代號,場所」CSV。',
+                    style: TextStyle(
+                        fontSize: 12, color: context.tokens.neutralFg2),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '排班口令 / CSV：',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          try {
+                            final clip = await Clipboard.getData(
+                                ClipboardData.textPlain);
+                            final text = clip?.text?.trim() ?? '';
+                            if (text.isNotEmpty) {
+                              ctrl.text = text;
+                              setD(() {
+                                result = decodeRosterText(
+                                    text, widget.store.defs);
+                              });
+                            }
+                          } catch (_) {}
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.paste, size: 14),
+                        label: const Text('貼上剪貼簿',
+                            style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: ctrl,
-                    maxLines: 8,
-                    minLines: 4,
+                    maxLines: 6,
+                    minLines: 3,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '貼上 CSV…',
+                      hintText: '貼上 SHIFTROSTER:v1:... 或 CSV…',
                     ),
                     style: const TextStyle(
-                        fontSize: 13, fontFamily: 'monospace'),
+                        fontSize: 12, fontFamily: 'monospace'),
+                    onChanged: (text) {
+                      setD(() {
+                        result = text.trim().isEmpty
+                            ? null
+                            : decodeRosterText(text, widget.store.defs);
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () {
-                      setD(() => preview = parseRosterCsv(ctrl.text, widget.store.defs));
+                      setD(() => result =
+                          decodeRosterText(ctrl.text, widget.store.defs));
                     },
                     child: const Text('解析預覽'),
                   ),
-                  if (preview != null) ...[
+                  if (result != null) ...[
                     const SizedBox(height: 8),
-                    _buildImportPreview(preview!),
+                    _buildRosterImportPreview(result!),
                   ],
                 ],
               ),
@@ -157,14 +381,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('取消')),
             FilledButton(
-              onPressed: (preview == null ||
-                      preview!.valid.isEmpty ||
+              onPressed: (result == null ||
+                      result!.importResult.valid.isEmpty ||
                       importing)
                   ? null
                   : () async {
                       setD(() => importing = true);
-                      final rows = preview!.valid;
-                      // 批次寫入 store（一次性持久化，避免反覆全量寫入 SharedPreferences）
+                      final rows = result!.importResult.valid;
                       await widget.store.assignBatch([
                         for (final r in rows)
                           (
@@ -192,8 +415,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('導入完成：$done 日')),
+                          SnackBar(content: Text('排班導入完成：$done 日')),
                         );
                       }
                     },
@@ -210,12 +432,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ctrl.dispose();
   }
 
-  Widget _buildImportPreview(CsvImportResult r) {
+  Widget _buildRosterImportPreview(DecodedRosterResult res) {
     final t = context.tokens;
+    final r = res.importResult;
     final overwrite = r.valid
         .where((row) => widget.store.assignments.containsKey(row.date))
         .length;
     final dates = r.valid.map((e) => e.date).toList()..sort();
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -225,22 +449,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('有效 ${r.valid.length} 行',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Row(
+            children: [
+              Text('有效 ${r.valid.length} 日排班',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              if (res.crcVerified)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFA5D6A7)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_outlined,
+                          size: 12, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 3),
+                      Text(
+                        'CRC32 校驗通過',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           if (dates.isNotEmpty)
-            Text('${dates.first} ～ ${dates.last}',
-                style:
-                    TextStyle(fontSize: 12, color: t.neutralFg2)),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text('${dates.first} ～ ${dates.last}',
+                  style: TextStyle(fontSize: 12, color: t.neutralFg2)),
+            ),
+          if (res.exportTime != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '導出時間：${res.exportTime!.year}-${res.exportTime!.month.toString().padLeft(2, '0')}-${res.exportTime!.day.toString().padLeft(2, '0')} ${res.exportTime!.hour.toString().padLeft(2, '0')}:${res.exportTime!.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 11, color: t.neutralFg2),
+              ),
+            ),
           if (overwrite > 0)
-            Text('其中 $overwrite 日已有排班，會被覆蓋',
-                style: TextStyle(fontSize: 12, color: t.danger)),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('其中 $overwrite 日已有排班，會被覆蓋',
+                  style: TextStyle(fontSize: 12, color: t.danger)),
+            ),
           if (r.errors.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text('跳過 ${r.errors.length} 行：',
                 style: TextStyle(fontSize: 12, color: t.danger)),
             for (final e in r.errors.take(5))
-              Text(e,
-                  style: TextStyle(fontSize: 11, color: t.danger)),
+              Text(e, style: TextStyle(fontSize: 11, color: t.danger)),
             if (r.errors.length > 5)
               Text('…仲有 ${r.errors.length - 5} 行',
                   style: TextStyle(fontSize: 11, color: t.danger)),
@@ -584,7 +851,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
-            const Text('版本 3.0.0', style: TextStyle(fontSize: 12)),
+            const Text('版本 3.2.0', style: TextStyle(fontSize: 12)),
             const SizedBox(height: 4),
             const SelectableText(
               'https://github.com/windowmmk/ShiftAlarm',
@@ -650,10 +917,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 1),
           ],
+          const _SectionHeader('排班表'),
+          ListTile(
+            leading: const Icon(Icons.calendar_month_outlined),
+            title: const Text('導出排班口令'),
+            subtitle: const Text('當月或全部排班，一鍵複製 Base58 口令'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _exportRoster,
+          ),
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.upload_outlined),
-            title: const Text('導入排班（CSV）'),
-            subtitle: const Text('貼上 YYYY-MM-DD,代號,場所'),
+            title: const Text('導入排班（口令 / CSV）'),
+            subtitle: const Text('支援 Base58 口令碼或 CSV 文字'),
             trailing: const Icon(Icons.chevron_right),
             onTap: _openImport,
           ),
