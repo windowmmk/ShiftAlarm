@@ -89,19 +89,22 @@ void main() {
       expect(store3.venues.length, 8);
     });
 
-    test('帶協議報文頭的 Base58 口令碼導出、校驗與導入還原', () async {
+    test('帶協議報文頭的 v2 緊湊二進制 Base58 口令碼導出、長度壓減、校驗與導入還原', () async {
       final store = await _storeWithPreset();
       final code = exportConfigCode(store);
 
       // 1. 報文頭格式與剪貼簿快速偵測檢查
       expect(isConfigPacket(code), isTrue);
-      expect(code.startsWith('SHIFTALARM:v1:crc='), isTrue);
+      expect(code.startsWith('SHIFTALARM:v2:crc='), isTrue);
       expect(code.contains(':len='), isTrue);
       expect(code.contains(':ts='), isTrue);
       final payload = code.split(':').last;
       expect(isBase58(payload), isTrue);
 
-      // 2. 報文頭預覽與 CRC32 校驗
+      // 2. 長度壓減檢驗：由原本 2000+ 字元壓縮至 200 字元以內！
+      expect(code.length, lessThan(200));
+
+      // 3. 報文頭預覽與 CRC32 校驗
       final p = previewConfig(code);
       expect(p.shifts, 4);
       expect(p.venues, 8);
@@ -109,17 +112,17 @@ void main() {
       expect(p.crcHex, isNotNull);
       expect(p.exportTime, isNotNull);
 
-      // 3. 通訊軟體折行與空格容錯（模擬微信/備忘錄自動換行）
+      // 4. 通訊軟體折行與空格容錯（模擬微信/備忘錄自動換行）
       final wrappedCode = code.replaceRange(30, 30, '\n  \t  ');
       final pWrapped = previewConfig(wrappedCode);
       expect(pWrapped.shifts, 4);
       expect(pWrapped.crcVerified, isTrue);
 
-      // 4. 清空現有資料
+      // 5. 清空現有資料
       await store.replaceAllDefs({});
       await store.replaceAllVenues([]);
 
-      // 5. 導入還原
+      // 6. 導入還原
       await importConfigText(store, wrappedCode);
       expect(store.defs.length, 4);
       expect(store.venues.length, 8);
