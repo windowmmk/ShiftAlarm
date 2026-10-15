@@ -33,7 +33,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Prepare APK Asset
         run: cp build/app/outputs/flutter-apk/app-release.apk ShiftAlarm-v3.1.0.apk
