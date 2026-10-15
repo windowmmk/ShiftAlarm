@@ -838,25 +838,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   bool _urlHashHandled = false;
 
-  /// 自動檢查網址 Hash（支援 #c=SA2:... 配置導入 或 #r=SR2:... 排班導入）
+  /// 自動檢查網址參數與 Hash（優先 ?c=SA2:... / ?r=SR2:... 避免微信標籤誤判；相容 #c= / #r=）
   void _checkUrlHashImport() {
     if (_urlHashHandled) return;
-    final fragment = Uri.base.fragment;
-    if (fragment.isEmpty) return;
-    _urlHashHandled = true;
 
     String? configCode;
     String? rosterCode;
 
-    if (fragment.startsWith('c=')) {
-      configCode = Uri.decodeComponent(fragment.substring(2));
-    } else if (fragment.startsWith('r=')) {
-      rosterCode = Uri.decodeComponent(fragment.substring(2));
-    } else if (isConfigPacket(fragment)) {
-      configCode = Uri.decodeComponent(fragment);
-    } else if (isRosterPacket(fragment)) {
-      rosterCode = Uri.decodeComponent(fragment);
+    // 1. 優先檢查 Query 參數（?c=... 或 ?r=...），在微信中完全無 # 符號，徹底杜絕被誤認為話題標籤
+    final q = Uri.base.queryParameters;
+    if (q.containsKey('c') && q['c']!.isNotEmpty) {
+      configCode = q['c'];
+    } else if (q.containsKey('r') && q['r']!.isNotEmpty) {
+      rosterCode = q['r'];
     }
+
+    // 2. 次選檢查 Hash 錨點（#c=... 或 #r=...）相容直接輸入或錨點連結
+    if (configCode == null && rosterCode == null) {
+      final fragment = Uri.base.fragment;
+      if (fragment.isNotEmpty) {
+        if (fragment.startsWith('c=')) {
+          configCode = Uri.decodeComponent(fragment.substring(2));
+        } else if (fragment.startsWith('r=')) {
+          rosterCode = Uri.decodeComponent(fragment.substring(2));
+        } else if (isConfigPacket(fragment)) {
+          configCode = Uri.decodeComponent(fragment);
+        } else if (isRosterPacket(fragment)) {
+          rosterCode = Uri.decodeComponent(fragment);
+        }
+      }
+    }
+
+    if (configCode == null && rosterCode == null) return;
+    _urlHashHandled = true;
 
     if (configCode != null && mounted) {
       _promptImportConfigFromUrl(configCode);
