@@ -482,74 +482,66 @@ class _CalendarScreenState extends State<CalendarScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
-      child: def == null
-          ? Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  '$day',
-                  style: TextStyle(
-                    fontSize: 19.0,
-                    fontWeight: isToday
-                        ? FontWeight.w800
-                        : (isCurrentMonth ? FontWeight.w600 : FontWeight.w400),
-                    color: dateColor,
-                    height: 1.0,
-                  ),
-                  textAlign: TextAlign.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 第一行：日期（統一固定 13.0px bold，無論有冇排班均佔相同高度）
+          Expanded(
+            child: Center(
+              child: Text(
+                '$day',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13.0,
+                  fontWeight: FontWeight.bold,
+                  color: dateColor,
+                  height: 1.0,
                 ),
+                textAlign: TextAlign.center,
               ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // 第一行：日期
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 13.0,
-                      fontWeight:
-                          isCurrentMonth ? FontWeight.bold : FontWeight.w500,
-                      color: dateColor,
-                      height: 1.0,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                // 第二行：班次縮寫（大號、超粗黑體）
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    truncateAbbr(def.abbr),
-                    style: TextStyle(
-                      fontSize: note.isNotEmpty ? 15.5 : 18.5,
-                      fontWeight: FontWeight.w900,
-                      color: abbrColor,
-                      height: 1.0,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                // 第三行：場所（有場所才佔位，無場所時班次享有更大空間）
-                if (note.isNotEmpty)
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      truncateAbbr(note),
+            ),
+          ),
+          // 第二行：班次縮寫（固定 13.0px 超粗黑體；無排班佔位對齊）
+          Expanded(
+            child: Center(
+              child: def != null
+                  ? Text(
+                      truncateAbbr(def.abbr),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 11.0,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w900,
+                        color: abbrColor,
+                        height: 1.0,
+                      ),
+                      textAlign: TextAlign.center,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+          // 第三行：場所（固定 13.0px 粗體，與班次同等權重；無場所佔位對齊）
+          Expanded(
+            child: Center(
+              child: (def != null && note.isNotEmpty)
+                  ? Text(
+                      truncateAbbr(note),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.0,
+                        fontWeight: FontWeight.w800,
                         color: noteColor,
                         height: 1.0,
                       ),
                       textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
+                    )
+                  : const SizedBox.shrink(),
             ),
+          ),
+        ],
+      ),
     );
 
     return GestureDetector(
