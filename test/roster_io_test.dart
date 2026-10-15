@@ -56,16 +56,12 @@ void main() {
       final code = exportRosterCode(store);
 
       expect(isRosterPacket(code), isTrue);
-      expect(code.startsWith('SHIFTROSTER:v2:crc='), isTrue);
-      expect(code.contains(':len='), isTrue);
-      expect(code.contains(':days=4:'), isTrue);
-      expect(code.contains(':ts='), isTrue);
+      expect(code.startsWith('SR2:'), isTrue);
 
-      // 緊湊預編碼長度檢驗：整月排班由 3500+ 字元壓縮至 300 字元以內
-      expect(code.length, lessThan(200));
+      // 極簡緊湊預編碼長度檢驗：4天排班（含自定義中文備註）壓縮至 150 字元以內
+      expect(code.length, lessThan(150));
 
-      final parts = code.split(':');
-      final payload = parts.last;
+      final payload = code.substring(4);
       expect(isBase58(payload), isTrue);
     });
 
@@ -119,7 +115,11 @@ void main() {
       final store = await _storeWithSampleRoster();
       final code = exportRosterCode(store);
 
-      final tampered = code.replaceFirst('crc=', 'crc=99999999_');
+      // 篡改 Base58 數據內容
+      final payload = code.substring(4);
+      final tamperedPayload =
+          (payload.startsWith('1') ? '2' : '1') + payload.substring(1);
+      final tampered = 'SR2:$tamperedPayload';
       final decoded = decodeRosterText(tampered, store.defs);
       expect(decoded.importResult.valid, isEmpty);
       expect(decoded.importResult.errors.first, contains('校驗碼不符'));
@@ -136,6 +136,19 @@ void main() {
       expect(decoded.importResult.valid.length, 2);
       expect(decoded.importResult.valid[0].date, '2026-10-15');
       expect(decoded.importResult.valid[0].venue, 'A1');
+    });
+
+    test('網址 Hash 參數提取與還原', () async {
+      final store = await _storeWithSampleRoster();
+      final code = exportRosterCode(store);
+      final shareUrl = 'https://windowmmk.github.io/ShiftAlarm/#r=$code';
+      final uri = Uri.parse(shareUrl);
+      final fragment = uri.fragment;
+      expect(fragment.startsWith('r='), isTrue);
+      final extracted = Uri.decodeComponent(fragment.substring(2));
+      expect(extracted, equals(code));
+      final decoded = decodeRosterText(extracted, store.defs);
+      expect(decoded.importResult.valid.length, 4);
     });
   });
 }
