@@ -238,10 +238,6 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
               child: const Text('取消')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF424242),
-              foregroundColor: Colors.white,
-            ),
             child: const Text('新增'),
           ),
         ],
@@ -274,10 +270,6 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
               child: const Text('取消')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF424242),
-              foregroundColor: Colors.white,
-            ),
             child: const Text('儲存'),
           ),
         ],
@@ -291,6 +283,7 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
   }
 
   Future<void> _deleteVenue(String v) async {
+    final t = context.tokens;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -303,7 +296,7 @@ class _ShiftManageScreenState extends State<ShiftManageScreen>
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF424242),
+              backgroundColor: t.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('刪除'),
@@ -532,10 +525,6 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
                 child: const Text('取消')),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF424242),
-                foregroundColor: Colors.white,
-              ),
               child: const Text('確定'),
             ),
           ],
@@ -637,7 +626,7 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF424242),
+              backgroundColor: const ShiftTokens().danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('刪除'),
@@ -923,8 +912,6 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
           FilledButton(
             onPressed: _saving ? null : _save,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF424242),
-              foregroundColor: Colors.white,
               minimumSize: const Size(0, 52),
             ),
             child: Text(_saving ? '儲存緊…' : '儲存'),

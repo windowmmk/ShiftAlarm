@@ -183,12 +183,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 IconButton(
                   onPressed: () => setDialogState(() => selectedYear--),
                   icon: const Icon(Icons.chevron_left),
+                  tooltip: '上一年',
                 ),
                 Text('$selectedYear年',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: t.neutralFg)),
                 IconButton(
                   onPressed: () => setDialogState(() => selectedYear++),
                   icon: const Icon(Icons.chevron_right),
+                  tooltip: '下一年',
                 ),
               ],
             ),
@@ -214,12 +219,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       Navigator.pop(ctx);
                       _jumpToYearMonth(selectedYear, month);
                     },
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     child: Container(
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: isCurrent ? t.brand : t.neutralBg2,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: isCurrent ? t.brand : t.neutralStroke,
                         ),
@@ -239,9 +244,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('關閉'),
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('關閉',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
           );
@@ -451,8 +462,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (isCurrentMonth) {
       cellBg = baseBg;
       borderColor = isSelected
-          ? t.neutralFg
-          : (isToday ? t.brand : (slot?.border ?? t.neutralStroke));
+          ? t.brand
+          : (isToday ? t.brand.withValues(alpha: 0.65) : (slot?.border ?? t.neutralStroke));
       dateColor = (holiday != null) ? t.danger : baseFg;
       abbrColor = baseFg;
       noteColor = baseFg;
@@ -462,9 +473,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ? slot!.bg.withValues(alpha: 0.3)
           : t.neutralBg2.withValues(alpha: 0.45);
       borderColor = isSelected
-          ? t.neutralFg.withValues(alpha: 0.6)
+          ? t.brand.withValues(alpha: 0.6)
           : (isToday
-              ? t.brand.withValues(alpha: 0.5)
+              ? t.brand.withValues(alpha: 0.4)
               : t.neutralStroke.withValues(alpha: 0.35));
       dateColor = (holiday != null)
           ? t.danger.withValues(alpha: 0.38)
@@ -479,7 +490,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         color: cellBg,
         border: Border.all(
           color: borderColor,
-          width: (isSelected || isToday) ? 2.0 : 1.0,
+          width: (isSelected || isToday) ? 1.5 : 1.0,
         ),
         borderRadius: BorderRadius.circular(4),
       ),
@@ -847,7 +858,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     child: Text(n,
                         style: TextStyle(
                             fontSize: t.fontCaption,
-                            color: const Color(0xFF2A9D8F),
+                            color: t.neutralFg2,
                             fontWeight: FontWeight.w600)),
                   ),
                 ))
@@ -905,11 +916,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.link, color: Color(0xFF2E7D32)),
-              SizedBox(width: 8),
-              Text('網址配置導入'),
+              Icon(Icons.link, color: context.tokens.brand),
+              const SizedBox(width: 8),
+              const Text('網址配置導入'),
             ],
           ),
           content: Column(
@@ -921,9 +932,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F8E9),
+                  color: context.tokens.neutralBg2,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFA5D6A7)),
+                  border: Border.all(color: context.tokens.neutralStroke),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1002,11 +1013,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.link, color: Color(0xFF1565C0)),
-              SizedBox(width: 8),
-              Text('網址排班導入'),
+              Icon(Icons.link, color: context.tokens.brand),
+              const SizedBox(width: 8),
+              const Text('網址排班導入'),
             ],
           ),
           content: Column(
@@ -1018,9 +1029,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD),
+                  color: context.tokens.neutralBg2,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF90CAF9)),
+                  border: Border.all(color: context.tokens.neutralStroke),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

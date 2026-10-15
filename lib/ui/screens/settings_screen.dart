@@ -323,13 +323,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             actions: [
-              TextButton(
+              OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(64, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
-                child: const Text('關閉', style: TextStyle(fontSize: 14)),
+                child: const Text('關閉', style: TextStyle(fontSize: 13.5)),
               ),
               OutlinedButton.icon(
                 onPressed: () {
@@ -343,12 +343,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
-                icon: const Icon(Icons.qr_code, size: 17),
+                icon: const Icon(Icons.qr_code, size: 16),
                 label: const Text('二維碼 / 連結',
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold)),
               ),
               FilledButton.icon(
                 onPressed: () async {
@@ -360,12 +361,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  backgroundColor: context.tokens.brand,
                 ),
-                icon: const Icon(Icons.copy, size: 17),
+                icon: const Icon(Icons.copy, size: 16),
                 label: const Text('複製口令',
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -431,13 +434,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 42),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(64, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
-            child: const Text('關閉', style: TextStyle(fontSize: 14)),
+            child: const Text('關閉', style: TextStyle(fontSize: 13.5)),
           ),
           OutlinedButton.icon(
             onPressed: () {
@@ -451,12 +454,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 42),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
-            icon: const Icon(Icons.qr_code, size: 17),
+            icon: const Icon(Icons.qr_code, size: 16),
             label: const Text('二維碼 / 連結',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.bold)),
           ),
           FilledButton.icon(
             onPressed: () async {
@@ -472,12 +476,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
             style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 42),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              backgroundColor: context.tokens.brand,
             ),
-            icon: const Icon(Icons.copy, size: 17),
+            icon: const Icon(Icons.copy, size: 16),
             label: const Text('複製口令',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -495,37 +501,152 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _openAbout() {
+    final t = context.tokens;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('關於'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        title: Row(
           children: [
-            const Text('排班鬧鐘'),
-            const SizedBox(height: 8),
-            const Text(
-              '為輪班人士設計嘅排班＋鬧鐘 App。本地排班、原生系統鬧鐘、純離線——無帳號、無網絡、無追蹤。',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            const Text('版本 3.3.1', style: TextStyle(fontSize: 12)),
-            const SizedBox(height: 4),
-            const SelectableText(
-              'https://github.com/windowmmk/ShiftAlarm',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue,
-                decoration: TextDecoration.underline,
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: t.brand,
+                borderRadius: BorderRadius.circular(8),
               ),
+              child: const Center(
+                child: Text(
+                  'S',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ShiftAlarm 排班鬧鐘',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: t.neutralFg,
+                  ),
+                ),
+                Text(
+                  '版本 3.3.5 (Build 21)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: t.neutralFg2,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F1FC),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFB6D3F9)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, size: 16, color: t.brand),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '100% 純離線 · 零網絡權限 · 零追蹤',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: t.brand,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '專為輪班人士量身打造的極致隱私排班日曆與精確鬧鐘。瑞士精密工藝排版，原生底層鬧鐘喚醒，支援極簡二進制口令協議。',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: t.neutralFg,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: t.neutralBg2,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: t.neutralStroke),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.code, size: 15, color: t.neutralFg2),
+                        const SizedBox(width: 6),
+                        Text(
+                          '開源代碼庫 (GitHub)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: t.neutralFg,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      'https://github.com/windowmmk/ShiftAlarm',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: t.brand,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                backgroundColor: t.brand,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('知道了',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),

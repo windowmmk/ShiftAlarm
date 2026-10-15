@@ -456,12 +456,8 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                FilledButton.tonal(
+                OutlinedButton(
                   onPressed: () => _open(item),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE0E0E0),
-                    foregroundColor: const Color(0xFF424242),
-                  ),
                   child: Text(item.actionLabel),
                 ),
                 if (item.manualConfirmKey != null && !item.manualOk)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/alarm_service.dart';
 import '../../domain/shift_store.dart';
+import '../../theme/app_theme.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'shift_manage_screen.dart';
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     return Scaffold(
       body: IndexedStack(
         index: _index,
@@ -33,31 +35,37 @@ class _HomeScreenState extends State<HomeScreen> {
           SettingsScreen(store: widget.store, alarms: widget.alarms),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: '日曆',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule),
-            label: '班次',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: '統計',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '設置',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: t.neutralStroke, width: 0.8)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month),
+              label: '日曆',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.schedule_outlined),
+              selectedIcon: Icon(Icons.schedule),
+              label: '班次',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_outlined),
+              selectedIcon: Icon(Icons.bar_chart),
+              label: '統計',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: '設置',
+            ),
+          ],
+        ),
       ),
     );
   }

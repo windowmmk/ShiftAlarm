@@ -105,26 +105,47 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget _rangeChips(ShiftTokens t) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final r in StatsRange.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: ChoiceChip(
-                label: Text(r.label,
-                    style: TextStyle(
-                        fontSize: t.fontCaption,
-                        color: _range == r ? Colors.white : t.neutralFg)),
-                selected: _range == r,
-                selectedColor: t.brand,
-                backgroundColor: t.neutralBg2,
-                side: BorderSide.none,
-                onSelected: (_) => setState(() {
+          for (final r in StatsRange.values) ...[
+            Builder(builder: (ctx) {
+              final isSel = _range == r;
+              return InkWell(
+                onTap: () => setState(() {
                   _range = r;
                   _cachedResult = null;
                 }),
-              ),
-            ),
+                borderRadius: BorderRadius.circular(6),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSel ? t.brand : t.neutralBg2,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSel ? t.brand : t.neutralStroke,
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    r.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                      color: isSel ? Colors.white : t.neutralFg,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(width: 6),
+          ],
         ],
       ),
     );
@@ -232,7 +253,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         height: 18,
                         decoration: BoxDecoration(
                           color: t.neutralBg2,
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: FractionallySizedBox(
                           alignment: Alignment.centerLeft,
@@ -242,7 +263,7 @@ class _StatsScreenState extends State<StatsScreen> {
                             decoration: BoxDecoration(
                               color: bgs[i],
                               border: Border.all(color: borders[i]),
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           ),
                         ),
@@ -308,7 +329,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         height: 18,
                         decoration: BoxDecoration(
                           color: t.neutralBg2,
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: FractionallySizedBox(
                           alignment: Alignment.centerLeft,
@@ -319,7 +340,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               color: const Color(0xFFD6E9F8),
                               border:
                                   Border.all(color: const Color(0xFFA9CCE8)),
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           ),
                         ),
