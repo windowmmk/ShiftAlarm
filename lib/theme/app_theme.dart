@@ -52,12 +52,12 @@ class ShiftTokens extends ThemeExtension<ShiftTokens> {
     this.slot18Fg = const Color(0xFF5B21B6),
     this.slot18Border = const Color(0xFFC4B5FD),
     this.neutralBg = const Color(0xFFFFFFFF),
-    this.neutralBg2 = const Color(0xFFF5F5F5),
-    this.neutralFg = const Color(0xFF242424),
-    this.neutralFg2 = const Color(0xFF616161),
-    this.neutralStroke = const Color(0xFFD1D1D1),
-    this.brand = const Color(0xFF0078D4),
-    this.danger = const Color(0xFFBC2F32),
+    this.neutralBg2 = const Color(0xFFF6F8FA),
+    this.neutralFg = const Color(0xFF1F2328),
+    this.neutralFg2 = const Color(0xFF656D76),
+    this.neutralStroke = const Color(0xFFD0D7DE),
+    this.brand = const Color(0xFF0969DA),
+    this.danger = const Color(0xFFCF222E),
     this.fontCaption = 12,
     this.fontBody = 14,
     this.fontSubtitle = 20,
@@ -184,20 +184,130 @@ ThemeData buildAppTheme() {
     scaffoldBackgroundColor: t.neutralBg,
     colorScheme: ColorScheme.light(
       primary: t.brand,
+      onPrimary: Colors.white,
+      secondary: t.brand,
+      onSecondary: Colors.white,
+      secondaryContainer: const Color(0xFFE8F1FC), // 消除 M3 預設薄荷青，鎖定冷淡冰藍
+      onSecondaryContainer: t.brand,
       surface: t.neutralBg,
-      surfaceContainerHighest: t.neutralBg2,
       onSurface: t.neutralFg,
+      surfaceContainerHighest: t.neutralBg2,
+      outline: t.neutralStroke,
+      outlineVariant: const Color(0xFFE1E4E8),
       error: t.danger,
+      onError: Colors.white,
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: t.neutralBg,
       foregroundColor: t.neutralFg,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
       titleTextStyle: TextStyle(
         color: t.neutralFg,
-        fontSize: t.fontSubtitle,
-        fontWeight: FontWeight.w600,
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
       ),
+      iconTheme: IconThemeData(color: t.neutralFg),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      height: 64,
+      indicatorColor: const Color(0xFFE8F1FC),
+      indicatorShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return IconThemeData(color: t.brand, size: 24);
+        }
+        return IconThemeData(color: t.neutralFg2, size: 24);
+      }),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: t.brand,
+          );
+        }
+        return TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: t.neutralFg2,
+        );
+      }),
+    ),
+    dialogTheme: DialogTheme(
+      backgroundColor: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: t.neutralStroke, width: 1),
+      ),
+      titleTextStyle: TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.bold,
+        color: t.neutralFg,
+      ),
+    ),
+    cardTheme: CardTheme(
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: t.neutralStroke, width: 1),
+      ),
+      margin: EdgeInsets.zero,
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: t.brand,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        side: BorderSide(color: t.neutralStroke, width: 1),
+        foregroundColor: t.neutralFg,
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        foregroundColor: t.brand,
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: t.neutralBg2,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: t.neutralStroke, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: t.neutralStroke, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: t.brand, width: 1.5),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: t.neutralStroke,
+      thickness: 1,
+      space: 1,
+    ),
+    chipTheme: ChipThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      side: BorderSide.none,
+      showCheckmark: false,
     ),
     extensions: const [ShiftTokens()],
   );

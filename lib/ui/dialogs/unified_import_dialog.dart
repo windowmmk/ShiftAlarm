@@ -256,11 +256,11 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         _configPreview != null;
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.file_download_outlined, color: Color(0xFF0078D4)),
-          SizedBox(width: 8),
-          Text('導入排班 / 配置', style: TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.file_download_outlined, color: t.brand),
+          const SizedBox(width: 8),
+          const Text('導入排班 / 配置', style: TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
       content: SizedBox(
@@ -310,7 +310,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                     '貼上排班內容：',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
-                  FilledButton.tonalIcon(
+                  OutlinedButton.icon(
                     onPressed: () async {
                       try {
                         final clip =
@@ -322,12 +322,14 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                         }
                       } catch (_) {}
                     },
-                    style: FilledButton.styleFrom(
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       minimumSize: const Size(0, 34),
+                      side: BorderSide(color: t.neutralStroke),
+                      foregroundColor: t.brand,
                     ),
-                    icon: const Icon(Icons.paste, size: 14),
+                    icon: Icon(Icons.paste, size: 14, color: t.brand),
                     label: const Text('貼上剪貼簿',
                         style: TextStyle(
                             fontSize: 12.5, fontWeight: FontWeight.bold)),
@@ -340,7 +342,6 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
                 maxLines: 5,
                 minLines: 3,
                 decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
                   hintText: '在此貼上分享連結、排班文字或代碼…',
                   hintStyle: const TextStyle(fontSize: 13),
                   suffixIcon: _ctrl.text.isNotEmpty
@@ -376,10 +377,10 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        OutlinedButton(
           onPressed: _importing ? null : () => Navigator.pop(context),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, 42),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(80, 42),
             padding: const EdgeInsets.symmetric(horizontal: 18),
           ),
           child: const Text('取消', style: TextStyle(fontSize: 14)),
@@ -387,9 +388,9 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         FilledButton.icon(
           onPressed: (canConfirm && !_importing) ? _executeImport : null,
           style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 42),
+            minimumSize: const Size(110, 42),
             padding: const EdgeInsets.symmetric(horizontal: 18),
-            backgroundColor: const Color(0xFF0078D4),
+            backgroundColor: t.brand,
             foregroundColor: Colors.white,
           ),
           icon: _importing
