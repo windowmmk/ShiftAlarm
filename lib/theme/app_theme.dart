@@ -311,7 +311,6 @@ ThemeData buildAppTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      duration: const Duration(milliseconds: 1500),
       backgroundColor: t.neutralFg,
       contentTextStyle: const TextStyle(
         color: Colors.white,
