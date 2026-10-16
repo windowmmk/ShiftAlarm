@@ -54,6 +54,33 @@ class AlarmService {
     return '準時';
   }
 
+  /// 推送及全屏鬧鐘文案格式化（去除「延後360分鐘」等技術位移用語，轉為人性化自然文案）
+  static String formatAlarmBody({
+    required String startTime,
+    required String endTime,
+    required ShiftAlarm alarm,
+    String note = '',
+  }) {
+    final (triggerHhmm, _) = alarmClockParts(startTime, alarm.offsetMinutes);
+    final venuePart = note.trim().isNotEmpty ? ' · 地點：${note.trim()}' : '';
+    final label = alarm.label;
+    final isClockOut = alarm.id == ShiftAlarm.clockOutId ||
+        label.contains('收工') ||
+        label.contains('下班');
+    final isClockIn = alarm.id == ShiftAlarm.clockInId ||
+        label.contains('開工打卡') ||
+        label.contains('上班打卡');
+
+    if (isClockOut) {
+      return '收工時間到了，記得打卡！ ($triggerHhmm)$venuePart';
+    }
+    if (isClockIn) {
+      return '開工時間到了，記得打卡！ ($startTime)$venuePart';
+    }
+    final shiftRange = endTime.isNotEmpty ? '$startTime–$endTime' : startTime;
+    return '班次時間：$shiftRange$venuePart';
+  }
+
   /// 鬧鐘實際觸發時刻（**顯示用**，唔影響排程）：
   /// trigger = 開工分鐘數 + offsetMinutes，normalize 到 0–1439。
   /// 回傳 (HH:mm, dayOffset)：dayOffset −1=前一日、0=當日、+1=後一日。
@@ -121,8 +148,12 @@ class AlarmService {
       if (t == null) continue; // 已過，唔排
       final id = base * 10 + i;
       final title = '${def.name} ${alarm.label}';
-      final body =
-          '$ymd ${def.startTime}開工（${offsetText(alarm.offsetMinutes)}）${note.isNotEmpty ? ' · $note' : ''}';
+      final body = formatAlarmBody(
+        startTime: def.startTime,
+        endTime: def.endTime,
+        alarm: alarm,
+        note: note,
+      );
       if (alarm.notificationOnly) {
         await bridge.scheduleGentle(
           id: id,
@@ -175,8 +206,12 @@ class AlarmService {
         if (t == null) continue;
         final id = base * 10 + i;
         final title = '${def.name} ${alarm.label}';
-        final body =
-            '${e.key} ${def.startTime}開工（${offsetText(alarm.offsetMinutes)}）${note.isNotEmpty ? ' · $note' : ''}';
+        final body = formatAlarmBody(
+          startTime: def.startTime,
+          endTime: def.endTime,
+          alarm: alarm,
+          note: note,
+        );
         if (alarm.notificationOnly) {
           gentle.add(GentleAlarmSchedule(
             id: id,
