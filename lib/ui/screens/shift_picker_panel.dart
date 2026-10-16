@@ -346,222 +346,229 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 第一行：日期切換、當日時間與地點（兩行高展示）、完成按鈕
-            Row(
+        child: SizedBox(
+          height: 126,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 8, left: 10, right: 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 左切日按鈕
-                InkWell(
-                  onTap: _saving ? null : () => _goDay(-1),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    width: 28,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: t.neutralBg2,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: t.neutralStroke),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.chevron_left, size: 18, color: t.neutralFg),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _dateLabel,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: t.neutralFg,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // 右切日按鈕
-                InkWell(
-                  onTap: _saving ? null : () => _goDay(1),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    width: 28,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: t.neutralBg2,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: t.neutralStroke),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(Icons.chevron_right, size: 18, color: t.neutralFg),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // 中間：時間與地點（兩行高）
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // 第一行：日期切換、當日時間與地點（兩行高展示）、完成按鈕（固定 42px）
+                SizedBox(
+                  height: 42,
+                  child: Row(
                     children: [
-                      // 上行：班次與時間
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.schedule, size: 13, color: t.neutralFg2),
-                          const SizedBox(width: 3),
-                          if (currentDef != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 0.5),
-                              decoration: BoxDecoration(
-                                color: slot?.bg ?? t.neutralBg2,
-                                borderRadius: BorderRadius.circular(3),
-                                border: Border.all(
-                                    color: slot?.border ?? t.neutralStroke,
-                                    width: 0.8),
-                              ),
-                              child: Text(
-                                currentDef.name,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: slot?.fg ?? t.neutralFg,
-                                ),
+                      // 左切日按鈕
+                      InkWell(
+                        onTap: _saving ? null : () => _goDay(-1),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          width: 28,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: t.neutralBg2,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: t.neutralStroke),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.chevron_left, size: 18, color: t.neutralFg),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _dateLabel,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: t.neutralFg,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // 右切日按鈕
+                      InkWell(
+                        onTap: _saving ? null : () => _goDay(1),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          width: 28,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: t.neutralBg2,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: t.neutralStroke),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.chevron_right, size: 18, color: t.neutralFg),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 中間：時間與地點（兩行高，固定內部各 19px）
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 上行：班次與時間（固定 19px）
+                            SizedBox(
+                              height: 19,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.schedule, size: 13, color: t.neutralFg2),
+                                  const SizedBox(width: 3),
+                                  if (currentDef != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4, vertical: 0.5),
+                                      decoration: BoxDecoration(
+                                        color: slot?.bg ?? t.neutralBg2,
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(
+                                            color: slot?.border ?? t.neutralStroke,
+                                            width: 0.8),
+                                      ),
+                                      child: Text(
+                                        currentDef.name,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: slot?.fg ?? t.neutralFg,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        '${currentDef.startTime}–${currentDef.endTime}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.normal,
+                                          color: t.neutralFg,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Text(
+                                      '未排班',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.normal,
+                                        color: t.neutralFg2,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '${currentDef.startTime}–${currentDef.endTime}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.normal,
-                                  color: t.neutralFg,
+                            const SizedBox(height: 1),
+                            // 下行：地點按鈕（固定 19px）
+                            SizedBox(
+                              height: 19,
+                              child: InkWell(
+                                onTap: () => _openVenueDialog(context),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on,
+                                      size: 13,
+                                      color: note.isNotEmpty ? t.brand : t.neutralFg2,
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Flexible(
+                                      child: Text(
+                                        note.isNotEmpty ? note : '設置地點',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: note.isNotEmpty
+                                              ? FontWeight.w500
+                                              : FontWeight.normal,
+                                          color: note.isNotEmpty
+                                              ? t.brand
+                                              : t.neutralFg2,
+                                          decoration: note.isEmpty
+                                              ? TextDecoration.underline
+                                              : TextDecoration.none,
+                                          decorationColor:
+                                              t.neutralFg2.withValues(alpha: 0.4),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (note.isNotEmpty) ...[
+                                      const SizedBox(width: 2),
+                                      Icon(Icons.edit,
+                                          size: 10,
+                                          color: t.brand.withValues(alpha: 0.7)),
+                                    ],
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ] else ...[
-                            Text(
-                              '未排班',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.normal,
-                                color: t.neutralFg2,
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      // 下行：地點按鈕（點擊設置/修改地點）
-                      InkWell(
-                        onTap: () => _openVenueDialog(context),
-                        borderRadius: BorderRadius.circular(4),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 1),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 13,
-                                color: note.isNotEmpty ? t.brand : t.neutralFg2,
-                              ),
-                              const SizedBox(width: 2),
-                              Flexible(
-                                child: Text(
-                                  note.isNotEmpty ? note : '設置地點',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: note.isNotEmpty
-                                        ? FontWeight.w500
-                                        : FontWeight.normal,
-                                    color: note.isNotEmpty
-                                        ? t.brand
-                                        : t.neutralFg2,
-                                    decoration: note.isEmpty
-                                        ? TextDecoration.underline
-                                        : TextDecoration.none,
-                                    decorationColor:
-                                        t.neutralFg2.withValues(alpha: 0.4),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (note.isNotEmpty) ...[
-                                const SizedBox(width: 2),
-                                Icon(Icons.edit,
-                                    size: 10,
-                                    color: t.brand.withValues(alpha: 0.7)),
-                              ],
-                            ],
+                      const SizedBox(width: 8),
+                      // 完成退出按鈕
+                      FilledButton(
+                        onPressed: widget.onClose,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 0),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
+                        child: const Text('完成',
+                            style:
+                                TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                // 完成退出按鈕
-                FilledButton(
-                  onPressed: widget.onClose,
-                  style: FilledButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                    minimumSize: const Size(0, 34),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text('完成',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                // 第二行：橫向排班卡片（點更即排，自動保存，高度固定 58px）
+                SizedBox(
+                  height: 58,
+                  child: defs.length <= 4
+                      ? Row(
+                          children: [
+                            for (int i = 0; i < defs.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 6),
+                              Expanded(
+                                child: _compactShiftButton(
+                                    t, defs[i], defs[i].id == currentId),
+                              ),
+                            ],
+                            const SizedBox(width: 6),
+                            _clearButton(t, currentId),
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (int i = 0; i < defs.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 6),
+                                SizedBox(
+                                  width: 88,
+                                  child: _compactShiftButton(
+                                      t, defs[i], defs[i].id == currentId),
+                                ),
+                              ],
+                              const SizedBox(width: 6),
+                              _clearButton(t, currentId),
+                            ],
+                          ),
+                        ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // 第二行：橫向排班卡片（點更即排，自動保存）
-            SizedBox(
-              height: 54,
-              child: defs.length <= 4
-                  ? Row(
-                      children: [
-                        for (int i = 0; i < defs.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 6),
-                          Expanded(
-                            child: _compactShiftButton(
-                                t, defs[i], defs[i].id == currentId),
-                          ),
-                        ],
-                        const SizedBox(width: 6),
-                        _clearButton(t, currentId),
-                      ],
-                    )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          for (int i = 0; i < defs.length; i++) ...[
-                            if (i > 0) const SizedBox(width: 6),
-                            SizedBox(
-                              width: 88,
-                              child: _compactShiftButton(
-                                  t, defs[i], defs[i].id == currentId),
-                            ),
-                          ],
-                          const SizedBox(width: 6),
-                          _clearButton(t, currentId),
-                        ],
-                      ),
-                    ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -626,7 +633,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   Widget _clearButton(ShiftTokens t, String? currentId) {
     return SizedBox(
       width: 56,
-      height: 54,
+      height: 58,
       child: Tooltip(
         message: '清除此日排更（設為放假）',
         child: OutlinedButton(

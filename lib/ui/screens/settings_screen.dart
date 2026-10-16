@@ -542,7 +542,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 Text(
-                  '版本 3.3.10 (Build 26)',
+                  '版本 3.3.11 (Build 27)',
                   style: TextStyle(
                     fontSize: 12,
                     color: t.neutralFg2,
