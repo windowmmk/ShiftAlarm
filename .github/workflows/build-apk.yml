@@ -16,12 +16,47 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Setup Permanent Release Keystore
+        run: |
+          KEYSTORE_PATH="android/app/shiftalarm-release.jks"
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Generating permanent release keystore with keytool..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias shiftalarm \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 18250 \
+              -storepass shiftalarm2026 \
+              -keypass shiftalarm2026 \
+              -dname "CN=ShiftAlarm, OU=App, O=ShiftAlarm, L=HongKong, ST=HK, C=HK"
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$KEYSTORE_PATH"
+            git commit -m "ci: persist permanent release keystore shiftalarm-release.jks [skip ci]" || true
+            git push origin HEAD:main || true
+          else
+            echo "Permanent keystore already present: $KEYSTORE_PATH"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Backup Keystore Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiftalarm-release-keystore-backup
+          path: android/app/shiftalarm-release.jks
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -37,6 +72,10 @@ jobs:
 
       - name: Build Release APK
         run: flutter build apk --release --android-skip-build-dependency-validation
+        env:
+          KEYSTORE_PASSWORD: shiftalarm2026
+          KEY_ALIAS: shiftalarm
+          KEY_PASSWORD: shiftalarm2026
 
       - name: Prepare APK Asset
         run: |
@@ -62,17 +101,10 @@ jobs:
 
             專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式。
 
-            #### ✨ 主要功能亮點
-            - 🚀 **全新 SA2 / SR2 極簡二進制協議（Base58）**：
-              - 配置口令 `SA2:<Base58>`（90 ~ 115 字元）
-              - 排班口令 `SR2:<Base58>`（150 ~ 230 字元）
-              - 內嵌 IEEE 802.3 CRC32 防偽防篡改校驗碼與時間戳
-              - 雙模相容純 CSV 文字匯入（`YYYY-MM-DD,代號,地點`）
-            - 🔗 **全場景零負擔分享體驗**：
-              - 剪貼簿即時探針：打開彈窗自動辨識有效口令，免去手動貼上步驟
-              - 網址一鍵導入：支援 `?c=SA2:...` 與 `?r=SR2:...`（微信友善無 `#`）及 `#c=` / `#r=`，點開網址直接彈窗套用
-              - 二維碼（QR Code）面對面掃碼快傳
-            - 📅 **固定 6 週無縫月曆**：標準 42 格固定網格，消除跨月高度抖動；Web 端 60fps 流暢渲染。
-            - 🔒 **100% 純離線與極致隱私**：無 INTERNET 網路權限，無帳號、無雲端、零追蹤。
+            #### ✨ 本次版本更新亮點
+            - 🔑 **永久固定 Release 簽名金鑰**：建立項目永久簽名指紋，往後所有版本支援無縫直接覆蓋安裝升級，永不丟失數據。
+            - 🔔 **原生全屏鬧鐘瑞士幾何美學重構**：極簡雙耳時鐘矢量圖標、柔和呼吸光圈環、精密日期抬頭與自適應對稱膠囊按鈕。
+            - 💬 **推播提醒文案人性化**：去除「延後360分鐘」等技術位移用語，收工打卡與開工提醒一目了然。
+            - 🛡️ **儲存與導入強固化**：全面修復配置導入與 Base58 口令還原，完善單元測試覆蓋。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
