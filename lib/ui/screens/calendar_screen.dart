@@ -10,6 +10,7 @@ import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
+import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
 
 /// 支援桌面與網頁滑鼠拖曳、觸摸、觸控板左右換月的 ScrollBehavior
@@ -317,7 +318,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             icon: const Icon(Icons.file_download_outlined, size: 17),
             label: const Text('導入',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
           ),
           const SizedBox(width: 4),
           OutlinedButton(
@@ -327,7 +328,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               minimumSize: const Size(0, 36),
             ),
             child: const Text('今日',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
           ),
           IconButton(
             onPressed: () => _shiftMonth(-1),
@@ -416,7 +417,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  /// 日曆格：大字級、高對比、主次分明，零多餘行距與留白
+  /// 日曆格：清晰對比、主次分明、字重自然平衡
   Widget _dayCell(
     ShiftTokens t,
     DateTime date,
@@ -443,7 +444,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final baseFg = slot?.fg ?? t.neutralFg;
     final baseBg = slot?.bg ?? t.neutralBg;
 
-    // 當月與非當月（上月／下月）的鮮明視覺區分
+    // 當月與非當月（上月／下月）的色彩處理：減弱濾鏡效果，保持色彩清晰可辨
     final Color cellBg;
     final Color borderColor;
     final Color dateColor;
@@ -459,20 +460,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
       abbrColor = baseFg;
       noteColor = baseFg;
     } else {
-      // 非當月淡化處理：淡灰背景、邊框與低對比文字，一眼看出屬於鄰月
+      // 鄰月淡化處理：大幅調回色彩飽和度，減弱淡化濾鏡
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.3)
-          : t.neutralBg2.withValues(alpha: 0.45);
+          ? slot!.bg.withValues(alpha: 0.65)
+          : t.neutralBg2.withValues(alpha: 0.60);
       borderColor = isSelected
-          ? t.brand.withValues(alpha: 0.6)
+          ? t.brand
           : (isToday
-              ? t.brand.withValues(alpha: 0.4)
-              : t.neutralStroke.withValues(alpha: 0.35));
+              ? t.brand.withValues(alpha: 0.65)
+              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.55));
       dateColor = (holiday != null)
-          ? t.danger.withValues(alpha: 0.38)
-          : t.neutralFg2.withValues(alpha: 0.38);
-      abbrColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.38);
-      noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.32);
+          ? t.danger.withValues(alpha: 0.68)
+          : t.neutralFg.withValues(alpha: 0.58);
+      abbrColor = (slot?.fg ?? t.neutralFg).withValues(alpha: 0.72);
+      noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.65);
     }
 
     Widget cell = Container(
@@ -489,7 +490,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 第一行：日期（統一固定放大 17.0px bold，無論有冇排班均佔相同高度）
+          // 第一行：日期（自然半粗體 17.0px w600）
           Expanded(
             child: Center(
               child: FittedBox(
@@ -498,7 +499,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '$day',
                   style: TextStyle(
                     fontSize: 17.0,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: dateColor,
                     height: 1.0,
                   ),
@@ -507,7 +508,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
-          // 第二行：班次縮寫（放大 17.0px 特粗黑體；無排班佔位對齊）
+          // 第二行：班次縮寫（清晰有力 17.0px w700）
           Expanded(
             child: Center(
               child: def != null
@@ -517,7 +518,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         truncateAbbr(def.abbr),
                         style: TextStyle(
                           fontSize: 17.0,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           color: abbrColor,
                           height: 1.0,
                         ),
@@ -527,7 +528,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   : const SizedBox.shrink(),
             ),
           ),
-          // 第三行：地點（放大 17.0px 粗體，與班次同等權重；無地點佔位對齊）
+          // 第三行：地點（平衡字重 17.0px w500）
           Expanded(
             child: Center(
               child: (def != null && note.isNotEmpty)
@@ -537,7 +538,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         truncateAbbr(note),
                         style: TextStyle(
                           fontSize: 17.0,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w500,
                           color: noteColor,
                           height: 1.0,
                         ),
@@ -578,7 +579,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  /// 日曆下方簡潔狀態條（主次分明，零冗餘文字佔位，高度僅 54px）
+  /// 日曆下方詳情面板：
+  /// - 上方：備註便簽欄
+  /// - 下方：日期、班次、地點詳情條（兩行高，自然字重重構排版，主次分明）
   Widget _detailPanel(ShiftTokens t) {
     final key = ShiftStore.ymd(_selectedDate);
     final assignment = widget.store.assignments[key];
@@ -601,141 +604,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 第一行：日期、班次、地點、排班按鈕
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 日期標籤
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${_selectedDate.month}月${_selectedDate.day}日',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: t.neutralFg,
-                          height: 1.0,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '週$weekdayName',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: t.neutralFg2,
-                          height: 1.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (holiday != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        holiday,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: t.danger,
-                          fontWeight: FontWeight.w600,
-                          height: 1.0,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 10),
-              // 班次與地點標籤
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 班次徽章
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: slot?.bg ?? t.neutralBg2,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: slot?.border ?? t.neutralStroke,
-                          ),
-                        ),
-                        child: Text(
-                          def != null
-                              ? '${def.name} (${def.startTime}–${def.endTime})'
-                              : '未排班',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: def != null
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: slot?.fg ?? t.neutralFg2,
-                          ),
-                        ),
-                      ),
-                      // 地點徽章（重要性與班次同等，醒目展示）
-                      if (note.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: t.brand.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: t.brand.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.location_on,
-                                  size: 15, color: t.brand),
-                              const SizedBox(width: 3),
-                              Text(
-                                note,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: t.brand,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // 右側：排班按鈕（加大尺寸，好點擊）
-              FilledButton.icon(
-                onPressed: _openPanel,
-                style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  minimumSize: const Size(0, 38),
-                ),
-                icon: const Icon(Icons.edit_calendar, size: 16),
-                label: const Text('排班',
-                    style:
-                        TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // 第二行：備註欄（簡約現代設計）
+          // 第一行（上方）：備註便簽欄
           _editingRemark
               ? SizedBox(
-                  height: 48,
+                  height: 44,
                   child: TextField(
                     controller: _remarkCtrl,
                     focusNode: _remarkFocus,
@@ -756,7 +628,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       isDense: true,
                       hintText: '新增備註…',
                       prefixIcon: Icon(Icons.notes_rounded,
-                          size: 17, color: t.neutralFg2),
+                          size: 16, color: t.neutralFg2),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.check, size: 18),
                         onPressed: _saveInlineRemark,
@@ -778,7 +650,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   },
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    height: 44,
+                    height: 38,
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
@@ -790,7 +662,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     child: Row(
                       children: [
                         Icon(Icons.notes_rounded,
-                            size: 17, color: t.neutralFg2),
+                            size: 16, color: t.neutralFg2),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -800,7 +672,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               color: remark.isEmpty ? t.neutralFg2 : t.neutralFg,
                               height: 1.2,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -808,6 +680,145 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   ),
                 ),
+          const SizedBox(height: 8),
+          // 第二行（下方）：日期排班地點（兩行高，重新佈局，自然字重）
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: t.neutralBg2,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: t.neutralStroke),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 上行：日期與星期
+                      Row(
+                        children: [
+                          Text(
+                            '${_selectedDate.month}月${_selectedDate.day}日',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: t.neutralFg,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '星期$weekdayName',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.normal,
+                              color: t.neutralFg2,
+                            ),
+                          ),
+                          if (holiday != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: t.danger.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                holiday,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: t.danger,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // 下行：班次時間 與 地點
+                      Row(
+                        children: [
+                          if (def != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: slot?.bg ?? t.neutralBg,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: slot?.border ?? t.neutralStroke,
+                                ),
+                              ),
+                              child: Text(
+                                def.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: slot?.fg ?? t.neutralFg,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${def.startTime}–${def.endTime}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.normal,
+                                color: t.neutralFg,
+                              ),
+                            ),
+                          ] else ...[
+                            Text(
+                              '未排班',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.normal,
+                                color: t.neutralFg2,
+                              ),
+                            ),
+                          ],
+                          if (note.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.location_on, size: 14, color: t.brand),
+                            const SizedBox(width: 2),
+                            Text(
+                              note,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: t.brand,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // 右側：排班按鈕（自適應兩行高度）
+                FilledButton.icon(
+                  onPressed: _openPanel,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    minimumSize: const Size(0, 42),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_calendar, size: 16),
+                  label: const Text(
+                    '排班',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -823,6 +834,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
     _remarkFocus.unfocus();
     await widget.store.setRemark(key, text);
+    if (mounted) {
+      showTopNotification(context, '備註已保存');
+    }
   }
 
   Widget _weekHeader(ShiftTokens t) {
@@ -957,16 +971,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (confirm == true && mounted) {
         await importConfigText(widget.store, code);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('配置已成功導入！')),
-          );
+          showTopNotification(context, '配置已成功導入！');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('網址配置解析失敗: $e')),
-        );
+        showTopNotification(context, '網址配置解析失敗: $e',
+            icon: Icons.error_outline, iconColor: const Color(0xFFF87171));
       }
     }
   }
@@ -976,12 +987,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final decoded = decodeRosterText(code, widget.store.defs);
       if (decoded.importResult.valid.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(decoded.importResult.errors.isNotEmpty
-                  ? decoded.importResult.errors.first
-                  : '排班數據無效'),
-            ),
+          showTopNotification(
+            context,
+            decoded.importResult.errors.isNotEmpty
+                ? decoded.importResult.errors.first
+                : '排班數據無效',
+            icon: Icons.error_outline,
+            iconColor: const Color(0xFFF87171),
           );
         }
         return;
@@ -1064,16 +1076,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
           }
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('成功導入 $count 天排班！')),
-          );
+          showTopNotification(context, '成功導入 $count 天排班！');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('網址排班解析失敗: $e')),
-        );
+        showTopNotification(context, '網址排班解析失敗: $e',
+            icon: Icons.error_outline, iconColor: const Color(0xFFF87171));
       }
     }
   }

@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import '../../domain/alarm_service.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/top_notification.dart';
 
 /// 緊湊型自適應排班操作列（Shift Toolbar Dock）：
-/// 擺在日曆下方，高度僅約 100px，絕不擠壓日曆空間，保證日曆 5~6 行 100% 完整可見。
-/// - 頂部：日期標籤（可切換上一日／下一日）、地點快選膠囊、備註膠囊、完成關閉按鈕。
-/// - 底部：各班次按鈕橫排一字展示（點更即排，自動保存），附帶清除排班／放假按鈕。
+/// 擺在日曆下方，高度適中，絕不擠壓日曆空間，保證日曆 5~6 行 100% 完整可見。
+/// - 頂部：日期標籤（可切換上一日／下一日）、當日班次時間與地點兩行高展示、完成關閉按鈕。
+/// - 底部：各班次按鈕橫排一字展示（點更即排，自動保存），附帶清除排班（垃圾桶圖示）按鈕。
 class ShiftPickerPanel extends StatefulWidget {
   final DateTime initialDate;
   final ShiftStore store;
@@ -35,7 +36,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   late DateTime _currentDate;
 
   late final TextEditingController _noteCtrl;
-  late final TextEditingController _remarkCtrl;
 
   /// 已點選的班次 ID
   String? _selectedId;
@@ -53,16 +53,11 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       widget.initialDate.day,
     );
     _noteCtrl = TextEditingController();
-    _remarkCtrl = TextEditingController();
     _loadDay();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
-    });
   }
 
   void _loadDay() {
     _noteCtrl.text = widget.store.assignments[_key]?.note ?? '';
-    _remarkCtrl.text = widget.store.remarks[_key] ?? '';
     _selectedId = widget.store.assignments[_key]?.shiftId;
     if (_selectedId != null && !widget.store.defs.containsKey(_selectedId)) {
       _selectedId = null;
@@ -76,7 +71,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       _persistCurrent();
     }
     _noteCtrl.dispose();
-    _remarkCtrl.dispose();
     super.dispose();
   }
 
@@ -86,9 +80,11 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   bool _checkNoteOk() {
     if (abbrUnits(_noteCtrl.text.trim()) > 4) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('地點請唔超過 4 單位（2 中文字／4 英文字母）')),
+      showTopNotification(
+        context,
+        '地點請勿超過 4 單位（2 中文字／4 英文字母）',
+        icon: Icons.warning_amber_rounded,
+        iconColor: Colors.amber,
       );
       return false;
     }
@@ -101,15 +97,12 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     final shiftId = _selectedId;
     final assignment = widget.store.assignments[_key];
 
-    if (shiftId == null) {
-      await widget.store.setRemark(_key, _remarkCtrl.text);
-    } else {
+    if (shiftId != null) {
       final def = widget.store.defs[shiftId];
       if (def == null) return;
       final changedShift = assignment?.shiftId != shiftId;
       final changedNote = (assignment?.note ?? '') != note;
       await widget.store.assign(_key, shiftId, note: note);
-      await widget.store.setRemark(_key, _remarkCtrl.text);
       if (changedShift || changedNote) {
         try {
           await widget.alarms.onAssigned(
@@ -128,7 +121,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 跳去指定日期（上一日／下一日／點擊日曆格）
   Future<void> goToDate(DateTime date) async {
     if (_saving) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _saving = true);
     try {
       await _persistCurrent();
@@ -149,7 +141,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 點更即排：立即指派該班次並持久化
   Future<void> _pick(String shiftId) async {
     if (_saving) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
     HapticFeedback.selectionClick();
     setState(() {
       _selectedId = shiftId;
@@ -157,7 +148,13 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     });
     try {
       await _persistCurrent();
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        final def = widget.store.defs[shiftId];
+        if (def != null) {
+          showTopNotification(context, '已排 ${def.name}');
+        }
+      }
     } catch (_) {
       if (mounted) setState(() => _saving = false);
     }
@@ -166,7 +163,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 取消排更 / 放假
   Future<void> _unassign() async {
     if (_saving) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
     try {
@@ -180,6 +176,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           _noteCtrl.text = '';
           _saving = false;
         });
+        showTopNotification(context, '已清除排班');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -206,7 +203,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   /// 彈出地點選擇與輸入對話框
   Future<void> _openVenueDialog(BuildContext context) async {
-    ScaffoldMessenger.of(context).clearSnackBars();
     final t = context.tokens;
     final ctrl = TextEditingController(text: _noteCtrl.text);
     await showDialog<void>(
@@ -297,16 +293,18 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   _persistCurrent();
                   Navigator.pop(ctx);
                   setState(() {});
+                  showTopNotification(context, '已清除地點');
                 },
                 child: const Text('清除地點'),
               ),
               FilledButton(
                 onPressed: () {
                   if (abbrUnits(ctrl.text.trim()) > 4) {
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('地點請唔超過 4 單位（2 中文字／4 英文字母）')),
+                    showTopNotification(
+                      context,
+                      '地點請勿超過 4 單位（2 中文字／4 英文字母）',
+                      icon: Icons.warning_amber_rounded,
+                      iconColor: Colors.amber,
                     );
                     return;
                   }
@@ -315,6 +313,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   _persistCurrent();
                   Navigator.pop(ctx);
                   setState(() {});
+                  showTopNotification(context, '地點已更新');
                 },
                 child: const Text('確定'),
               ),
@@ -325,53 +324,15 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     );
   }
 
-  /// 彈出備註輸入對話框
-  Future<void> _openRemarkDialog(BuildContext context) async {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    final ctrl = TextEditingController(text: _remarkCtrl.text);
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('設置 $_dateLabel 備註'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '備註內容（與班次獨立）',
-            hintText: '如 換班、請假、特別事項',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-          maxLength: 200,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              _remarkCtrl.text = ctrl.text.trim();
-              _markDirty();
-              _persistCurrent();
-              Navigator.pop(ctx);
-              setState(() {});
-            },
-            child: const Text('確定'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final assignment = widget.store.assignments[_key];
     final currentId = assignment?.shiftId;
+    final currentDef = currentId != null ? widget.store.defs[currentId] : null;
+    final slot = currentDef != null ? t.slotForTime(currentDef.startTime) : null;
     final defs = widget.store.sortedDefs();
     final note = _noteCtrl.text.trim();
-    final remark = _remarkCtrl.text.trim();
 
     return Container(
       decoration: BoxDecoration(
@@ -392,7 +353,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 第一行：日期切換、地點按鈕、備註按鈕、完成按鈕（自適應緊湊排版，絕不擠爆）
+            // 第一行：日期切換、當日時間與地點（兩行高展示）、完成按鈕
             Row(
               children: [
                 // 左切日按鈕
@@ -401,7 +362,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
                     width: 28,
-                    height: 32,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: t.neutralBg2,
                       borderRadius: BorderRadius.circular(6),
@@ -416,7 +377,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   _dateLabel,
                   style: TextStyle(
                     fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: t.neutralFg,
                   ),
                 ),
@@ -427,7 +388,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
                     width: 28,
-                    height: 32,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: t.neutralBg2,
                       borderRadius: BorderRadius.circular(6),
@@ -437,70 +398,130 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                     child: Icon(Icons.chevron_right, size: 18, color: t.neutralFg),
                   ),
                 ),
-                const SizedBox(width: 6),
-                // 地點按鈕
-                Flexible(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _openVenueDialog(context),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                      minimumSize: const Size(0, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      backgroundColor: note.isNotEmpty
-                          ? t.brand.withValues(alpha: 0.15)
-                          : t.neutralBg2,
-                      foregroundColor: note.isNotEmpty ? t.brand : t.neutralFg,
-                    ),
-                    icon: Icon(Icons.location_on,
-                        size: 14,
-                        color: note.isNotEmpty ? t.brand : t.neutralFg2),
-                    label: Text(
-                      note.isNotEmpty ? note : '地點',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: note.isNotEmpty
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                const SizedBox(width: 10),
+                // 中間：時間與地點（兩行高）
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 上行：班次與時間
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule, size: 13, color: t.neutralFg2),
+                          const SizedBox(width: 3),
+                          if (currentDef != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 0.5),
+                              decoration: BoxDecoration(
+                                color: slot?.bg ?? t.neutralBg2,
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(
+                                    color: slot?.border ?? t.neutralStroke,
+                                    width: 0.8),
+                              ),
+                              child: Text(
+                                currentDef.name,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: slot?.fg ?? t.neutralFg,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${currentDef.startTime}–${currentDef.endTime}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.normal,
+                                  color: t.neutralFg,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else ...[
+                            Text(
+                              '未排班',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.normal,
+                                color: t.neutralFg2,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      // 下行：地點按鈕（點擊設置/修改地點）
+                      InkWell(
+                        onTap: () => _openVenueDialog(context),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 13,
+                                color: note.isNotEmpty ? t.brand : t.neutralFg2,
+                              ),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  note.isNotEmpty ? note : '設置地點',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: note.isNotEmpty
+                                        ? FontWeight.w500
+                                        : FontWeight.normal,
+                                    color: note.isNotEmpty
+                                        ? t.brand
+                                        : t.neutralFg2,
+                                    decoration: note.isEmpty
+                                        ? TextDecoration.underline
+                                        : TextDecoration.none,
+                                    decorationColor:
+                                        t.neutralFg2.withValues(alpha: 0.4),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (note.isNotEmpty) ...[
+                                const SizedBox(width: 2),
+                                Icon(Icons.edit,
+                                    size: 10,
+                                    color: t.brand.withValues(alpha: 0.7)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 4),
-                // 備註按鈕
-                OutlinedButton.icon(
-                  onPressed: () => _openRemarkDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: Icon(Icons.notes_rounded,
-                      size: 15,
-                      color: remark.isNotEmpty ? t.brand : t.neutralFg2),
-                  label: Text(
-                    remark.isNotEmpty ? '備註✓' : '備註',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: remark.isNotEmpty
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: remark.isNotEmpty ? t.brand : t.neutralFg2,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 // 完成退出按鈕
                 FilledButton(
                   onPressed: widget.onClose,
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    minimumSize: const Size(0, 32),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                    minimumSize: const Size(0, 34),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: const Text('完成',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                 ),
               ],
             ),
@@ -579,7 +600,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 def.code.isNotEmpty ? '${def.code} ${def.name}' : def.name,
                 style: TextStyle(
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: slot.fg,
                 ),
               ),
@@ -591,7 +612,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 '${def.startTime}–${def.endTime}',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.normal,
                   color: slot.fg.withValues(alpha: 0.85),
                 ),
               ),
@@ -604,24 +625,43 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   Widget _clearButton(ShiftTokens t, String? currentId) {
     return SizedBox(
-      width: 50,
+      width: 56,
       height: 54,
       child: Tooltip(
         message: '清除此日排更（設為放假）',
         child: OutlinedButton(
           onPressed: (_saving || currentId == null) ? null : _unassign,
           style: OutlinedButton.styleFrom(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: 4),
             side: BorderSide(
-                color: currentId != null
-                    ? t.danger.withValues(alpha: 0.5)
-                    : t.neutralStroke),
+              color: currentId != null
+                  ? t.danger.withValues(alpha: 0.6)
+                  : t.neutralStroke,
+              width: 1.0,
+            ),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-          child: Icon(Icons.clear,
-              size: 22,
-              color: currentId != null ? t.danger : t.neutralFg2),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: currentId != null ? t.danger : t.neutralFg2,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '清除',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.normal,
+                  color: currentId != null ? t.danger : t.neutralFg2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
