@@ -14,15 +14,17 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 /**
- * 全屏鬧鐘頁：淺色底＋呼吸光暈＋超大時鐘＋更名 badge＋大關閉掣。
- * 鈴聲由 AlarmSoundService（前台服務）播，呢度只負責畫面＋關閉。
+ * 全屏鬧鐘頁：瑞士極簡精密風格、純淨淺色底＋柔和呼吸動態光圈＋超大精密數字時鐘＋班次卡片＋自適應膠囊按鈕。
+ * 鈴聲由 AlarmSoundService（前台服務）播，呢度負責純淨全屏畫面與交互。
  */
 class AlarmActivity : Activity() {
 
@@ -40,7 +42,6 @@ class AlarmActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            // 雙保險：deprecated 但部分 OEM（HyperOS）更食呢套
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -56,7 +57,7 @@ class AlarmActivity : Activity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 沉浸式：唔畀 status bar／導航欄干擾
+        // 沉浸式：狀態欄與導航欄透明，無干擾
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
@@ -83,14 +84,13 @@ class AlarmActivity : Activity() {
         val note = intent.getStringExtra(AlarmScheduler.EXTRA_NOTE) ?: ""
         val launchSource = intent.getStringExtra(AlarmScheduler.EXTRA_LAUNCH_SOURCE) ?: "unknown"
 
-        // 診斷標記：全屏鬧鐘已啟動（src 分辨自動彈 fullscreen／手動㩒 content／前台直起 direct）
         AlarmDebugLog.append(this, "[ALARM_UI] id=$alarmId src=$launchSource 全屏已啟動")
 
-        // ---- 根佈局：淺色漸變（唔用深色模式） ----
+        // ---- 根佈局：極簡清爽漸變底色 ----
         val root = FrameLayout(this).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFFFFFFFF.toInt(), 0xFFF5F5F5.toInt())
+                intArrayOf(0xFFFFFFFF.toInt(), 0xFFF8FAFC.toInt())
             )
         }
 
@@ -102,56 +102,70 @@ class AlarmActivity : Activity() {
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.CENTER
-        ).apply { topMargin = -dp(40) }
+        ).apply { topMargin = -dp(32) }
         root.addView(column, columnParams)
 
-        // ---- 頂部：呼吸光暈圓環 ----
+        // ---- 頂部日期星期抬頭 ----
+        val dateHeader = TextView(this).apply {
+            text = getFormattedDate(date)
+            setTextColor(0xFF64748B.toInt()) // Slate 500
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(16))
+        }
+        column.addView(
+            dateHeader,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        // ---- 中央：呼吸動態光暈 + 矢量精緻鬧鐘 ----
         val pulseWrap = FrameLayout(this)
-        val pulseSize = dp(200)
+        val pulseSize = dp(140)
         column.addView(
             pulseWrap,
             LinearLayout.LayoutParams(pulseSize, pulseSize).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
         )
-        // 外層光暈（動畫目標）
+        // 外層呼吸光暈（柔和擴散）
         val glow = View(this).apply {
-            background = ovalDrawable(accentBg, 0.35f)
+            background = ovalDrawable(accentBg, 0.16f)
         }
         pulseWrap.addView(glow, FrameLayout.LayoutParams(pulseSize, pulseSize))
-        // 內圈細環
-        val ringSize = dp(150)
-        val ring = View(this).apply {
-            background = ringDrawable(accentBg)
+
+        // 內圈半透圓心底座
+        val innerCircleSize = dp(96)
+        val innerCircle = View(this).apply {
+            background = ovalDrawable(accentBg, 0.28f)
         }
         pulseWrap.addView(
-            ring,
-            FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER)
+            innerCircle,
+            FrameLayout.LayoutParams(innerCircleSize, innerCircleSize, Gravity.CENTER)
         )
-        // 中央鬧鐘 emoji
-        val bell = TextView(this).apply {
-            text = "\u23F0"
-            textSize = 56f
-            gravity = Gravity.CENTER
+
+        // 精緻雙耳時鐘矢量圖標（替換卡通 Emoji）
+        val bellIcon = ImageView(this).apply {
+            setImageResource(R.drawable.ic_alarm_bell)
+            setColorFilter(accentBg)
         }
+        val iconSize = dp(42)
         pulseWrap.addView(
-            bell,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
-            )
+            bellIcon,
+            FrameLayout.LayoutParams(iconSize, iconSize, Gravity.CENTER)
         )
         startPulse(glow)
 
-        // ---- 中央：超大時鐘 ----
+        // ---- 超大現代數字時鐘 ----
         val timeView = TextView(this).apply {
             text = nowHm()
-            setTextColor(0xFF242424.toInt())
-            textSize = 90f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(0xFF0F172A.toInt()) // Slate 900
+            textSize = 84f
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER
-            setPadding(0, dp(24), 0, 0)
+            setPadding(0, dp(12), 0, 0)
         }
         column.addView(
             timeView,
@@ -162,93 +176,129 @@ class AlarmActivity : Activity() {
         )
         startClock(timeView)
 
-        // ---- 更名 pill badge ----
-        val badgeLabel = shiftName.ifEmpty { title }
+        // ---- 班次與提醒精緻卡片 ----
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = cardDrawable()
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                elevation = dp(2).toFloat()
+            }
+        }
+        val cardParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginStart = dp(28)
+            marginEnd = dp(28)
+            topMargin = dp(20)
+        }
+        column.addView(card, cardParams)
+
+        // 卡片首行：更名 Badge + 鬧鐘標籤
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        card.addView(headerRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        val shiftBadgeText = shiftName.ifEmpty { "排班" }
         val badge = TextView(this).apply {
-            text = badgeLabel
-            setTextColor(0xFF1A1A1A.toInt())
-            textSize = 20f
+            text = shiftBadgeText
+            setTextColor(Color.WHITE)
+            textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            background = pillDrawable(accentBg)
-            setPadding(dp(28), dp(10), dp(28), dp(10))
+            background = badgeDrawable(accentBg)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
         }
-        column.addView(
-            badge,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(16)
-            }
-        )
+        headerRow.addView(badge)
 
-        // ---- 副標題 ----
-        val subtitleText = buildSubtitle(startTime, date, note, body)
-        if (subtitleText.isNotEmpty()) {
-            val subtitle = TextView(this).apply {
-                text = subtitleText
-                setTextColor(0xFF616161.toInt())
-                textSize = 17f
+        val alarmLabelText = if (title.contains(" ")) {
+            title.substringAfter(" ")
+        } else if (title != shiftBadgeText) {
+            title
+        } else {
+            "鬧鐘響起"
+        }
+        val labelView = TextView(this).apply {
+            text = alarmLabelText
+            setTextColor(0xFF1E293B.toInt()) // Slate 800
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(dp(10), 0, 0, 0)
+        }
+        headerRow.addView(labelView)
+
+        // 卡片次行：自然友好的提示文案（無技術位移用語）
+        val detailText = if (body.isNotEmpty()) body else buildFallbackDetail(startTime, note)
+        if (detailText.isNotEmpty()) {
+            val detailView = TextView(this).apply {
+                text = detailText
+                setTextColor(0xFF64748B.toInt()) // Slate 500
+                textSize = 14f
                 gravity = Gravity.CENTER
+                setPadding(0, dp(10), 0, 0)
             }
-            column.addView(
-                subtitle,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dp(10) }
-            )
+            card.addView(detailView)
         }
 
-        // ---- 底部：停止＋貪睡，兩個掣並排 ----
+        // ---- 底部操作掣：自適應寬度（weight=1），停止＋貪睡 ----
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val stopBtn = TextView(this).apply {
-            text = "停止"
-            setTextColor(Color.WHITE)
-            textSize = 20f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            background = capsuleDrawable(accentBg)
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { stopAndFinish() }
-        }
         val snoozeBtn = TextView(this).apply {
             text = "5 分鐘後再響"
-            setTextColor(0xFF424242.toInt())
-            textSize = 18f
+            setTextColor(0xFF334155.toInt()) // Slate 700
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            background = outlineCapsuleDrawable(accentBg)
+            background = secondaryBtnDrawable()
             isClickable = true
             isFocusable = true
             setOnClickListener { snoozeAndFinish() }
         }
-        val btnW = dp(168)
-        val btnH = dp(64)
+        val stopBtn = TextView(this).apply {
+            text = "停止"
+            setTextColor(Color.WHITE)
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            background = primaryBtnDrawable(accentBg)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { stopAndFinish() }
+        }
+        val btnH = dp(56)
         btnRow.addView(
-            stopBtn,
-            LinearLayout.LayoutParams(btnW, btnH).apply {
-                marginEnd = dp(12)
+            snoozeBtn,
+            LinearLayout.LayoutParams(0, btnH, 1f).apply {
+                marginEnd = dp(8)
             }
         )
         btnRow.addView(
-            snoozeBtn,
-            LinearLayout.LayoutParams(btnW, btnH).apply {
-                marginStart = dp(12)
+            stopBtn,
+            LinearLayout.LayoutParams(0, btnH, 1f).apply {
+                marginStart = dp(8)
             }
         )
         root.addView(
             btnRow,
             FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            ).apply { bottomMargin = dp(72) }
+                Gravity.BOTTOM
+            ).apply {
+                marginStart = dp(24)
+                marginEnd = dp(24)
+                bottomMargin = dp(48)
+            }
         )
 
         setContentView(root)
@@ -256,6 +306,35 @@ class AlarmActivity : Activity() {
 
     private fun nowHm(): String =
         SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+
+    private fun getFormattedDate(dateYmd: String): String {
+        return try {
+            val cal = Calendar.getInstance()
+            if (dateYmd.isNotEmpty()) {
+                val p = dateYmd.split("-")
+                if (p.size == 3) {
+                    cal.set(Calendar.YEAR, p[0].toInt())
+                    cal.set(Calendar.MONTH, p[1].toInt() - 1)
+                    cal.set(Calendar.DAY_OF_MONTH, p[2].toInt())
+                }
+            }
+            val month = cal.get(Calendar.MONTH) + 1
+            val day = cal.get(Calendar.DAY_OF_MONTH)
+            val weekDay = when (cal.get(Calendar.DAY_OF_WEEK)) {
+                Calendar.SUNDAY -> "星期日"
+                Calendar.MONDAY -> "星期一"
+                Calendar.TUESDAY -> "星期二"
+                Calendar.WEDNESDAY -> "星期三"
+                Calendar.THURSDAY -> "星期四"
+                Calendar.FRIDAY -> "星期五"
+                Calendar.SATURDAY -> "星期六"
+                else -> ""
+            }
+            "${month}月${day}日 · $weekDay"
+        } catch (_: Exception) {
+            SimpleDateFormat("MM月dd日", Locale.getDefault()).format(Date())
+        }
+    }
 
     private fun startClock(tv: TextView) {
         clockTick = object : Runnable {
@@ -267,20 +346,20 @@ class AlarmActivity : Activity() {
         handler.post(clockTick!!)
     }
 
-    /** 呼吸脈衝：scale 1.0→1.08＋alpha 循環 */
+    /** 呼吸脈衝：柔和縮放與透明度呼吸 */
     private fun startPulse(glow: View) {
         val sx = ObjectAnimator.ofFloat(glow, "scaleX", 1f, 1.08f).apply {
-            duration = 1600
+            duration = 1800
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
         }
         val sy = ObjectAnimator.ofFloat(glow, "scaleY", 1f, 1.08f).apply {
-            duration = 1600
+            duration = 1800
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
         }
         val alpha = ObjectAnimator.ofFloat(glow, "alpha", 0.45f, 1f).apply {
-            duration = 1600
+            duration = 1800
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
         }
@@ -290,25 +369,9 @@ class AlarmActivity : Activity() {
         }
     }
 
-    private fun buildSubtitle(startTime: String, date: String, note: String, body: String): String {
-        if (startTime.isEmpty() && date.isEmpty()) return body
-        val parts = mutableListOf<String>()
-        if (startTime.isNotEmpty()) {
-            parts.add("$startTime 開工" + if (note.isNotEmpty()) " · $note" else "")
-        }
-        val md = parseMd(date)
-        if (md != null) parts.add(md)
-        return parts.joinToString(" · ")
-    }
-
-    private fun parseMd(ymd: String): String? {
-        return try {
-            val p = ymd.split("-")
-            if (p.size != 3) return null
-            "${p[1].trimStart('0').ifEmpty { "0" }}月${p[2].trimStart('0').ifEmpty { "0" }}日"
-        } catch (_: Exception) {
-            null
-        }
+    private fun buildFallbackDetail(startTime: String, note: String): String {
+        val venuePart = if (note.trim().isNotEmpty()) " · 地點：${note.trim()}" else ""
+        return if (startTime.isNotEmpty()) "班次時間：$startTime$venuePart" else venuePart.trimStart(' ', '·', ' ')
     }
 
     private fun ovalDrawable(color: Int, alpha: Float): GradientDrawable {
@@ -322,37 +385,37 @@ class AlarmActivity : Activity() {
         }
     }
 
-    private fun ringDrawable(color: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(dp(3), color)
-        }
-    }
-
-    private fun pillDrawable(color: Int): GradientDrawable {
+    private fun cardDrawable(): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dp(16).toFloat()
+            setColor(0xFFFFFFFF.toInt())
+            setStroke(dp(1), 0xFFE2E8F0.toInt())
+        }
+    }
+
+    private fun badgeDrawable(color: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(8).toFloat()
             setColor(color)
         }
     }
 
-    private fun capsuleDrawable(color: Int): GradientDrawable {
+    private fun primaryBtnDrawable(color: Int): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(36).toFloat()
+            cornerRadius = dp(28).toFloat()
             setColor(color)
         }
     }
 
-    /** 描邊次要掣：白底＋時段色邊 */
-    private fun outlineCapsuleDrawable(color: Int): GradientDrawable {
+    private fun secondaryBtnDrawable(): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(32).toFloat()
-            setColor(Color.WHITE)
-            setStroke(dp(2), color)
+            cornerRadius = dp(28).toFloat()
+            setColor(0xFFFFFFFF.toInt())
+            setStroke(dp(1), 0xFFCBD5E1.toInt())
         }
     }
 

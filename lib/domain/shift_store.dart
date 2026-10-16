@@ -585,9 +585,9 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 地點清單管理：新增（去重、≤4 單位）、刪除、改名
+  /// 地點清單管理：新增（去重）、刪除、改名
   Future<void> addVenue(String v) async {
-    v = truncateAbbr(v.trim(), 4);
+    v = v.trim();
     if (v.isEmpty || venues.contains(v)) return;
     venues = [...venues, v];
     await prefs.setStringList(_kVenues, venues);
@@ -602,7 +602,7 @@ class ShiftStore extends ChangeNotifier {
   }
 
   Future<void> renameVenue(String oldV, String newV) async {
-    newV = truncateAbbr(newV.trim(), 4);
+    newV = newV.trim();
     final i = venues.indexOf(oldV);
     if (i < 0 || newV.isEmpty || venues.contains(newV)) return;
     venues = [...venues]..[i] = newV;
@@ -619,13 +619,9 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 配置導入用：整批替換地點清單（自動規範至 ≤4 單位）。
+  /// 配置導入用：整批替換地點清單。
   Future<void> replaceAllVenues(List<String> newVenues) async {
-    venues = newVenues
-        .map((v) => truncateAbbr(v.trim(), 4))
-        .where((v) => v.isNotEmpty)
-        .toSet()
-        .toList();
+    venues = List<String>.from(newVenues);
     await prefs.setStringList(_kVenues, venues);
     notifyListeners();
   }

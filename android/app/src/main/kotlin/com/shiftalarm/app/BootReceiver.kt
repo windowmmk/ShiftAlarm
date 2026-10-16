@@ -66,6 +66,7 @@ class BootReceiver : BroadcastReceiver() {
             val def = defs.optJSONObject(shiftId) ?: continue
             val name = def.optString("name", "排班")
             val startTime = def.optString("startTime", null) ?: continue
+            val endTime = def.optString("endTime", "")
 
             // 鬧鐘列表：新格式讀 alarms；舊格式由 advanceMinutes 遷移
             val alarms = mutableListOf<ParsedAlarm>()
@@ -92,7 +93,6 @@ class BootReceiver : BroadcastReceiver() {
             }
 
             val baseId = ymd.replace("-", "").toIntOrNull() ?: continue
-            val noteSuffix = if (note.isNotEmpty()) " · $note" else ""
             for ((index, alarm) in alarms.withIndex()) {
                 if (index >= 10) break
                 if (!alarm.enabled) continue
@@ -102,8 +102,13 @@ class BootReceiver : BroadcastReceiver() {
                 if (triggerMillis <= now) continue
                 val id = baseId * 10 + index
                 val title = "$name ${alarm.label}"
-                val body = "$ymd ${startTime}開工" +
-                    "（${offsetText(alarm.offsetMinutes)}）${noteSuffix}"
+                val body = formatAlarmBody(
+                    startTime,
+                    endTime,
+                    alarm.label,
+                    alarm.offsetMinutes,
+                    note
+                )
                 if (alarm.notificationOnly) {
                     AlarmScheduler.scheduleGentle(
                         context, id, triggerMillis, title, body
@@ -127,10 +132,37 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun offsetText(offsetMinutes: Int): String = when {
-        offsetMinutes < 0 -> "提前${-offsetMinutes}分鐘"
-        offsetMinutes > 0 -> "延後${offsetMinutes}分鐘"
-        else -> "準時"
+    private fun formatAlarmBody(
+        startTime: String,
+        endTime: String,
+        label: String,
+        offsetMinutes: Int,
+        note: String
+    ): String {
+        val triggerHhmm = formatTriggerHhmm(startTime, offsetMinutes)
+        val venuePart = if (note.trim().isNotEmpty()) " · 地點：${note.trim()}" else ""
+        val isClockOut = label.contains("收工") || label.contains("下班")
+        val isClockIn = label.contains("開工打卡") || label.contains("上班打卡")
+
+        if (isClockOut) {
+            return "收工時間到了，記得打卡！ ($triggerHhmm)$venuePart"
+        }
+        if (isClockIn) {
+            return "開工時間到了，記得打卡！ ($startTime)$venuePart"
+        }
+        val shiftRange = if (endTime.isNotEmpty()) "$startTime–$endTime" else startTime
+        return "班次時間：$shiftRange$venuePart"
+    }
+
+    private fun formatTriggerHhmm(startTime: String, offsetMinutes: Int): String {
+        val parts = startTime.split(":")
+        val startMin = (parts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 +
+                (parts.getOrNull(1)?.toIntOrNull() ?: 0)
+        var total = (startMin + offsetMinutes) % 1440
+        if (total < 0) total += 1440
+        val hh = (total / 60).toString().padStart(2, '0')
+        val mm = (total % 60).toString().padStart(2, '0')
+        return "$hh:$mm"
     }
 
     /** 按開工鐘點取時段 bg 色（同 Dart ShiftTokens.slotForTime 對應） */
