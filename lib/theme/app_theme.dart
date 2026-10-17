@@ -197,6 +197,14 @@ ThemeData buildAppTheme() {
       error: t.danger,
       onError: Colors.white,
     ),
+    fontFamilyFallback: const [
+      'PingFang SC',
+      'Heiti SC',
+      'Noto Sans CJK SC',
+      'Noto Sans CJK TC',
+      'Microsoft YaHei',
+      'sans-serif',
+    ],
     appBarTheme: AppBarTheme(
       backgroundColor: t.neutralBg,
       foregroundColor: t.neutralFg,
@@ -206,7 +214,7 @@ ThemeData buildAppTheme() {
       titleTextStyle: TextStyle(
         color: t.neutralFg,
         fontSize: 18,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w600,
       ),
       iconTheme: IconThemeData(color: t.neutralFg),
     ),
@@ -228,13 +236,13 @@ ThemeData buildAppTheme() {
         if (states.contains(WidgetState.selected)) {
           return TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             color: t.brand,
           );
         }
         return TextStyle(
           fontSize: 12,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.normal,
           color: t.neutralFg2,
         );
       }),
@@ -248,7 +256,7 @@ ThemeData buildAppTheme() {
       ),
       titleTextStyle: TextStyle(
         fontSize: 17,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w600,
         color: t.neutralFg,
       ),
     ),
