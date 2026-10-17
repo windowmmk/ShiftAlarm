@@ -460,20 +460,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
       abbrColor = baseFg;
       noteColor = baseFg;
     } else {
-      // 鄰月淡化處理：大幅調回色彩飽和度，減弱淡化濾鏡
+      // 鄰月淡化處理：再微調淺約 15%，保持柔和層次區分
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.65)
-          : t.neutralBg2.withValues(alpha: 0.60);
+          ? slot!.bg.withValues(alpha: 0.48)
+          : t.neutralBg2.withValues(alpha: 0.45);
       borderColor = isSelected
           ? t.brand
           : (isToday
-              ? t.brand.withValues(alpha: 0.65)
-              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.55));
+              ? t.brand.withValues(alpha: 0.55)
+              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.38));
       dateColor = (holiday != null)
-          ? t.danger.withValues(alpha: 0.68)
-          : t.neutralFg.withValues(alpha: 0.58);
-      abbrColor = (slot?.fg ?? t.neutralFg).withValues(alpha: 0.72);
-      noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.65);
+          ? t.danger.withValues(alpha: 0.52)
+          : t.neutralFg.withValues(alpha: 0.42);
+      abbrColor = (slot?.fg ?? t.neutralFg).withValues(alpha: 0.55);
+      noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.48);
     }
 
     Widget cell = Container(
@@ -486,68 +486,90 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         borderRadius: BorderRadius.circular(4),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          // 第一行：日期（自然半粗體 17.0px w600）
-          Expanded(
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  '$day',
-                  style: TextStyle(
-                    fontSize: 17.0,
-                    fontWeight: FontWeight.w600,
-                    color: dateColor,
-                    height: 1.0,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-          // 第二行：班次縮寫（清晰有力 17.0px w700）
-          Expanded(
-            child: Center(
-              child: def != null
-                  ? FittedBox(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 第一行：日期（自然平衡 17.0px w500，避免 Android 系統過粗）
+                Expanded(
+                  child: Center(
+                    child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        truncateAbbr(def.abbr),
-                        style: TextStyle(
-                          fontSize: 17.0,
-                          fontWeight: FontWeight.w700,
-                          color: abbrColor,
-                          height: 1.0,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ),
-          // 第三行：地點（平衡字重 17.0px w500）
-          Expanded(
-            child: Center(
-              child: (def != null && note.isNotEmpty)
-                  ? FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        truncateAbbr(note),
+                        '$day',
                         style: TextStyle(
                           fontSize: 17.0,
                           fontWeight: FontWeight.w500,
-                          color: noteColor,
+                          color: dateColor,
                           height: 1.0,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                    )
-                  : const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+                // 第二行：班次縮寫（清晰適中 17.0px w600）
+                Expanded(
+                  child: Center(
+                    child: def != null
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              truncateAbbr(def.abbr),
+                              style: TextStyle(
+                                fontSize: 17.0,
+                                fontWeight: FontWeight.w600,
+                                color: abbrColor,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+                // 第三行：地點（常規字重 17.0px normal）
+                Expanded(
+                  child: Center(
+                    child: (def != null && note.isNotEmpty)
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              truncateAbbr(note),
+                              style: TextStyle(
+                                fontSize: 17.0,
+                                fontWeight: FontWeight.normal,
+                                color: noteColor,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+              ],
             ),
           ),
+          // 公眾假期頂部紅色微粗線指示條（2.8px）
+          if (holiday != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 2.8,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isCurrentMonth
+                      ? t.danger
+                      : t.danger.withValues(alpha: 0.50),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -712,7 +734,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     '${_selectedDate.month}月${_selectedDate.day}日',
                                     style: TextStyle(
                                       fontSize: 14.5,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w500,
                                       color: t.neutralFg,
                                     ),
                                   ),
@@ -768,7 +790,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         def.name,
                                         style: TextStyle(
                                           fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w500,
                                           color: slot?.fg ?? t.neutralFg,
                                         ),
                                       ),
@@ -801,7 +823,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         note,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.normal,
                                           color: t.brand,
                                         ),
                                         maxLines: 1,
@@ -831,7 +853,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         label: const Text(
                           '排班',
                           style: TextStyle(
-                              fontSize: 13.5, fontWeight: FontWeight.w600),
+                              fontSize: 13.5, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
