@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,9 +11,21 @@ import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
-import '../widgets/duo_book_page_view.dart';
 import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
+
+/// 支援桌面與網頁滑鼠拖曳、觸摸、觸控板左右換月的 ScrollBehavior
+class _CalendarScrollBehavior extends MaterialScrollBehavior {
+  const _CalendarScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
 
 /// 120ms 堅實微觸感（微縮放 1.0 -> 0.965 -> 1.0）日曆格包裝組件
 class _HapticCell extends StatefulWidget {
@@ -81,7 +94,7 @@ class _HapticCellState extends State<_HapticCell>
 }
 
 /// 月曆：固定顯示 6 週（42 格），按月一頁頁左右滑動切換，極致 60fps GPU 快取過渡。
-/// 支援 Duo 式 3D 左界書頁翻頁、排班卡片從無到有飄入、跨月純視覺流光過渡與 120ms 堅實微觸感。
+/// 支援排班卡片從無到有飄入、公眾假期紅線與 120ms 堅實微觸感。
 class CalendarScreen extends StatefulWidget {
   final ShiftStore store;
   final AlarmService alarms;
@@ -107,7 +120,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     return DateTime(_kBaseYear, _kBaseMonth + delta, 1);
   }
 
-  late final DuoPageController _pageController;
+  late final PageController _pageController;
   late int _currentPage;
 
   /// 頂部標題當前月份（以當前顯示頁面為準）
@@ -145,7 +158,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     _activeYear = now.year;
     _activeMonth = now.month;
     _currentPage = _pageForYearMonth(now.year, now.month);
-    _pageController = DuoPageController(initialPage: _currentPage);
+    _pageController = PageController(initialPage: _currentPage);
 
     _cardFloatAnimCtrl = AnimationController(
       vsync: this,
@@ -182,7 +195,6 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUrlHashImport();
-      _checkMonthTransitionOnStartup();
     });
   }
 
@@ -196,48 +208,6 @@ class _CalendarScreenState extends State<CalendarScreen>
     _remarkFocus.dispose();
     widget.store.removeListener(_onStoreChanged);
     super.dispose();
-  }
-
-  /// 檢查是否每逢新月第一次進入：觸發純視覺流光掃過上月並自然 3D 翻書過渡到本月
-  void _checkMonthTransitionOnStartup() {
-    final now = DateTime.now();
-    final currentKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final lastSeen = widget.store.prefs.getString('last_seen_active_month');
-    if (lastSeen == null) {
-      widget.store.prefs.setString('last_seen_active_month', currentKey);
-      return;
-    }
-    if (lastSeen != currentKey) {
-      final parts = lastSeen.split('-');
-      if (parts.length == 2) {
-        final lastYear = int.tryParse(parts[0]);
-        final lastMonth = int.tryParse(parts[1]);
-        if (lastYear != null && lastMonth != null) {
-          final prevDate = DateTime(lastYear, lastMonth, 1);
-          final targetPage = _pageForYearMonth(now.year, now.month);
-          final prevPage = _pageForYearMonth(prevDate.year, prevDate.month);
-          if (targetPage - prevPage == 1) {
-            // 剛好隔 1 個月：先停留在上一月，流光掃過上月月末，然後自然 3D 翻書進本月
-            _pageController.jumpToPage(prevPage);
-            setState(() {
-              _currentPage = prevPage;
-              _activeYear = prevDate.year;
-              _activeMonth = prevDate.month;
-            });
-            Future.delayed(const Duration(milliseconds: 350), () {
-              if (!mounted) return;
-              _sweepAnimCtrl.forward(from: 0.0).then((_) {
-                if (!mounted) return;
-                _shiftMonth(1);
-                widget.store.prefs.setString('last_seen_active_month', currentKey);
-              });
-            });
-            return;
-          }
-        }
-      }
-      widget.store.prefs.setString('last_seen_active_month', currentKey);
-    }
   }
 
   /// store 有寫入即自動刷新
@@ -264,12 +234,12 @@ class _CalendarScreenState extends State<CalendarScreen>
       _currentPage = targetPage;
     });
     if (_pageController.hasClients) {
-      final curPage = _pageController.page;
+      final curPage = _pageController.page?.round() ?? _currentPage;
       if (curPage != targetPage) {
-        if ((targetPage - curPage).abs() <= 1) {
+        if ((targetPage - curPage).abs() <= 3) {
           _pageController.animateToPage(
             targetPage,
-            duration: const Duration(milliseconds: 380),
+            duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
           );
         } else {
@@ -279,13 +249,13 @@ class _CalendarScreenState extends State<CalendarScreen>
     }
   }
 
-  /// 左右切月：平滑切換到上一月／下一月（Duo 3D 書頁立體翻頁）
+  /// 左右切月：平滑切換到上一月／下一月（左右平滑滑動）
   void _shiftMonth(int delta) {
     if (!_pageController.hasClients) return;
     final targetPage = _currentPage + delta;
     _pageController.animateToPage(
       targetPage,
-      duration: const Duration(milliseconds: 380),
+      duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
     );
   }
@@ -478,17 +448,22 @@ class _CalendarScreenState extends State<CalendarScreen>
         children: [
           _weekHeader(t),
           Expanded(
-            child: DuoBookPageView(
-              controller: _pageController,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (_, page) {
-                final m = _monthForPage(page);
-                // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
-                return RepaintBoundary(
-                  key: ValueKey('month_${m.year}_${m.month}'),
-                  child: _monthGrid(t, m.year, m.month),
-                );
-              },
+            child: ScrollConfiguration(
+              behavior: const _CalendarScrollBehavior(),
+              child: PageView.builder(
+                scrollDirection: Axis.horizontal, // 左右翻月
+                physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                itemBuilder: (_, page) {
+                  final m = _monthForPage(page);
+                  // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
+                  return RepaintBoundary(
+                    key: ValueKey('month_${m.year}_${m.month}'),
+                    child: _monthGrid(t, m.year, m.month),
+                  );
+                },
+              ),
             ),
           ),
           // 排班面板或精簡詳情板
