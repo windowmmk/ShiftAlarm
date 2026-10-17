@@ -36,6 +36,8 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   late DateTime _currentDate;
 
   late final TextEditingController _noteCtrl;
+  late final FocusNode _venueFocus;
+  bool _editingVenue = false;
 
   /// 已點選的班次 ID
   String? _selectedId;
@@ -53,11 +55,18 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       widget.initialDate.day,
     );
     _noteCtrl = TextEditingController();
+    _venueFocus = FocusNode();
+    _venueFocus.addListener(() {
+      if (!_venueFocus.hasFocus && _editingVenue) {
+        _saveInlineVenue();
+      }
+    });
     _loadDay();
   }
 
   void _loadDay() {
     _noteCtrl.text = widget.store.assignments[_key]?.note ?? '';
+    _editingVenue = false;
     _selectedId = widget.store.assignments[_key]?.shiftId;
     if (_selectedId != null && !widget.store.defs.containsKey(_selectedId)) {
       _selectedId = null;
@@ -67,10 +76,14 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   @override
   void dispose() {
+    if (_editingVenue) {
+      _saveInlineVenue();
+    }
     if (_dirty && !_saving) {
       _persistCurrent();
     }
     _noteCtrl.dispose();
+    _venueFocus.dispose();
     super.dispose();
   }
 
@@ -89,6 +102,26 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       return false;
     }
     return true;
+  }
+
+  Future<void> _saveInlineVenue() async {
+    if (!_editingVenue) return;
+    final val = _noteCtrl.text.trim();
+    if (abbrUnits(val) > 4) {
+      showTopNotification(
+        context,
+        '地點請勿超過 4 單位（2 中文字／4 英文字母）',
+        icon: Icons.warning_amber_rounded,
+        iconColor: Colors.amber,
+      );
+      return;
+    }
+    if (mounted) setState(() => _editingVenue = false);
+    _markDirty();
+    await _persistCurrent();
+    if (val.isNotEmpty && !widget.store.venues.contains(val)) {
+      await widget.store.addVenue(val);
+    }
   }
 
   Future<void> _persistCurrent() async {
@@ -121,6 +154,9 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   /// 跳去指定日期（上一日／下一日／點擊日曆格）
   Future<void> goToDate(DateTime date) async {
     if (_saving) return;
+    if (_editingVenue) {
+      await _saveInlineVenue();
+    }
     setState(() => _saving = true);
     try {
       await _persistCurrent();
@@ -185,141 +221,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   static int _slotFg(ShiftDef def) =>
       const ShiftTokens().slotForTime(def.startTime).fg.toARGB32();
 
-  List<String> _filterVenues(String q) {
-    final matches = widget.store.venues
-        .where((v) => v.toLowerCase().contains(q))
-        .toList();
-    matches.sort((a, b) {
-      final ah = a.startsWith('#') ? 1 : 0;
-      final bh = b.startsWith('#') ? 1 : 0;
-      if (ah != bh) return ah - bh;
-      return a.toLowerCase().compareTo(b.toLowerCase());
-    });
-    return matches;
-  }
 
-  /// 彈出地點選擇與輸入對話框
-  Future<void> _openVenueDialog(BuildContext context) async {
-    final t = context.tokens;
-    final ctrl = TextEditingController(text: _noteCtrl.text);
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) {
-          final q = ctrl.text.trim().toLowerCase();
-          final matches = _filterVenues(q);
-          final isNew = q.isNotEmpty &&
-              !widget.store.venues.any((v) => v.toLowerCase() == q);
-          return AlertDialog(
-            title: Text('設置 $_dateLabel 地點'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: ctrl,
-                      autofocus: true,
-                      inputFormatters: const [AbbrUnitLengthFormatter(4)],
-                      maxLength: 4,
-                      decoration: InputDecoration(
-                        labelText: '地點（最多 4 單位）',
-                        hintText: '如 總部、A1（2全形/4半形）',
-                        counterText: '',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: ctrl.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 16),
-                                onPressed: () {
-                                  ctrl.clear();
-                                  setD(() {});
-                                },
-                              )
-                            : null,
-                      ),
-                      onChanged: (_) => setD(() {}),
-                    ),
-                    if (matches.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      const Text('快速選擇現有地點：',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final v in matches.take(15))
-                            ActionChip(
-                              label: Text(v, style: const TextStyle(fontSize: 12)),
-                              backgroundColor:
-                                  ctrl.text.trim().toUpperCase() == v.toUpperCase()
-                                      ? t.brand.withValues(alpha: 0.15)
-                                      : t.neutralBg2,
-                              onPressed: () {
-                                ctrl.text = v;
-                                setD(() {});
-                              },
-                            ),
-                        ],
-                      ),
-                    ],
-                    if (isNew) ...[
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.add, size: 14),
-                        label: Text('新增「${ctrl.text.trim()}」到地點清單'),
-                        onPressed: () async {
-                          await widget.store.addVenue(ctrl.text.trim());
-                          setD(() {});
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  ctrl.clear();
-                  _noteCtrl.text = '';
-                  _markDirty();
-                  _persistCurrent();
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  showTopNotification(context, '已清除地點');
-                },
-                child: const Text('清除地點'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (abbrUnits(ctrl.text.trim()) > 4) {
-                    showTopNotification(
-                      context,
-                      '地點請勿超過 4 單位（2 中文字／4 英文字母）',
-                      icon: Icons.warning_amber_rounded,
-                      iconColor: Colors.amber,
-                    );
-                    return;
-                  }
-                  _noteCtrl.text = ctrl.text.trim();
-                  _markDirty();
-                  _persistCurrent();
-                  Navigator.pop(ctx);
-                  setState(() {});
-                  showTopNotification(context, '地點已更新');
-                },
-                child: const Text('確定'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -366,65 +268,119 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // 地點按鈕（充裕空間，直接展示與點擊設置）
+                      // 地點輸入欄（原頁面文本框輸入，無彈窗，與入備註方式完全一致）
                       Expanded(
-                        child: InkWell(
-                          onTap: () => _openVenueDialog(context),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: note.isNotEmpty
-                                  ? t.brand.withValues(alpha: 0.12)
-                                  : t.neutralBg2,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: note.isNotEmpty
-                                    ? t.brand.withValues(alpha: 0.35)
-                                    : t.neutralStroke,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 15,
-                                  color: note.isNotEmpty ? t.brand : t.neutralFg2,
-                                ),
-                                const SizedBox(width: 5),
-                                Expanded(
-                                  child: Text(
-                                    note.isNotEmpty ? note : '設置地點',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: note.isNotEmpty
-                                          ? FontWeight.w500
-                                          : FontWeight.normal,
-                                      color: note.isNotEmpty
-                                          ? t.brand
-                                          : t.neutralFg2,
+                        child: SizedBox(
+                          height: 36,
+                          child: _editingVenue
+                              ? TextField(
+                                  controller: _noteCtrl,
+                                  focusNode: _venueFocus,
+                                  maxLines: 1,
+                                  maxLength: 4,
+                                  inputFormatters: const [
+                                    AbbrUnitLengthFormatter(4)
+                                  ],
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: t.neutralBg2,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                          color: t.brand, width: 1.5),
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 6),
+                                    counterText: '',
+                                    isDense: true,
+                                    hintText: '輸入地點（如總部）',
+                                    prefixIcon: Icon(Icons.location_on,
+                                        size: 16, color: t.brand),
+                                    suffixIcon: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.check, size: 18),
+                                      onPressed: _saveInlineVenue,
+                                    ),
+                                  ),
+                                  onEditingComplete: _saveInlineVenue,
+                                )
+                              : GestureDetector(
+                                  onTap: () {
+                                    setState(() => _editingVenue = true);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      if (mounted) _venueFocus.requestFocus();
+                                    });
+                                  },
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    height: 36,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10),
+                                    decoration: BoxDecoration(
+                                      color: note.isNotEmpty
+                                          ? t.brand.withValues(alpha: 0.12)
+                                          : t.neutralBg2,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: note.isNotEmpty
+                                            ? t.brand.withValues(alpha: 0.35)
+                                            : t.neutralStroke,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 15,
+                                          color: note.isNotEmpty
+                                              ? t.brand
+                                              : t.neutralFg2,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Expanded(
+                                          child: Text(
+                                            note.isNotEmpty
+                                                ? note
+                                                : '新增地點…',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: note.isNotEmpty
+                                                  ? FontWeight.w500
+                                                  : FontWeight.normal,
+                                              color: note.isNotEmpty
+                                                  ? t.brand
+                                                  : t.neutralFg2,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Icon(
+                                          note.isNotEmpty
+                                              ? Icons.edit
+                                              : Icons.add,
+                                          size: 13,
+                                          color: note.isNotEmpty
+                                              ? t.brand.withValues(alpha: 0.7)
+                                              : t.neutralFg2,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                Icon(
-                                  note.isNotEmpty ? Icons.edit : Icons.add,
-                                  size: 13,
-                                  color: note.isNotEmpty
-                                      ? t.brand.withValues(alpha: 0.7)
-                                      : t.neutralFg2,
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       // 完成退出按鈕
                       FilledButton(
-                        onPressed: widget.onClose,
+                        onPressed: () {
+                          if (_editingVenue) {
+                            _saveInlineVenue();
+                          }
+                          widget.onClose();
+                        },
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 0),
