@@ -1,4 +1,4 @@
-import 'dart:ui' show PointerDeviceKind;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,24 +10,78 @@ import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
+import '../widgets/duo_book_page_view.dart';
 import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
 
-/// 支援桌面與網頁滑鼠拖曳、觸摸、觸控板左右換月的 ScrollBehavior
-class _CalendarScrollBehavior extends MaterialScrollBehavior {
-  const _CalendarScrollBehavior();
+/// 120ms 堅實微觸感（微縮放 1.0 -> 0.965 -> 1.0）日曆格包裝組件
+class _HapticCell extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _HapticCell({
+    super.key,
+    required this.child,
+    required this.onTap,
+  });
 
   @override
-  Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-      };
+  State<_HapticCell> createState() => _HapticCellState();
+}
+
+class _HapticCellState extends State<_HapticCell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.965)
+            .chain(CurveTween(curve: Curves.easeInQuad)),
+        weight: 38,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.965, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 62,
+      ),
+    ]).animate(_ctrl);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    _ctrl.forward(from: 0.0);
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _onTap,
+      behavior: HitTestBehavior.opaque,
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.child,
+      ),
+    );
+  }
 }
 
 /// 月曆：固定顯示 6 週（42 格），按月一頁頁左右滑動切換，極致 60fps GPU 快取過渡。
-/// 明確區分本月與上月／下月；點選日期底部顯示班次與備忘；點「排班」即時排更。
+/// 支援 Duo 式 3D 左界書頁翻頁、排班卡片從無到有飄入、跨月純視覺流光過渡與 120ms 堅實微觸感。
 class CalendarScreen extends StatefulWidget {
   final ShiftStore store;
   final AlarmService alarms;
@@ -38,7 +92,8 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class _CalendarScreenState extends State<CalendarScreen>
+    with TickerProviderStateMixin {
   /// 基準年月與頁碼映射：支援前後 100 年，徹底杜絕偏移算錯導致的 3943 年 Bug
   static const int _kBaseYear = 2026;
   static const int _kBaseMonth = 1;
@@ -52,13 +107,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return DateTime(_kBaseYear, _kBaseMonth + delta, 1);
   }
 
-  late final PageController _pageController;
+  late final DuoPageController _pageController;
   late int _currentPage;
 
   /// 頂部標題當前月份（以當前顯示頁面為準）
   late int _activeYear;
   late int _activeMonth;
-
 
   /// 詳情板選中日期（預設今日）；㩒日曆格更新
   late DateTime _selectedDate;
@@ -74,6 +128,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   late final TextEditingController _remarkCtrl;
   late final FocusNode _remarkFocus;
 
+  /// 排班卡片從無到有飄入動畫控制器（時長 1100ms）
+  late final AnimationController _cardFloatAnimCtrl;
+
+  /// 跨月純視覺流光掃過動畫控制器（時長 650ms）
+  late final AnimationController _sweepAnimCtrl;
+
+  /// 今日 (Today) 柔和呼吸圈動畫控制器（循環 2000ms）
+  late final AnimationController _todayPulseCtrl;
+
   @override
   void initState() {
     super.initState();
@@ -82,7 +145,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _activeYear = now.year;
     _activeMonth = now.month;
     _currentPage = _pageForYearMonth(now.year, now.month);
-    _pageController = PageController(initialPage: _currentPage);
+    _pageController = DuoPageController(initialPage: _currentPage);
+
+    _cardFloatAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..addListener(() {
+        if (mounted) setState(() {});
+      });
+
+    _sweepAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    )..addListener(() {
+        if (mounted) setState(() {});
+      });
+
+    _todayPulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _todayPulseCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     _remarkCtrl = TextEditingController();
     _remarkFocus = FocusNode();
@@ -97,16 +182,62 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUrlHashImport();
+      _checkMonthTransitionOnStartup();
     });
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _cardFloatAnimCtrl.dispose();
+    _sweepAnimCtrl.dispose();
+    _todayPulseCtrl.dispose();
     _remarkCtrl.dispose();
     _remarkFocus.dispose();
     widget.store.removeListener(_onStoreChanged);
     super.dispose();
+  }
+
+  /// 檢查是否每逢新月第一次進入：觸發純視覺流光掃過上月並自然 3D 翻書過渡到本月
+  void _checkMonthTransitionOnStartup() {
+    final now = DateTime.now();
+    final currentKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final lastSeen = widget.store.prefs.getString('last_seen_active_month');
+    if (lastSeen == null) {
+      widget.store.prefs.setString('last_seen_active_month', currentKey);
+      return;
+    }
+    if (lastSeen != currentKey) {
+      final parts = lastSeen.split('-');
+      if (parts.length == 2) {
+        final lastYear = int.tryParse(parts[0]);
+        final lastMonth = int.tryParse(parts[1]);
+        if (lastYear != null && lastMonth != null) {
+          final prevDate = DateTime(lastYear, lastMonth, 1);
+          final targetPage = _pageForYearMonth(now.year, now.month);
+          final prevPage = _pageForYearMonth(prevDate.year, prevDate.month);
+          if (targetPage - prevPage == 1) {
+            // 剛好隔 1 個月：先停留在上一月，流光掃過上月月末，然後自然 3D 翻書進本月
+            _pageController.jumpToPage(prevPage);
+            setState(() {
+              _currentPage = prevPage;
+              _activeYear = prevDate.year;
+              _activeMonth = prevDate.month;
+            });
+            Future.delayed(const Duration(milliseconds: 350), () {
+              if (!mounted) return;
+              _sweepAnimCtrl.forward(from: 0.0).then((_) {
+                if (!mounted) return;
+                _shiftMonth(1);
+                widget.store.prefs.setString('last_seen_active_month', currentKey);
+              });
+            });
+            return;
+          }
+        }
+      }
+      widget.store.prefs.setString('last_seen_active_month', currentKey);
+    }
   }
 
   /// store 有寫入即自動刷新
@@ -123,7 +254,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
-
   void _goToToday() {
     final now = DateTime.now();
     final targetPage = _pageForYearMonth(now.year, now.month);
@@ -134,12 +264,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _currentPage = targetPage;
     });
     if (_pageController.hasClients) {
-      final curPage = _pageController.page?.round() ?? _currentPage;
+      final curPage = _pageController.page;
       if (curPage != targetPage) {
-        if ((targetPage - curPage).abs() <= 3) {
+        if ((targetPage - curPage).abs() <= 1) {
           _pageController.animateToPage(
             targetPage,
-            duration: const Duration(milliseconds: 260),
+            duration: const Duration(milliseconds: 380),
             curve: Curves.easeOutCubic,
           );
         } else {
@@ -149,17 +279,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  /// 左右切月：平滑切換到上一月／下一月（左右翻頁）
+  /// 左右切月：平滑切換到上一月／下一月（Duo 3D 書頁立體翻頁）
   void _shiftMonth(int delta) {
     if (!_pageController.hasClients) return;
     final targetPage = _currentPage + delta;
     _pageController.animateToPage(
       targetPage,
-      duration: const Duration(milliseconds: 260),
+      duration: const Duration(milliseconds: 380),
       curve: Curves.easeOutCubic,
     );
   }
-
 
   /// 開排班面板：取代詳情板，擺喺日曆下方
   void _openPanel() {
@@ -266,11 +395,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _jumpToYearMonth(int year, int month) {
     final targetPage = _pageForYearMonth(year, month);
     if (_pageController.hasClients) {
-      final curPage = _pageController.page?.round() ?? _currentPage;
-      if ((targetPage - curPage).abs() <= 3) {
+      final curPage = _pageController.page;
+      if ((targetPage - curPage).abs() <= 1) {
         _pageController.animateToPage(
           targetPage,
-          duration: const Duration(milliseconds: 260),
+          duration: const Duration(milliseconds: 380),
           curve: Curves.easeOutCubic,
         );
       } else {
@@ -310,7 +439,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               context: context,
               store: widget.store,
               alarms: widget.alarms,
-              onImportDone: () => setState(() {}),
+              onImportDone: () {
+                setState(() {});
+                _cardFloatAnimCtrl.forward(from: 0.0);
+              },
             ),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -346,22 +478,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         children: [
           _weekHeader(t),
           Expanded(
-            child: ScrollConfiguration(
-              behavior: const _CalendarScrollBehavior(),
-              child: PageView.builder(
-                scrollDirection: Axis.horizontal, // 左右翻月
-                physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                itemBuilder: (_, page) {
-                  final m = _monthForPage(page);
-                  // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
-                  return RepaintBoundary(
-                    key: ValueKey('month_${m.year}_${m.month}'),
-                    child: _monthGrid(t, m.year, m.month),
-                  );
-                },
-              ),
+            child: DuoBookPageView(
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (_, page) {
+                final m = _monthForPage(page);
+                // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
+                return RepaintBoundary(
+                  key: ValueKey('month_${m.year}_${m.month}'),
+                  child: _monthGrid(t, m.year, m.month),
+                );
+              },
             ),
           ),
           // 排班面板或精簡詳情板
@@ -476,6 +603,78 @@ class _CalendarScreenState extends State<CalendarScreen> {
       noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.48);
     }
 
+    // 今日 (Today) 柔和微呼吸圈
+    BoxShadow? todayPulseShadow;
+    if (isToday && isCurrentMonth) {
+      final pulseVal = _todayPulseCtrl.value;
+      todayPulseShadow = BoxShadow(
+        color: t.brand.withValues(alpha: 0.12 + 0.26 * pulseVal),
+        blurRadius: 4.0 + 3.0 * pulseVal,
+        spreadRadius: 0.5 + 1.2 * pulseVal,
+      );
+    }
+
+    // 排班卡片從無到有飄入計算（Staggered Float In）
+    final bool isCardFloating =
+        _cardFloatAnimCtrl.isAnimating && isCurrentMonth && def != null;
+    double cardT = 1.0;
+    if (isCardFloating) {
+      final dayRatio = ((day - 1) * 0.022).clamp(0.0, 0.70);
+      final endRatio = (dayRatio + 0.30).clamp(0.0, 1.0);
+      final animVal = _cardFloatAnimCtrl.value;
+      if (animVal < dayRatio) {
+        cardT = 0.0;
+      } else if (animVal >= endRatio) {
+        cardT = 1.0;
+      } else {
+        final localT = (animVal - dayRatio) / (endRatio - dayRatio);
+        cardT = Curves.easeOutBack.transform(localT);
+      }
+    }
+
+    Widget wrapFloatingCard(Widget child) {
+      if (!isCardFloating) return child;
+      if (cardT <= 0.001) return const SizedBox.shrink();
+      final clampedT = cardT.clamp(0.0, 1.0);
+      return Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001)
+          ..translate(0.0, -24.0 * (1.0 - clampedT))
+          ..rotateX(0.18 * (1.0 - clampedT))
+          ..scale(0.92 + 0.08 * clampedT),
+        child: Opacity(
+          opacity: clampedT,
+          child: child,
+        ),
+      );
+    }
+
+    // 月終純視覺時間流光（sweepAnimCtrl 播放時依序掠過 1~31 日）
+    Widget? sweepOverlay;
+    if (_sweepAnimCtrl.isAnimating && isCurrentMonth) {
+      final dayProg = (day - 1) / 30.0;
+      final sweepVal = _sweepAnimCtrl.value;
+      final dist = (sweepVal - dayProg).abs();
+      if (dist < 0.14) {
+        final intensity = (1.0 - dist / 0.14).clamp(0.0, 1.0);
+        sweepOverlay = Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                color: t.brand.withValues(alpha: 0.22 * intensity),
+                border: Border.all(
+                  color: t.brand.withValues(alpha: 0.55 * intensity),
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
     Widget cell = Container(
       margin: EdgeInsets.zero,
       decoration: BoxDecoration(
@@ -485,6 +684,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           width: (isSelected || isToday) ? 1.5 : 1.0,
         ),
         borderRadius: BorderRadius.circular(4),
+        boxShadow: todayPulseShadow != null ? [todayPulseShadow] : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -512,41 +712,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   ),
                 ),
-                // 第二行：班次縮寫（清晰適中 17.0px w600）
+                // 第二行：班次縮寫（清晰適中 17.0px w600，支援從無到有飄入）
                 Expanded(
                   child: Center(
                     child: def != null
-                        ? FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              truncateAbbr(def.abbr),
-                              style: TextStyle(
-                                fontSize: 17.0,
-                                fontWeight: FontWeight.w600,
-                                color: abbrColor,
-                                height: 1.0,
+                        ? wrapFloatingCard(
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                truncateAbbr(def.abbr),
+                                style: TextStyle(
+                                  fontSize: 17.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: abbrColor,
+                                  height: 1.0,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
                           )
                         : const SizedBox.shrink(),
                   ),
                 ),
-                // 第三行：地點（常規字重 17.0px normal）
+                // 第三行：地點（常規字重 17.0px normal，支援從無到有飄入）
                 Expanded(
                   child: Center(
                     child: (def != null && note.isNotEmpty)
-                        ? FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              truncateAbbr(note),
-                              style: TextStyle(
-                                fontSize: 17.0,
-                                fontWeight: FontWeight.normal,
-                                color: noteColor,
-                                height: 1.0,
+                        ? wrapFloatingCard(
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                truncateAbbr(note),
+                                style: TextStyle(
+                                  fontSize: 17.0,
+                                  fontWeight: FontWeight.normal,
+                                  color: noteColor,
+                                  height: 1.0,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
                           )
                         : const SizedBox.shrink(),
@@ -555,7 +759,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ],
             ),
           ),
-          // 公眾假期頂部紅色微粗線指示條（2.8px）
+          // 公眾假期頂部紅色微粗線指示條（緊貼框邊，頂部圓角契合外框）
           if (holiday != null)
             Positioned(
               top: 0,
@@ -567,16 +771,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: isCurrentMonth
                       ? t.danger
                       : t.danger.withValues(alpha: 0.50),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(3.0),
+                  ),
                 ),
               ),
             ),
+          // 月終純視覺時間流光（掠過 1~31 日）
+          if (sweepOverlay != null) sweepOverlay,
         ],
       ),
     );
 
-    return GestureDetector(
+    return _HapticCell(
       onTap: () {
-        HapticFeedback.selectionClick();
         if (_editingRemark) {
           _saveInlineRemark();
         }
