@@ -365,11 +365,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   void _jumpToYearMonth(int year, int month) {
     final targetPage = _pageForYearMonth(year, month);
     if (_pageController.hasClients) {
-      final curPage = _pageController.page;
-      if ((targetPage - curPage).abs() <= 1) {
+      final curPage = _pageController.page?.round() ?? _currentPage;
+      if ((targetPage - curPage).abs() <= 3) {
         _pageController.animateToPage(
           targetPage,
-          duration: const Duration(milliseconds: 380),
+          duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
         );
       } else {
