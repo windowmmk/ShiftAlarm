@@ -568,7 +568,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  /// 一個月固定 6 週（42 格）標準網格：上下左右留空，格子浮動於海天之上
+  /// 一個月固定 6 週（42 格）標準網格：四周留白，破浪光潮推進時整個月曆容器如甲板般 3D 俯仰
   Widget _monthGrid(ShiftTokens t, int year, int month) {
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
@@ -576,7 +576,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     const weekCount = 6; // 永遠固定 6 行（42 格），消除跨月高度撕裂與抖動
     final today = DateTime.now();
 
-    return Padding(
+    final grid = Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
       child: Column(
         children: [
@@ -609,6 +609,20 @@ class _CalendarScreenState extends State<CalendarScreen>
         ],
       ),
     );
+
+    if (!_cardFloatAnimCtrl.isAnimating) return grid;
+
+    // 破浪光潮推進時，整個月曆容器 3D 俯仰傾斜（深度參考 shiftalarm_web_ocean）
+    final tiltT = math.sin(_cardFloatAnimCtrl.value * math.pi);
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..setEntry(3, 2, 0.0012)
+        ..rotateX(0.08 * tiltT)
+        ..translate(0.0, 6.0 * tiltT)
+        ..scale(1.0 - 0.015 * tiltT),
+      child: grid,
+    );
   }
 
   /// 日曆格：清晰對比、主次分明、字重自然平衡
@@ -640,7 +654,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final baseFg = slot?.fg ?? t.neutralFg;
     final baseBg = slot?.bg ?? t.neutralBg;
 
-    // 當月與非當月（上月／下月）的色彩處理：減弱濾鏡效果，保持色彩清晰可辨
+    // 當月與非當月（上月／下月）的色彩處理：輕度半透明保護高對比度可讀性
     final Color cellBg;
     final Color borderColor;
     final Color dateColor;
@@ -648,27 +662,24 @@ class _CalendarScreenState extends State<CalendarScreen>
     final Color noteColor;
 
     if (isCurrentMonth) {
+      // 輕度半透明：排更格 0.88 飽和色，空白格 0.84 珍珠白，文字深邃清晰
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.52)
-          : Colors.white.withValues(alpha: 0.38);
+          ? slot!.bg.withValues(alpha: 0.88)
+          : Colors.white.withValues(alpha: 0.84);
       borderColor = isSelected
           ? t.brand
           : (isToday
-              ? t.brand.withValues(alpha: 0.75)
-              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.50));
+              ? t.brand.withValues(alpha: 0.85)
+              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.65));
       dateColor = (holiday != null) ? t.danger : baseFg;
       abbrColor = baseFg;
       noteColor = baseFg;
     } else {
       // 鄰月淡化處理
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.25)
-          : Colors.white.withValues(alpha: 0.16);
-      borderColor = isSelected
-          ? t.brand
-          : (isToday
-              ? t.brand.withValues(alpha: 0.45)
-              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.22));
+          ? slot!.bg.withValues(alpha: 0.40)
+          : Colors.white.withValues(alpha: 0.35);
+      borderColor = (slot?.border ?? t.neutralStroke).withValues(alpha: 0.30);
       dateColor = (holiday != null)
           ? t.danger.withValues(alpha: 0.52)
           : t.neutralFg.withValues(alpha: 0.42);
@@ -704,7 +715,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         sheenT = 0.0;
       } else {
         final localT = (animVal - waveStart) / (waveEnd - waveStart);
-        waveT = Curves.easeOutBack.transform(localT);
+        waveT = localT.clamp(0.0, 1.0);
         sheenT = localT.clamp(0.0, 1.0);
       }
     }
@@ -730,38 +741,23 @@ class _CalendarScreenState extends State<CalendarScreen>
       } else {
         // 夜更：深海星夜與藍眼淚螢光青藍
         shiftFxPrimary = const Color(0xFF6366F1);
-        shiftFxAccent = const Color(0xFF38BDF8);
+        shiftFxAccent = const Color(0xFF00F0FF);
       }
     }
 
     // 浪花掠過時的更次專屬色彩微光暈
     BoxShadow? surgeGlowShadow;
-    if (isWaveSurging && sheenT > 0.05 && sheenT < 0.95) {
+    if (isWaveSurging && sheenT > 0.03 && sheenT < 0.97) {
       final pulse = (1.0 - (sheenT - 0.5).abs() * 2.0).clamp(0.0, 1.0);
       surgeGlowShadow = BoxShadow(
-        color: shiftFxPrimary.withValues(alpha: 0.50 * pulse),
-        blurRadius: 9.0 * pulse,
-        spreadRadius: 1.2 * pulse,
+        color: shiftFxPrimary.withValues(alpha: 0.55 * pulse),
+        blurRadius: 16.0 * pulse,
+        spreadRadius: 1.5 * pulse,
+        offset: Offset(0, 6.0 * pulse),
       );
     }
 
-    Widget wrapWaveContent(Widget child) {
-      if (!isWaveSurging) return child;
-      if (waveT <= 0.001) return const SizedBox.shrink();
-      final clampedT = waveT.clamp(0.0, 1.0);
-      return Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.001)
-          ..translate(0.0, 24.0 * (1.0 - clampedT))
-          ..rotateX(0.16 * (1.0 - clampedT))
-          ..scale(0.88 + 0.12 * clampedT),
-        child: Opacity(
-          opacity: clampedT,
-          child: child,
-        ),
-      );
-    }
+    Widget wrapWaveContent(Widget child) => child;
 
     // 月終純視覺時間流光（sweepAnimCtrl 播放時依序掠過 1~31 日）
     Widget? sweepOverlay;
@@ -927,6 +923,51 @@ class _CalendarScreenState extends State<CalendarScreen>
       ),
     );
 
+    // 破浪浮力 3D 拋起、旋轉與落位物理動效（深度參考 shiftalarm_web_ocean）
+    if (isWaveSurging) {
+      double transY = 0.0;
+      double transZ = 0.0;
+      double rotX = 0.0;
+      double scale = 1.0;
+      double cellOpacity = 1.0;
+
+      if (waveT < 0.55) {
+        final p = Curves.easeOutCubic.transform(waveT / 0.55);
+        transY = 36.0 * (1.0 - p) - 9.0 * p;
+        transZ = -65.0 * (1.0 - p) + 26.0 * p;
+        rotX = 0.62 * (1.0 - p) - 0.16 * p;
+        scale = 0.80 + 0.26 * p;
+        cellOpacity = 0.25 + 0.75 * p;
+      } else if (waveT < 0.80) {
+        final p = Curves.easeInOut.transform((waveT - 0.55) / 0.25);
+        transY = -9.0 * (1.0 - p) + 2.5 * p;
+        transZ = 26.0 * (1.0 - p) - 5.0 * p;
+        rotX = -0.16 * (1.0 - p) + 0.05 * p;
+        scale = 1.06 - 0.075 * p;
+        cellOpacity = 1.0;
+      } else {
+        final p = Curves.easeOut.transform((waveT - 0.80) / 0.20);
+        transY = 2.5 * (1.0 - p);
+        transZ = -5.0 * (1.0 - p);
+        rotX = 0.05 * (1.0 - p);
+        scale = 0.985 + 0.015 * p;
+        cellOpacity = 1.0;
+      }
+
+      cell = Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.0016)
+          ..translate(0.0, transY, transZ)
+          ..rotateX(rotX)
+          ..scale(scale),
+        child: Opacity(
+          opacity: cellOpacity,
+          child: cell,
+        ),
+      );
+    }
+
     return _HapticCell(
       onTap: () {
         if (_editingRemark) {
@@ -972,16 +1013,16 @@ class _CalendarScreenState extends State<CalendarScreen>
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(10, 4, 10, 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.68),
+        color: Colors.white.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.85),
-          width: 1.0,
+          color: Colors.white.withValues(alpha: 0.95),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
             offset: const Offset(0, 3),
           ),
         ],
