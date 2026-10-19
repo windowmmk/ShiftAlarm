@@ -90,8 +90,17 @@
     }
   };
 
-  const oceanCurrent = Object.assign({}, SHIFT_OCEAN_PRESETS.M);
-  const oceanTarget = Object.assign({}, SHIFT_OCEAN_PRESETS.M);
+  function getPresetByCurrentTime() {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return SHIFT_OCEAN_PRESETS.M;
+    if (hour >= 11 && hour < 17) return SHIFT_OCEAN_PRESETS.A;
+    if (hour >= 17 && hour < 20) return SHIFT_OCEAN_PRESETS.S;
+    return SHIFT_OCEAN_PRESETS.N;
+  }
+
+  const initialPreset = getPresetByCurrentTime();
+  const oceanCurrent = Object.assign({}, initialPreset);
+  const oceanTarget = Object.assign({}, initialPreset);
 
   const importFx = {
     active: false,
