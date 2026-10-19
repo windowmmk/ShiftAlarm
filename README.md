@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.4.4-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v3.4.5-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
 
 專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
 
