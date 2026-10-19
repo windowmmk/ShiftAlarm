@@ -410,20 +410,19 @@ class _OceanPainter extends CustomPainter {
     }
   }
 
-  /// 繪製淺色磨砂玻璃疊加層，確保文字在任何光線下依然清晰銳利
+  /// 繪製微柔和透光層，在確保文字高對比度的同時讓海面、波浪與太陽清晰通透
   void _paintLightModeOverlay(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
 
-    // 半透明柔白漸變罩層，保護日曆格內文字的高對比可讀性
     final overlayPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.70),
-          Colors.white.withValues(alpha: 0.76),
-          Colors.white.withValues(alpha: 0.82),
+          Colors.white.withValues(alpha: 0.04),
+          Colors.white.withValues(alpha: 0.08),
+          Colors.white.withValues(alpha: 0.16),
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
 

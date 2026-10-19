@@ -26,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Scaffold(
+      extendBody: true,
+      backgroundColor: Colors.transparent,
       body: IndexedStack(
         index: _index,
         children: [
@@ -37,10 +39,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: t.neutralStroke, width: 0.8)),
+          color: Colors.white.withValues(alpha: 0.65),
+          border: Border(
+            top: BorderSide(
+              color: t.neutralStroke.withValues(alpha: 0.35),
+              width: 0.8,
+            ),
+          ),
         ),
         child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
           selectedIndex: _index,
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: const [

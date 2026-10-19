@@ -12,7 +12,7 @@ Future<void> showUnifiedImportDialog({
   required BuildContext context,
   required ShiftStore store,
   required AlarmService alarms,
-  VoidCallback? onImportDone,
+  void Function(List<String> importedDates)? onImportDone,
 }) async {
   await showDialog<void>(
     context: context,
@@ -27,7 +27,7 @@ Future<void> showUnifiedImportDialog({
 class _UnifiedImportDialog extends StatefulWidget {
   final ShiftStore store;
   final AlarmService alarms;
-  final VoidCallback? onImportDone;
+  final void Function(List<String> importedDates)? onImportDone;
 
   const _UnifiedImportDialog({
     required this.store,
@@ -179,7 +179,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         await importConfigText(widget.store, clean);
         if (mounted) {
           Navigator.pop(context);
-          widget.onImportDone?.call();
+          widget.onImportDone?.call(const []);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -231,7 +231,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
 
         if (mounted) {
           Navigator.pop(context);
-          widget.onImportDone?.call();
+          widget.onImportDone?.call([for (final r in rows) r.date]);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('排班導入成功：共 ${rows.length} 日排班（$alarmSuccessCount 個鬧鐘已同步）'),
