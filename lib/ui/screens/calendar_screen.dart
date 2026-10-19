@@ -543,7 +543,6 @@ class _CalendarScreenState extends State<CalendarScreen>
           ),
           Column(
             children: [
-              _weekHeader(t),
               Expanded(
                 child: ScrollConfiguration(
                   behavior: const _CalendarScrollBehavior(),
@@ -616,9 +615,11 @@ class _CalendarScreenState extends State<CalendarScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _weekHeader(t),
+              const SizedBox(height: 4),
               for (int w = 0; w < weekCount; w++)
                 SizedBox(
-                  height: 58.0,
+                  height: 70.0,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 1.5),
                     child: Row(
@@ -1297,17 +1298,24 @@ class _CalendarScreenState extends State<CalendarScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
-        children: names
-            .map((n) => Expanded(
-                  child: Center(
-                    child: Text(n,
-                        style: TextStyle(
-                            fontSize: t.fontCaption,
-                            color: t.neutralFg2,
-                            fontWeight: FontWeight.w600)),
+        children: [
+          for (int d = 0; d < 7; d++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: d < 6 ? 3.0 : 0),
+                child: Center(
+                  child: Text(
+                    names[d],
+                    style: TextStyle(
+                      fontSize: t.fontCaption,
+                      color: t.neutralFg2,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ))
-            .toList(),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
