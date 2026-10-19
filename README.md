@@ -4,11 +4,25 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.3.21-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v3.4.0-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
 
 專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
 
 🌐 **線上體驗 Web 版**：[https://windowmmk.github.io/ShiftAlarm/](https://windowmmk.github.io/ShiftAlarm/)
+
+---
+
+## 🌊 v3.4.0 重大里程碑：真 3D 海洋與全新流體動效 UI
+
+- **WebGL 3D 光線步進物理著色器**：GPU 硬體滿幀渲染 9 層傅立葉物理波高、次表面翡翠散射、各向異性太陽碎鑽光斑與星夜螢光「藍眼淚」。
+- **四時天空色彩強烈對比**：
+  - 🌅 **晨曦破曉**（早更）：旭日東升、粉金朝霞；
+  - ☀️ **碧海晴空**（午更）：仰角 $55^\circ$ 高動態明亮豔陽、清澈湛藍海面；
+  - 🌇 **金暉落日**（黃昏）：海平線緋紅暮光、熔金夕陽波濤；
+  - 🌌 **星夜深海**（夜更）：黑曜石暗夜天幕、暗黑海浪、浪尖 $3.2\times$ 璀璨藍眼淚螢光。
+- **真實世界自然時辰即時感應**：未選中日期時，自動按目前實際時鐘時辰展現真實海天。
+- **42 格對角線 3D 破浪浮力轉場**：批量導入與跨月換頁時，依照波浪相位由下而上推進 3D 透視拋起、旋轉、浮力落位與浪尖高光閃邊。
+- **全新緊湊排班卡片（支援下划隱去）**：自適應緊湊包裹，零多餘空白；選取日期時自底部平滑彈出，支援向下劃動（Swipe down）或點擊下箭頭隨時收起。
 
 ---
 
