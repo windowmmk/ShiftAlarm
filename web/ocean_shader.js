@@ -92,10 +92,10 @@
 
   function getPresetByCurrentTime() {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 11) return SHIFT_OCEAN_PRESETS.M;
-    if (hour >= 11 && hour < 17) return SHIFT_OCEAN_PRESETS.A;
-    if (hour >= 17 && hour < 20) return SHIFT_OCEAN_PRESETS.S;
-    return SHIFT_OCEAN_PRESETS.N;
+    if (hour >= 3 && hour < 9) return SHIFT_OCEAN_PRESETS.M;   // 早班 06 晨曦破曉
+    if (hour >= 9 && hour < 15) return SHIFT_OCEAN_PRESETS.A;  // 午班 12 豔陽碧海
+    if (hour >= 15 && hour < 21) return SHIFT_OCEAN_PRESETS.S; // 18 晚班金暉落日
+    return SHIFT_OCEAN_PRESETS.N;                              // 00 星夜深邃
   }
 
   const initialPreset = getPresetByCurrentTime();

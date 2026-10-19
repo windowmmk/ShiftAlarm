@@ -74,59 +74,70 @@ class OceanAtmoState {
     desc: '暗夜深邃 • 星月沉靜 • 璀璨藍眼淚螢光',
   );
 
-  /// 根據班次名稱與開始時間綜合判斷對應大氣
+  /// 根據班次名稱與開始時間綜合判斷對應大氣：
+  /// - 早班 06 對應晨曦破曉
+  /// - 午班 12 對應豔陽碧海
+  /// - 18 晚班對應金暉落日
+  /// - 00 夜班對應星夜深邃
   static OceanAtmoState fromShift(String? shiftName, String? startTime) {
     if (shiftName != null && shiftName.isNotEmpty) {
       final name = shiftName.trim();
-      if (name.contains('夜') || name.contains('通宵') || name.contains('晚')) {
-        return night;
+      if (name.contains('夜') || name.contains('通宵') || name.contains('大夜') || name.contains('深')) {
+        return night; // 00: 星夜深邃
       }
-      if (name.contains('午') || name.contains('中')) {
-        return midday; // 午班：豔陽晴空高照（天足夠亮）
+      if (name.contains('晚') || name.contains('夕') || name.contains('落日') || name.contains('黃昏')) {
+        return sunset; // 18: 晚班金暉落日
+      }
+      if (name.contains('中')) {
+        return sunset; // 中班多為下午傍晚班次 -> 金暉落日
+      }
+      if (name.contains('午') || name.contains('日') || name.contains('晴') || name.contains('休')) {
+        return midday; // 12: 午班豔陽碧海
       }
       if (name.contains('早') || name.contains('晨')) {
-        return morning;
-      }
-      if (name.contains('休')) {
-        return midday;
+        return morning; // 06: 早班晨曦破曉
       }
     }
     return fromStartTime(startTime);
   }
 
-  /// 根據班次開始時間（"HH:mm"）判斷對應大氣
+  /// 根據班次開始時間（"HH:mm"）判斷對應大氣：
+  /// - 03:00–08:59（早班 06）：晨曦破曉
+  /// - 09:00–14:59（午班 12）：豔陽碧海
+  /// - 15:00–20:59（18 晚班）：金暉落日
+  /// - 21:00–02:59（00 夜班）：星夜深邃
   static OceanAtmoState fromStartTime(String? startTime) {
     if (startTime == null || startTime.isEmpty) {
       return midday;
     }
     final hour = int.tryParse(startTime.split(':').firstOrNull ?? '') ?? 12;
-    if (hour >= 5 && hour < 11) {
-      return morning;
-    } else if (hour >= 11 && hour < 17) {
-      return midday; // 午班／日間：豔陽高照
-    } else if (hour >= 17 && hour < 20) {
-      return sunset; // 黃昏暮光
+    if (hour >= 3 && hour < 9) {
+      return morning; // 06 早班：晨曦破曉
+    } else if (hour >= 9 && hour < 15) {
+      return midday; // 12 午班：豔陽碧海
+    } else if (hour >= 15 && hour < 21) {
+      return sunset; // 18 晚班：金暉落日
     } else {
-      return night; // 夜更：深邃星夜
+      return night; // 00 夜班：星夜深邃
     }
   }
 
   /// 根據當前真實世界時間（自然時辰）取得海天大氣：
-  /// - 05:00–10:59：晨曦朝霞旭日東升
-  /// - 11:00–16:59：豔陽晴空碧海（午間天足夠亮）
-  /// - 17:00–19:59：金暉落日夕陽餘暉
-  /// - 20:00–04:59：深邃暗夜星空與藍眼淚（夜間天足夠暗）
+  /// - 03:00–08:59（06 晨曦）：晨曦朝霞旭日東升
+  /// - 09:00–14:59（12 日照）：豔陽碧海晴空高照
+  /// - 15:00–20:59（18 晚霞）：金暉落日夕陽餘暉
+  /// - 21:00–02:59（00 子夜）：星夜深邃暗海與藍眼淚
   static OceanAtmoState fromCurrentTime([DateTime? time]) {
     final now = time ?? DateTime.now();
     final hour = now.hour;
-    if (hour >= 5 && hour < 11) {
-      return morning;
-    } else if (hour >= 11 && hour < 17) {
-      return midday;
-    } else if (hour >= 17 && hour < 20) {
-      return sunset;
+    if (hour >= 3 && hour < 9) {
+      return morning; // 06 晨曦破曉
+    } else if (hour >= 9 && hour < 15) {
+      return midday; // 12 豔陽碧海
+    } else if (hour >= 15 && hour < 21) {
+      return sunset; // 18 金暉落日
     } else {
-      return night;
+      return night; // 00 星夜深邃
     }
   }
 
