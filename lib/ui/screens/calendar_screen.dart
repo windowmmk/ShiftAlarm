@@ -144,24 +144,19 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// 詳情排班欄展開狀態（預設隱藏，點選日期彈出，支援下划隱去）
   bool _showDetailPanel = false;
 
-  /// 依選中日期的班次時間取得海天大氣狀態（早更晨曦 / 午更豔陽晴空 / 中更落日 / 夜更深邃星空）
+  /// 依選中日期的班次時間取得海天大氣狀態：
+  /// - 當沒有選中日期時，嚴格按照目前真實世界時間（自然時辰）顯示大海；
+  /// - 當選中日期時，依該日班次時間呈現對應海天；若該日未排班，亦還原為當前時間的大海。
   OceanAtmoState _getCurrentAtmoState() {
     if (!_showDetailPanel) {
-      final todayKey = ShiftStore.ymd(DateTime.now());
-      final todayAssign = widget.store.assignments[todayKey];
-      final todayDef =
-          todayAssign != null ? widget.store.defs[todayAssign.shiftId] : null;
-      if (todayDef != null) {
-        return OceanAtmoState.fromShift(todayDef.name, todayDef.startTime);
-      }
-      return OceanAtmoState.midday;
+      return OceanAtmoState.fromCurrentTime();
     }
     final key = ShiftStore.ymd(_selectedDate);
     final assignment = widget.store.assignments[key];
     final def =
         assignment != null ? widget.store.defs[assignment.shiftId] : null;
     if (def == null) {
-      return OceanAtmoState.midday;
+      return OceanAtmoState.fromCurrentTime();
     }
     return OceanAtmoState.fromShift(def.name, def.startTime);
   }

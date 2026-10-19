@@ -111,6 +111,25 @@ class OceanAtmoState {
     }
   }
 
+  /// 根據當前真實世界時間（自然時辰）取得海天大氣：
+  /// - 05:00–10:59：晨曦朝霞旭日東升
+  /// - 11:00–16:59：豔陽晴空碧海（午間天足夠亮）
+  /// - 17:00–19:59：金暉落日夕陽餘暉
+  /// - 20:00–04:59：深邃暗夜星空與藍眼淚（夜間天足夠暗）
+  static OceanAtmoState fromCurrentTime([DateTime? time]) {
+    final now = time ?? DateTime.now();
+    final hour = now.hour;
+    if (hour >= 5 && hour < 11) {
+      return morning;
+    } else if (hour >= 11 && hour < 17) {
+      return midday;
+    } else if (hour >= 17 && hour < 20) {
+      return sunset;
+    } else {
+      return night;
+    }
+  }
+
   static OceanAtmoState lerp(OceanAtmoState a, OceanAtmoState b, double t) {
     return OceanAtmoState(
       sunElevation: a.sunElevation + (b.sunElevation - a.sunElevation) * t,
