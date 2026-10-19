@@ -608,42 +608,49 @@ class _CalendarScreenState extends State<CalendarScreen>
     const weekCount = 6; // 永遠固定 6 行（42 格），消除跨月高度撕裂與抖動
     final today = DateTime.now();
 
-    final grid = Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
-      child: Column(
-        children: [
-          for (int w = 0; w < weekCount; w++)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 1.5),
-                child: Row(
-                  children: [
-                    for (int d = 0; d < 7; d++)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(right: d < 6 ? 3.0 : 0),
-                          child: OceanStaggeredCellTransition(
-                            index: w * 7 + d,
-                            controller: _cardFloatAnimCtrl,
-                            mode: OceanImportMode.tidalWave,
-                            child: _dayCell(
-                              t,
-                              DateTime(firstSunday.year, firstSunday.month,
-                                  firstSunday.day + w * 7 + d),
-                              today,
-                              year,
-                              month,
-                              row: w,
-                              col: d,
+    final grid = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int w = 0; w < weekCount; w++)
+                SizedBox(
+                  height: 58.0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 1.5),
+                    child: Row(
+                      children: [
+                        for (int d = 0; d < 7; d++)
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: d < 6 ? 3.0 : 0),
+                              child: OceanStaggeredCellTransition(
+                                index: w * 7 + d,
+                                controller: _cardFloatAnimCtrl,
+                                mode: OceanImportMode.tidalWave,
+                                child: _dayCell(
+                                  t,
+                                  DateTime(firstSunday.year, firstSunday.month,
+                                      firstSunday.day + w * 7 + d),
+                                  today,
+                                  year,
+                                  month,
+                                  row: w,
+                                  col: d,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
 
