@@ -232,6 +232,59 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (mounted) setState(() {});
   }
 
+  /// 批量導入跨月動效：依序自第一個月推進波浪落位，完成後自動滑動翻至下個月，直至所有月份排更完成
+  Future<void> _playSequentialImportAnimation(List<String> dates) async {
+    final Set<int> pageIndices = {};
+    for (final d in dates) {
+      final parts = d.split('-');
+      if (parts.length >= 2) {
+        final y = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        if (y != null && m != null) {
+          pageIndices.add(_pageForYearMonth(y, m));
+        }
+      }
+    }
+    final sortedPages = pageIndices.toList()..sort();
+    if (sortedPages.isEmpty) {
+      if (mounted) setState(() {});
+      _oceanKey.currentState?.triggerSurge();
+      _cardFloatAnimCtrl.forward(from: 0.0);
+      return;
+    }
+
+    for (int i = 0; i < sortedPages.length; i++) {
+      final targetPage = sortedPages[i];
+      if (_pageController.hasClients) {
+        final curPage = _pageController.page?.round() ?? _currentPage;
+        if (curPage != targetPage) {
+          await _pageController.animateToPage(
+            targetPage,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeInOutCubic,
+          );
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _currentPage = targetPage;
+          final m = _monthForPage(targetPage);
+          _activeYear = m.year;
+          _activeMonth = m.month;
+        });
+      }
+
+      // 觸發海面浪湧與該月 42 格專屬色彩波浪推進
+      _oceanKey.currentState?.triggerSurge();
+      await _cardFloatAnimCtrl.forward(from: 0.0);
+
+      // 若有後續月份，稍作停留讓用戶清晰感知完成狀態後換頁
+      if (i < sortedPages.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 220));
+      }
+    }
+  }
+
   void _onPageChanged(int page) {
     final m = _monthForPage(page);
     setState(() {
@@ -405,7 +458,12 @@ class _CalendarScreenState extends State<CalendarScreen>
     final t = context.tokens;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: InkWell(
           onTap: _showMonthPicker,
           borderRadius: BorderRadius.circular(8),
@@ -426,10 +484,8 @@ class _CalendarScreenState extends State<CalendarScreen>
               context: context,
               store: widget.store,
               alarms: widget.alarms,
-              onImportDone: () {
-                setState(() {});
-                _cardFloatAnimCtrl.forward(from: 0.0);
-                _oceanKey.currentState?.triggerSurge();
+              onImportDone: (dates) {
+                _playSequentialImportAnimation(dates);
               },
             ),
             style: FilledButton.styleFrom(
@@ -464,7 +520,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       ),
       body: Stack(
         children: [
-          // 海天連動動態背景（隨選取日期班次時間，呈現對應太陽高度與海浪形態）
+          // 海天連動動態背景（鋪滿整個介面，延伸至狀態欄與導航欄底層）
           Positioned.fill(
             child: OceanAtmosphereWidget(
               key: _oceanKey,
@@ -503,6 +559,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                       onClose: () => setState(() => _schedPanelOpen = false),
                     )
                   : _detailPanel(t),
+              // 預留底部半透明導航欄高度，使詳情卡片浮於導航欄上方且海浪自然流經底部
+              const SizedBox(height: 72),
             ],
           ),
         ],
@@ -510,7 +568,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  /// 一個月固定 6 週（42 格）標準網格：緊湊排版，消除上下左右與行距多餘留白
+  /// 一個月固定 6 週（42 格）標準網格：上下左右留空，格子浮動於海天之上
   Widget _monthGrid(ShiftTokens t, int year, int month) {
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
@@ -518,35 +576,38 @@ class _CalendarScreenState extends State<CalendarScreen>
     const weekCount = 6; // 永遠固定 6 行（42 格），消除跨月高度撕裂與抖動
     final today = DateTime.now();
 
-    return Column(
-      children: [
-        for (int w = 0; w < weekCount; w++)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
-              child: Row(
-                children: [
-                  for (int d = 0; d < 7; d++)
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(right: d < 6 ? 1.5 : 0),
-                        child: _dayCell(
-                          t,
-                          DateTime(firstSunday.year, firstSunday.month,
-                              firstSunday.day + w * 7 + d),
-                          today,
-                          year,
-                          month,
-                          row: w,
-                          col: d,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
+      child: Column(
+        children: [
+          for (int w = 0; w < weekCount; w++)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 1.5),
+                child: Row(
+                  children: [
+                    for (int d = 0; d < 7; d++)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: d < 6 ? 3.0 : 0),
+                          child: _dayCell(
+                            t,
+                            DateTime(firstSunday.year, firstSunday.month,
+                                firstSunday.day + w * 7 + d),
+                            today,
+                            year,
+                            month,
+                            row: w,
+                            col: d,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -588,24 +649,26 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     if (isCurrentMonth) {
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.88)
-          : Colors.white.withValues(alpha: 0.78);
+          ? slot!.bg.withValues(alpha: 0.52)
+          : Colors.white.withValues(alpha: 0.38);
       borderColor = isSelected
           ? t.brand
-          : (isToday ? t.brand.withValues(alpha: 0.65) : (slot?.border ?? t.neutralStroke));
+          : (isToday
+              ? t.brand.withValues(alpha: 0.75)
+              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.50));
       dateColor = (holiday != null) ? t.danger : baseFg;
       abbrColor = baseFg;
       noteColor = baseFg;
     } else {
-      // 鄰月淡化處理：再微調淺約 15%，保持柔和層次區分
+      // 鄰月淡化處理
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.45)
-          : Colors.white.withValues(alpha: 0.35);
+          ? slot!.bg.withValues(alpha: 0.25)
+          : Colors.white.withValues(alpha: 0.16);
       borderColor = isSelected
           ? t.brand
           : (isToday
-              ? t.brand.withValues(alpha: 0.55)
-              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.38));
+              ? t.brand.withValues(alpha: 0.45)
+              : (slot?.border ?? t.neutralStroke).withValues(alpha: 0.22));
       dateColor = (holiday != null)
           ? t.danger.withValues(alpha: 0.52)
           : t.neutralFg.withValues(alpha: 0.42);
@@ -644,6 +707,42 @@ class _CalendarScreenState extends State<CalendarScreen>
         waveT = Curves.easeOutBack.transform(localT);
         sheenT = localT.clamp(0.0, 1.0);
       }
+    }
+
+    // 依更次時段取得專屬流光與浪花光暈主色（早更金紅/正午天藍/中更粉紫/夜更螢光深海）
+    Color shiftFxPrimary = t.brand;
+    Color shiftFxAccent = const Color(0xFFFDE047);
+    if (def != null) {
+      final hour =
+          int.tryParse(def.startTime.split(':').firstOrNull ?? '') ?? 12;
+      if (hour >= 5 && hour < 11) {
+        // 早更：晨曦旭日金色與暖紅朝霞
+        shiftFxPrimary = const Color(0xFFEA580C);
+        shiftFxAccent = const Color(0xFFFBBF24);
+      } else if (hour >= 11 && hour < 15) {
+        // 正午／日更：碧海天藍與日光浪尖
+        shiftFxPrimary = const Color(0xFF0284C7);
+        shiftFxAccent = const Color(0xFF38BDF8);
+      } else if (hour >= 15 && hour < 21) {
+        // 中更／黃昏：暮光玫紅與落日晚霞粉紫
+        shiftFxPrimary = const Color(0xFFE11D48);
+        shiftFxAccent = const Color(0xFFF472B6);
+      } else {
+        // 夜更：深海星夜與藍眼淚螢光青藍
+        shiftFxPrimary = const Color(0xFF6366F1);
+        shiftFxAccent = const Color(0xFF38BDF8);
+      }
+    }
+
+    // 浪花掠過時的更次專屬色彩微光暈
+    BoxShadow? surgeGlowShadow;
+    if (isWaveSurging && sheenT > 0.05 && sheenT < 0.95) {
+      final pulse = (1.0 - (sheenT - 0.5).abs() * 2.0).clamp(0.0, 1.0);
+      surgeGlowShadow = BoxShadow(
+        color: shiftFxPrimary.withValues(alpha: 0.50 * pulse),
+        blurRadius: 9.0 * pulse,
+        spreadRadius: 1.2 * pulse,
+      );
     }
 
     Widget wrapWaveContent(Widget child) {
@@ -698,7 +797,10 @@ class _CalendarScreenState extends State<CalendarScreen>
           width: (isSelected || isToday) ? 1.5 : 1.0,
         ),
         borderRadius: BorderRadius.circular(4),
-        boxShadow: todayPulseShadow != null ? [todayPulseShadow] : null,
+        boxShadow: [
+          if (todayPulseShadow != null) todayPulseShadow,
+          if (surgeGlowShadow != null) surgeGlowShadow,
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -791,12 +893,12 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
               ),
             ),
-          // 導入排更波浪流光掠過
+          // 導入排更波浪流光掠過（依更次不同色彩展現專屬流光）
           if (isWaveSurging && sheenT > 0.01 && sheenT < 0.99)
             Positioned.fill(
               child: IgnorePointer(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: Transform.translate(
                     offset: Offset((sheenT * 2.4 - 1.2) * 55.0, 0),
                     child: Transform.rotate(
@@ -806,11 +908,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,
-                              t.brand.withValues(alpha: 0.25),
-                              const Color(0xFFFDE047).withValues(alpha: 0.35),
+                              shiftFxPrimary.withValues(alpha: 0.40),
+                              shiftFxAccent.withValues(alpha: 0.60),
                               Colors.transparent,
                             ],
-                            stops: const [0.0, 0.42, 0.58, 1.0],
+                            stops: const [0.0, 0.40, 0.60, 1.0],
                           ),
                         ),
                       ),
@@ -868,16 +970,28 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(10, 4, 10, 6),
       decoration: BoxDecoration(
-        color: t.neutralBg,
-        border: Border(top: BorderSide(color: t.neutralStroke)),
+        color: Colors.white.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.85),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
           height: 126,
           child: Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8, left: 12, right: 12),
+            padding: const EdgeInsets.only(top: 8, bottom: 8, left: 10, right: 10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -893,7 +1007,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                           style: const TextStyle(fontSize: 13),
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: t.neutralBg2,
+                            fillColor: Colors.white.withValues(alpha: 0.85),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
                               borderSide: BorderSide(color: t.brand, width: 1.5),
@@ -931,9 +1045,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: t.neutralBg2,
+                              color: Colors.white.withValues(alpha: 0.60),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: t.neutralStroke),
+                              border: Border.all(
+                                color: t.neutralStroke.withValues(alpha: 0.45),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -963,9 +1079,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                   height: 64,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: t.neutralBg2,
+                    color: Colors.white.withValues(alpha: 0.60),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: t.neutralStroke),
+                    border: Border.all(
+                      color: t.neutralStroke.withValues(alpha: 0.45),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -1369,8 +1487,8 @@ class _CalendarScreenState extends State<CalendarScreen>
           }
         }
         if (mounted) {
-          _cardFloatAnimCtrl.forward(from: 0.0);
-          _oceanKey.currentState?.triggerSurge();
+          _playSequentialImportAnimation(
+              [for (final r in decoded.importResult.valid) r.date]);
           showTopNotification(context, '成功導入 $count 天排班！');
         }
       }

@@ -219,8 +219,9 @@ ThemeData buildAppTheme() {
       iconTheme: IconThemeData(color: t.neutralFg),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       elevation: 0,
+      surfaceTintColor: Colors.transparent,
       height: 64,
       indicatorColor: const Color(0xFFE8F1FC),
       indicatorShape: RoundedRectangleBorder(
