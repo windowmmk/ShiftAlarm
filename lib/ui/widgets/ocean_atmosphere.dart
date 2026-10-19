@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// 海洋大氣參數
+/// 海洋大氣物理與視覺參數（深度參考 shiftalarm_web_ocean 規格）
 class OceanAtmoState {
-  final double sunElevation; // -0.2 (深夜) .. 0.1 (日出/日落) .. 0.9 (正午)
-  final double sunAzimuth; // -1.0 (西) .. 0.0 (正南) .. 1.0 (東)
+  final double sunElevation; // 太陽仰角 (-0.2 深夜 .. 0.06 黃昏 .. 0.14 晨曦 .. 0.75 正午)
+  final double sunAzimuth; // 太陽方位 (-1.0 西 .. 0.0 正南 .. 1.0 東)
   final double nightFactor; // 0.0 (白天) .. 1.0 (黑夜)
+  final double nightGlow; // 0.0 (無) .. 1.0 (夜更「藍眼淚」生物螢光)
   final double waveAmp; // 波浪振幅倍率
   final double waveSpeed; // 波浪速度倍率
   final String mood; // 大氣狀態簡稱
@@ -15,54 +16,59 @@ class OceanAtmoState {
     required this.sunElevation,
     required this.sunAzimuth,
     required this.nightFactor,
+    required this.nightGlow,
     required this.waveAmp,
     required this.waveSpeed,
     required this.mood,
     required this.desc,
   });
 
-  /// 晨更（05:00–10:59）：旭日東升、金輝破曉
+  /// 晨更（05:00–10:59）：旭日東升、金輝破曉、次表面翡翠微浪
   static const OceanAtmoState morning = OceanAtmoState(
-    sunElevation: 0.12,
-    sunAzimuth: 0.85,
+    sunElevation: 0.14,
+    sunAzimuth: 0.75,
     nightFactor: 0.0,
-    waveAmp: 0.9,
+    nightGlow: 0.0,
+    waveAmp: 0.95,
     waveSpeed: 1.0,
-    mood: '晨曦',
-    desc: '太陽仰角 8° • 旭日東升',
+    mood: '晨曦破曉',
+    desc: '太陽仰角 9.5° • 晨曦金光 • 翡翠次表面微浪',
   );
 
-  /// 正午／休假（11:00–14:59 或休假）：碧海晴空、豔陽高照
+  /// 正午／休假（11:00–14:59 或休假）：碧海晴空、豔陽高照、清澈粼粼波光
   static const OceanAtmoState midday = OceanAtmoState(
-    sunElevation: 0.88,
+    sunElevation: 0.75,
     sunAzimuth: 0.10,
     nightFactor: 0.0,
-    waveAmp: 0.7,
+    nightGlow: 0.0,
+    waveAmp: 0.75,
     waveSpeed: 0.85,
-    mood: '碧海',
-    desc: '太陽仰角 55° • 碧海晴空',
+    mood: '碧海晴空',
+    desc: '太陽仰角 34° • 清澈天藍 • 碧海粼粼日光',
   );
 
-  /// 中更／黃昏（15:00–20:59）：金暉落日、暖橘晚霞
+  /// 中更／黃昏（15:00–20:59）：金暉落日、夕陽晚霞、波光粼粼夕陽霞光
   static const OceanAtmoState sunset = OceanAtmoState(
-    sunElevation: 0.08,
+    sunElevation: 0.06,
     sunAzimuth: -0.65,
     nightFactor: 0.0,
-    waveAmp: 1.2,
+    nightGlow: 0.0,
+    waveAmp: 1.25,
     waveSpeed: 1.15,
-    mood: '黃昏',
-    desc: '太陽仰角 5° • 金暉落日',
+    mood: '金暉落日',
+    desc: '太陽仰角 4.8° • 湧浪波光 • 夕陽餘暉金霞',
   );
 
-  /// 夜更（21:00–04:59）：星夜月色、深邃靜海
+  /// 夜更（21:00–04:59）：星夜深海、月色靜海、藍眼淚螢光長湧
   static const OceanAtmoState night = OceanAtmoState(
     sunElevation: -0.16,
     sunAzimuth: 0.40,
     nightFactor: 1.0,
-    waveAmp: 0.6,
-    waveSpeed: 0.7,
-    mood: '星夜',
-    desc: '暮光仰角 -9° • 月色靜海',
+    nightGlow: 0.90,
+    waveAmp: 0.70,
+    waveSpeed: 0.75,
+    mood: '星夜藍眼淚',
+    desc: '暮光仰角 -2.2° • 星夜深海 • 藍眼淚螢光長湧',
   );
 
   /// 根據班次開始時間（"HH:mm"）判斷對應大氣
@@ -87,6 +93,7 @@ class OceanAtmoState {
       sunElevation: a.sunElevation + (b.sunElevation - a.sunElevation) * t,
       sunAzimuth: a.sunAzimuth + (b.sunAzimuth - a.sunAzimuth) * t,
       nightFactor: a.nightFactor + (b.nightFactor - a.nightFactor) * t,
+      nightGlow: a.nightGlow + (b.nightGlow - a.nightGlow) * t,
       waveAmp: a.waveAmp + (b.waveAmp - a.waveAmp) * t,
       waveSpeed: a.waveSpeed + (b.waveSpeed - a.waveSpeed) * t,
       mood: t < 0.5 ? a.mood : b.mood,
@@ -115,12 +122,12 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
   /// 持續波浪流動控制器（循環 8000ms）
   late final AnimationController _waveCycleCtrl;
 
-  /// 大氣狀態過渡控制器（平滑插值 700ms）
+  /// 大氣狀態過渡控制器（平滑插值 750ms）
   late final AnimationController _transitionCtrl;
   late OceanAtmoState _prevState;
   late OceanAtmoState _currentState;
 
-  /// 導入排更時的巨浪增強控制器（1800ms）
+  /// 導入排更時的巨浪增強控制器（2000ms）
   late final AnimationController _surgeCtrl;
 
   @override
@@ -136,12 +143,12 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
 
     _transitionCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 750),
     );
 
     _surgeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 2000),
     );
   }
 
@@ -186,14 +193,15 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
       builder: (context, child) {
         final state = _currentInterpolatedState;
         final surgeProgress = _surgeCtrl.value;
-        // 激盪脈衝倍率：拋物線曲線 0 -> 1 -> 0
-        final surgeMultiplier = math.sin(surgeProgress * math.pi) * 1.4;
+        // 激盪脈衝倍率：拋物線 0 -> 1 -> 0
+        final surgeMultiplier = math.sin(surgeProgress * math.pi) * 1.6;
 
         return CustomPaint(
           painter: _OceanPainter(
             time: _waveCycleCtrl.value * 2 * math.pi,
             atmo: state,
             surgeMultiplier: surgeMultiplier,
+            surgeProgress: surgeProgress,
           ),
           child: child,
         );
@@ -207,11 +215,13 @@ class _OceanPainter extends CustomPainter {
   final double time;
   final OceanAtmoState atmo;
   final double surgeMultiplier;
+  final double surgeProgress;
 
   _OceanPainter({
     required this.time,
     required this.atmo,
     required this.surgeMultiplier,
+    required this.surgeProgress,
   });
 
   @override
@@ -220,8 +230,8 @@ class _OceanPainter extends CustomPainter {
     final h = size.height;
     if (w <= 0 || h <= 0) return;
 
-    // 海平線位置（約螢幕 42% 高度處）
-    final horizonY = h * 0.42;
+    // 海平線位置（隨海浪微幅呼吸）
+    final horizonY = h * 0.40 + math.sin(time * 0.8) * 3.0;
 
     _paintSky(canvas, Size(w, horizonY));
     _paintSunOrMoon(canvas, Size(w, horizonY));
@@ -229,7 +239,7 @@ class _OceanPainter extends CustomPainter {
     _paintLightModeOverlay(canvas, Size(w, h));
   }
 
-  /// 繪製天空漸變（根據太陽仰角與晝夜模式）
+  /// 繪製天空漸變與大氣光暈
   void _paintSky(Canvas canvas, Size skySize) {
     final w = skySize.width;
     final h = skySize.height;
@@ -237,68 +247,63 @@ class _OceanPainter extends CustomPainter {
     final night = atmo.nightFactor.clamp(0.0, 1.0);
     final elev = atmo.sunElevation;
 
-    final Color topColor;
-    final Color bottomColor;
+    final Color zenithCol;
+    final Color horizonCol;
 
     if (night > 0.5) {
       // 深邃星夜天空
-      topColor = const Color(0xFF0D172A);
-      bottomColor = const Color(0xFF1E293B);
+      zenithCol = const Color(0xFF070D1E);
+      horizonCol = const Color(0xFF142038);
     } else if (elev < 0.20) {
-      // 晨曦／黃昏橘紅漸變
+      // 晨曦／金暉落日橘紅與霞光
       final isMorning = atmo.sunAzimuth > 0;
       if (isMorning) {
-        topColor = Color.lerp(
-          const Color(0xFF60A5FA),
-          const Color(0xFFFDE68A),
-          0.35,
-        )!;
-        bottomColor = const Color(0xFFFDBA74);
+        zenithCol = const Color(0xFF3B82F6);
+        horizonCol = const Color(0xFFFDBA74);
       } else {
-        topColor = const Color(0xFF818CF8);
-        bottomColor = const Color(0xFFFB7185);
+        zenithCol = const Color(0xFF6366F1);
+        horizonCol = const Color(0xFFFB7185);
       }
     } else {
-      // 碧海晴空日間天藍色
-      topColor = const Color(0xFF93C5FD);
-      bottomColor = const Color(0xFFE0F2FE);
+      // 碧海晴空天藍
+      zenithCol = const Color(0xFF38BDF8);
+      horizonCol = const Color(0xFFBAE6FD);
     }
 
     final skyPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [topColor, bottomColor],
-      ).createShader(Rect.fromLTWH(0, 0, w, h + 10));
+        colors: [zenithCol, horizonCol],
+      ).createShader(Rect.fromLTWH(0, 0, w, h + 8));
 
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h + 10), skyPaint);
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h + 8), skyPaint);
   }
 
-  /// 繪製太陽或月亮與光暈
+  /// 繪製太陽或月亮、光暈與星光
   void _paintSunOrMoon(Canvas canvas, Size skySize) {
     final w = skySize.width;
     final h = skySize.height;
     final night = atmo.nightFactor;
     final elev = atmo.sunElevation;
 
-    // 太陽仰角對應螢幕 Y：elev 越高，位置越偏上
-    final sunScreenY = h - (elev + 0.15) * (h * 0.70);
+    // 太陽仰角對應螢幕 Y
+    final sunScreenY = h - (elev + 0.12) * (h * 0.70);
     final sunScreenX = w * (0.5 + atmo.sunAzimuth * 0.35);
 
     if (night < 0.5) {
-      // 太陽與光暈
-      final sunRadius = (16.0 + (1.0 - elev.clamp(0.0, 1.0)) * 6.0);
-      final glowRadius = sunRadius * 4.2;
+      final sunRadius = 18.0 + (1.0 - elev.clamp(0.0, 1.0)) * 6.0;
+      final glowRadius = sunRadius * 4.6;
 
       final isSunsetOrSunrise = elev < 0.20;
       final Color glowColor = isSunsetOrSunrise
-          ? const Color(0xFFF97316).withValues(alpha: 0.35)
-          : const Color(0xFFFDE047).withValues(alpha: 0.28);
+          ? const Color(0xFFF97316).withValues(alpha: 0.42)
+          : const Color(0xFFFDE047).withValues(alpha: 0.32);
       final Color sunColor = isSunsetOrSunrise
           ? const Color(0xFFEA580C)
           : const Color(0xFFFEF08A);
 
-      // 外光暈
+      // 外光暈（Mie 散射大氣輝光）
       final glowPaint = Paint()
         ..shader = RadialGradient(
           colors: [glowColor, glowColor.withValues(alpha: 0.0)],
@@ -310,40 +315,38 @@ class _OceanPainter extends CustomPainter {
       final sunPaint = Paint()..color = sunColor;
       canvas.drawCircle(Offset(sunScreenX, sunScreenY), sunRadius, sunPaint);
     } else {
-      // 月亮與靜夜星光
-      const moonX = 0.72;
-      final moonCenter = Offset(w * moonX, h * 0.28);
+      // 月亮與靜夜繁星
+      final moonCenter = Offset(w * 0.72, h * 0.26);
       const moonRadius = 14.0;
 
       // 月暈
       final moonGlowPaint = Paint()
         ..shader = RadialGradient(
           colors: [
-            const Color(0xFFE0E7FF).withValues(alpha: 0.25),
+            const Color(0xFFE0E7FF).withValues(alpha: 0.30),
             const Color(0xFFE0E7FF).withValues(alpha: 0.0),
           ],
         ).createShader(
-            Rect.fromCircle(center: moonCenter, radius: moonRadius * 3.5));
-      canvas.drawCircle(moonCenter, moonRadius * 3.5, moonGlowPaint);
+            Rect.fromCircle(center: moonCenter, radius: moonRadius * 3.8));
+      canvas.drawCircle(moonCenter, moonRadius * 3.8, moonGlowPaint);
 
       // 彎月本體
       final moonPaint = Paint()..color = const Color(0xFFEEF2FF);
       canvas.drawCircle(moonCenter, moonRadius, moonPaint);
 
-      // 靜夜繁星
+      // 靜夜繁星（隨波光閃爍）
       final starPaint = Paint()..color = Colors.white;
-      for (int i = 0; i < 28; i++) {
+      for (int i = 0; i < 32; i++) {
         final sx = ((i * 79 + 23) % w.toInt()).toDouble();
-        final sy = ((i * 53 + 17) % (h * 0.85).toInt()).toDouble();
-        final twinkle =
-            0.35 + 0.65 * math.sin(time * 2.0 + i * 1.3).abs();
-        starPaint.color = Colors.white.withValues(alpha: 0.75 * twinkle);
-        canvas.drawCircle(Offset(sx, sy), (i % 3 == 0 ? 1.2 : 0.8), starPaint);
+        final sy = ((i * 53 + 17) % (h * 0.88).toInt()).toDouble();
+        final twinkle = 0.35 + 0.65 * math.sin(time * 2.2 + i * 1.3).abs();
+        starPaint.color = Colors.white.withValues(alpha: 0.80 * twinkle);
+        canvas.drawCircle(Offset(sx, sy), (i % 4 == 0 ? 1.4 : 0.85), starPaint);
       }
     }
   }
 
-  /// 繪製多層次動態海浪
+  /// 繪製海面、太陽光柱粼粼倒影、白浪泡沫與星夜藍眼淚
   void _paintWater(Canvas canvas, Size fullSize, double horizonY) {
     final w = fullSize.width;
     final h = fullSize.height;
@@ -356,14 +359,14 @@ class _OceanPainter extends CustomPainter {
     final Color waterBottomColor;
 
     if (night > 0.5) {
-      waterTopColor = const Color(0xFF1E293B);
-      waterBottomColor = const Color(0xFF0F172A);
+      waterTopColor = const Color(0xFF0F1A2F);
+      waterBottomColor = const Color(0xFF060B14);
     } else if (elev < 0.20) {
       waterTopColor = const Color(0xFF0284C7);
-      waterBottomColor = const Color(0xFF0369A1);
+      waterBottomColor = const Color(0xFF082F49);
     } else {
-      waterTopColor = const Color(0xFF38BDF8);
-      waterBottomColor = const Color(0xFF0284C7);
+      waterTopColor = const Color(0xFF0284C7);
+      waterBottomColor = const Color(0xFF0C4A6E);
     }
 
     final waterBgPaint = Paint()
@@ -375,42 +378,129 @@ class _OceanPainter extends CustomPainter {
 
     canvas.drawRect(Rect.fromLTWH(0, horizonY, w, waterH), waterBgPaint);
 
-    // 4 層波浪（近大遠小、波速疊加、含激盪脈衝）
-    final baseAmp = (atmo.waveAmp + surgeMultiplier) * 8.0;
+    // ── 1. 太陽／月亮海面長條粼粼光柱倒影（Specular Glitter Path）──
+    final sunScreenX = night < 0.5
+        ? w * (0.5 + atmo.sunAzimuth * 0.35)
+        : w * 0.72;
+    final Color glitterColor = night > 0.5
+        ? const Color(0xFFE0E7FF)
+        : (elev < 0.20 ? const Color(0xFFFDE047) : const Color(0xFFFFFFFF));
+
+    final topGlitterW = w * 0.08;
+    final btmGlitterW = w * 0.36;
+
+    for (double y = horizonY + 2; y < h; y += 4.5) {
+      final prog = (y - horizonY) / waterH;
+      final curW = topGlitterW + (btmGlitterW - topGlitterW) * prog;
+      final shimmer = math.sin(y * 0.24 - time * 3.8) * 0.5 + 0.5;
+      if (shimmer > 0.22) {
+        final lineAlpha = ((0.12 + 0.45 * shimmer) * (1.0 - prog * 0.35))
+            .clamp(0.0, 1.0);
+        final linePaint = Paint()
+          ..color = glitterColor.withValues(alpha: lineAlpha)
+          ..strokeWidth = 2.0;
+        canvas.drawLine(
+          Offset(sunScreenX - curW * 0.5 * shimmer, y),
+          Offset(sunScreenX + curW * 0.5 * shimmer, y),
+          linePaint,
+        );
+      }
+    }
+
+    // ── 2. 多層次 Gerstner 幾何波浪與白浪泡沫／藍眼淚 ──
+    final baseAmp = (atmo.waveAmp + surgeMultiplier) * 9.0;
 
     final waves = [
-      _WaveSpec(freq: 0.012, amp: baseAmp * 1.0, speed: 1.0, yRatio: 0.0, alpha: 0.35),
-      _WaveSpec(freq: 0.018, amp: baseAmp * 0.8, speed: 1.4, yRatio: 0.18, alpha: 0.28),
-      _WaveSpec(freq: 0.026, amp: baseAmp * 0.55, speed: 1.9, yRatio: 0.38, alpha: 0.22),
-      _WaveSpec(freq: 0.038, amp: baseAmp * 0.35, speed: 2.5, yRatio: 0.62, alpha: 0.18),
+      _WaveSpec(freq: 0.012, amp: baseAmp * 1.0, speed: 1.0, yRatio: 0.02, alpha: 0.32),
+      _WaveSpec(freq: 0.018, amp: baseAmp * 0.82, speed: 1.35, yRatio: 0.18, alpha: 0.26),
+      _WaveSpec(freq: 0.025, amp: baseAmp * 0.60, speed: 1.8, yRatio: 0.38, alpha: 0.22),
+      _WaveSpec(freq: 0.036, amp: baseAmp * 0.38, speed: 2.4, yRatio: 0.65, alpha: 0.18),
     ];
 
     for (final wave in waves) {
       final wavePath = Path();
+      final foamPath = Path();
       final baseY = horizonY + waterH * wave.yRatio;
       wavePath.moveTo(0, baseY);
 
-      for (double x = 0; x <= w; x += 4.0) {
-        final waveVal = math.sin(x * wave.freq + time * wave.speed) * wave.amp +
-            math.sin(x * wave.freq * 1.8 + time * wave.speed * 0.6 + 1.2) *
-                (wave.amp * 0.45);
-        wavePath.lineTo(x, baseY + waveVal);
+      bool foamStarted = false;
+
+      for (double x = 0; x <= w; x += 3.5) {
+        // Gerstner 尖峰修正（Crest Sharpening）
+        final ph = x * wave.freq + time * wave.speed;
+        final waveVal = math.sin(ph) * wave.amp +
+            math.sin(ph * 2.0 + 1.2) * (wave.amp * 0.30);
+        final curY = baseY + waveVal;
+        wavePath.lineTo(x, curY);
+
+        // 波峰處繪製白浪泡沫或夜更藍眼淚螢光
+        if (waveVal < -wave.amp * 0.35) {
+          if (!foamStarted) {
+            foamPath.moveTo(x, curY);
+            foamStarted = true;
+          } else {
+            foamPath.lineTo(x, curY);
+          }
+        } else {
+          foamStarted = false;
+        }
       }
 
       wavePath.lineTo(w, h);
       wavePath.lineTo(0, h);
       wavePath.close();
 
+      // 波浪本體著色
       final waveColor = night > 0.5
-          ? const Color(0xFF38BDF8).withValues(alpha: wave.alpha * 0.65)
-          : Colors.white.withValues(alpha: wave.alpha);
+          ? const Color(0xFF1E3A8A).withValues(alpha: wave.alpha * 0.75)
+          : (elev < 0.20
+              ? const Color(0xFF0369A1).withValues(alpha: wave.alpha)
+              : const Color(0xFF38BDF8).withValues(alpha: wave.alpha));
 
       final wavePaint = Paint()..color = waveColor;
       canvas.drawPath(wavePath, wavePaint);
+
+      // 浪尖白浪泡沫或「星夜藍眼淚」螢光
+      final Color foamColor = (night > 0.5 && atmo.nightGlow > 0.1)
+          ? const Color(0xFF00F0FF).withValues(alpha: 0.75) // 藍眼淚璀璨青藍
+          : Colors.white.withValues(alpha: 0.45);
+
+      final foamPaint = Paint()
+        ..color = foamColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (night > 0.5 && atmo.nightGlow > 0.1) ? 2.6 : 1.8
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawPath(foamPath, foamPaint);
+    }
+
+    // ── 3. 導入排更時擴散的衝擊波光浪（Shockwave Ring Crest）──
+    if (surgeProgress > 0.01 && surgeProgress < 0.99) {
+      final ringY = horizonY + waterH * (1.0 - surgeProgress);
+      final ringPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFF38BDF8).withValues(alpha: 0.75 * surgeMultiplier),
+            const Color(0xFFFDE047).withValues(alpha: 0.90 * surgeMultiplier),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.40, 0.60, 1.0],
+        ).createShader(Rect.fromLTWH(0, ringY - 8, w, 16))
+        ..strokeWidth = 3.5
+        ..style = PaintingStyle.stroke;
+
+      final ringPath = Path();
+      ringPath.moveTo(0, ringY);
+      for (double x = 0; x <= w; x += 6.0) {
+        final dy = math.sin(x * 0.04 + time * 6.0) * 4.0;
+        ringPath.lineTo(x, ringY + dy);
+      }
+      canvas.drawPath(ringPath, ringPaint);
     }
   }
 
-  /// 繪製微柔和透光層，在確保文字高對比度的同時讓海面、波浪與太陽清晰通透
+  /// 繪製微柔和透光層（確保文字高對比度的同時讓海面、波浪與太陽清晰通透）
   void _paintLightModeOverlay(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
@@ -420,9 +510,9 @@ class _OceanPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.04),
-          Colors.white.withValues(alpha: 0.08),
-          Colors.white.withValues(alpha: 0.16),
+          Colors.white.withValues(alpha: 0.06),
+          Colors.white.withValues(alpha: 0.10),
+          Colors.white.withValues(alpha: 0.18),
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
 
@@ -433,7 +523,8 @@ class _OceanPainter extends CustomPainter {
   bool shouldRepaint(covariant _OceanPainter oldDelegate) {
     return oldDelegate.time != time ||
         oldDelegate.atmo != atmo ||
-        oldDelegate.surgeMultiplier != surgeMultiplier;
+        oldDelegate.surgeMultiplier != surgeMultiplier ||
+        oldDelegate.surgeProgress != surgeProgress;
   }
 }
 

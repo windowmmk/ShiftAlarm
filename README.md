@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.3.17-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v3.3.18-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
 
 專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
 
@@ -111,7 +111,11 @@ flutter build web --release
 
 ## 📜 版本演進歷程
 
-- **v3.3.17** *(當前版本)*：
+- **v3.3.18** *(當前版本)*：
+  - 深度融合 `shiftalarm_web_ocean` 震撼視覺體系：整個月曆容器隨浪湧 3D 俯仰，42 格按浪潮幾何物理實現 3D 浮力拋起、旋轉落位（Buoyant Surge）與更次專屬流光衝刷。
+  - 大氣海天物理升級：海面太陽／月光長條粼粼光柱倒影（Specular Glitter Path）、Gerstner 波浪白浪沫、夜更星夜「藍眼淚」生物螢光與衝擊波光浪。
+  - 半透明對比度全面調優：日曆格與詳情卡片採用輕度磨砂透光（0.84~0.88），文字清晰高對比，兼顧震撼海景與極致閱讀體驗。
+- **v3.3.17**：
   - 全界面通透海天連動背景（貫通頂部 AppBar 與底部導航欄）。
   - 選定不同日期／更次動態連動不同太陽高度（晨曦破曉、正午烈日、落日餘暉、月升星夜與夜光藍眼淚）。
   - 批量排班跨月自動換頁與專屬更次色彩光浪推進動效。
