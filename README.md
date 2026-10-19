@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.4.1-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v3.4.2-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
 
 專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
 
@@ -21,7 +21,7 @@
   - 🌇 **18:00 晚班**：金暉落日（海平線緋紅夕陽暮光、熔金夕陽波濤）
   - 🌌 **00:00 夜班**：星夜深邃（黑曜石暗夜天幕、暗海靜謐、浪尖 $3.2\times$ 藍眼淚螢光，天特別暗！）
 - **真實世界自然時辰即時感應**：未選中日期時，自動按目前實際時鐘時辰展現真實海天；
-- **日曆自然大小屏幕置中**：未選中日期時，日曆不佔滿全屏，而是在屏幕中心以原創自然尺寸舒適置中，開闊透氣展現壯闊海景。
+- **日曆自然大小屏幕置中、高度擴充 20%（70px/格）與星期列一體隨動**：未選中日期時，日曆不佔滿全屏，而是在屏幕中心以原創自然尺寸舒適置中；星期列（日〜六）融入月曆甲板一體隨動並精準對齊日曆欄位，每格高度增至 70px，開闊透氣展現壯闊海景且點選體驗極佳。
 - **42 格對角線 3D 破浪浮力轉場**：批量導入與跨月換頁時，依照波浪相位由下而上推進 3D 透視拋起、旋轉、浮力落位與浪尖高光閃邊。
 - **全新緊湊排班卡片（支援下划隱去）**：自適應緊湊包裹（總高約 88px），零多餘空白；選取日期時自底部平滑彈出，支援向下劃動（Swipe down）或點擊下箭頭隨時收起。
 
