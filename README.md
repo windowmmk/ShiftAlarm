@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.3.1-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v3.3.17-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
 
 專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
 
@@ -111,7 +111,12 @@ flutter build web --release
 
 ## 📜 版本演進歷程
 
-- **v3.3.1** *(當前版本)*：
+- **v3.3.17** *(當前版本)*：
+  - 全界面通透海天連動背景（貫通頂部 AppBar 與底部導航欄）。
+  - 選定不同日期／更次動態連動不同太陽高度（晨曦破曉、正午烈日、落日餘暉、月升星夜與夜光藍眼淚）。
+  - 批量排班跨月自動換頁與專屬更次色彩光浪推進動效。
+  - 行內備註與地點直接編輯優化，移除額外彈窗干擾。
+- **v3.3.1**：
   - 徹底剔除歷史過渡期代碼與冗餘測試，代碼減重 550+ 行。
   - 正式確立 `SA2:` 與 `SR2:` 最新極簡二進制 Base58 協議與純 CSV 雙模架構。
   - 修復網址 Hash 導入排班時的原生鬧鐘自動註冊機制。
