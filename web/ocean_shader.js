@@ -91,11 +91,12 @@
   };
 
   function getPresetByCurrentTime() {
-    const hour = new Date().getHours();
-    if (hour >= 3 && hour < 9) return SHIFT_OCEAN_PRESETS.M;   // 早班 06 晨曦破曉
-    if (hour >= 9 && hour < 15) return SHIFT_OCEAN_PRESETS.A;  // 午班 12 豔陽碧海
-    if (hour >= 15 && hour < 21) return SHIFT_OCEAN_PRESETS.S; // 18 晚班金暉落日
-    return SHIFT_OCEAN_PRESETS.N;                              // 00 星夜深邃
+    const d = new Date();
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m >= 300 && m < 660) return SHIFT_OCEAN_PRESETS.M;   // 05:00 - 10:59 早班出發：晨曦破曉
+    if (m >= 660 && m < 990) return SHIFT_OCEAN_PRESETS.A;   // 11:00 - 16:29 午班出發：豔陽碧海
+    if (m >= 990 && m < 1290) return SHIFT_OCEAN_PRESETS.S;  // 16:30 - 21:29 晚班出發：金暉落日
+    return SHIFT_OCEAN_PRESETS.N;                             // 21:30 - 04:59 夜班出發：星夜深邃
   }
 
   const initialPreset = getPresetByCurrentTime();

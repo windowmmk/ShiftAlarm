@@ -74,70 +74,74 @@ class OceanAtmoState {
     desc: '暗夜深邃 • 星月沉靜 • 璀璨藍眼淚螢光',
   );
 
-  /// 根據班次名稱與開始時間綜合判斷對應大氣：
-  /// - 早班 06 對應晨曦破曉
-  /// - 午班 12 對應豔陽碧海
-  /// - 18 晚班對應金暉落日
-  /// - 00 夜班對應星夜深邃
+  /// 根據班次名稱與開始時間綜合判斷對應大氣（體現用戶出發通勤時的天空）：
+  /// - 早班出發（約 05:00~07:00 出門，上班約 05:00~11:59）：天剛矇矇亮、晨曦露臉 -> 晨曦破曉
+  /// - 午班出發（約 11:00~14:30 出門，上班約 12:00~16:59）：正午頂頭烈日、晴空萬里 -> 豔陽碧海
+  /// - 晚班出發（約 16:30~18:30 出門，上班約 17:00~21:59）：夕陽西下、金暉落日暮光 -> 金暉落日
+  /// - 夜班出發（約 21:30~23:30 出門，上班約 22:00~04:59）：萬籟俱寂、暗夜星空深邃 -> 星夜深邃
   static OceanAtmoState fromShift(String? shiftName, String? startTime) {
     if (shiftName != null && shiftName.isNotEmpty) {
       final name = shiftName.trim();
       if (name.contains('夜') || name.contains('通宵') || name.contains('大夜') || name.contains('深')) {
-        return night; // 00: 星夜深邃
+        return night; // 夜班：星夜深邃
       }
       if (name.contains('晚') || name.contains('夕') || name.contains('落日') || name.contains('黃昏')) {
-        return sunset; // 18: 晚班金暉落日
+        return sunset; // 晚班：金暉落日
       }
       if (name.contains('中')) {
-        return sunset; // 中班多為下午傍晚班次 -> 金暉落日
+        return startTime != null ? fromStartTime(startTime) : sunset; // 中班若有時間依開始時間，否則偏晚班
       }
       if (name.contains('午') || name.contains('日') || name.contains('晴') || name.contains('休')) {
-        return midday; // 12: 午班豔陽碧海
+        return midday; // 午班：豔陽碧海
       }
       if (name.contains('早') || name.contains('晨')) {
-        return morning; // 06: 早班晨曦破曉
+        return morning; // 早班：晨曦破曉
       }
     }
     return fromStartTime(startTime);
   }
 
-  /// 根據班次開始時間（"HH:mm"）判斷對應大氣：
-  /// - 03:00–08:59（早班 06）：晨曦破曉
-  /// - 09:00–14:59（午班 12）：豔陽碧海
-  /// - 15:00–20:59（18 晚班）：金暉落日
-  /// - 21:00–02:59（00 夜班）：星夜深邃
+  /// 根據班次開始時間（"HH:mm"）判斷對應大氣（以通勤出發時空為準，約提早 30~60 分鐘出發）：
+  /// - 05:00–11:59 上班（對應出發 05:00~07:00）：晨曦破曉
+  /// - 12:00–16:59 上班（對應出發 11:00~14:30）：豔陽碧海
+  /// - 17:00–21:59 上班（對應出發 16:30~18:30）：金暉落日
+  /// - 22:00–04:59 上班（對應出發 21:30~23:30）：星夜深邃
   static OceanAtmoState fromStartTime(String? startTime) {
     if (startTime == null || startTime.isEmpty) {
       return midday;
     }
-    final hour = int.tryParse(startTime.split(':').firstOrNull ?? '') ?? 12;
-    if (hour >= 3 && hour < 9) {
-      return morning; // 06 早班：晨曦破曉
-    } else if (hour >= 9 && hour < 15) {
-      return midday; // 12 午班：豔陽碧海
-    } else if (hour >= 15 && hour < 21) {
-      return sunset; // 18 晚班：金暉落日
+    final parts = startTime.split(':');
+    final hour = int.tryParse(parts.firstOrNull ?? '') ?? 12;
+    final minute = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+    final totalMinutes = hour * 60 + minute;
+
+    if (totalMinutes >= 300 && totalMinutes < 720) {
+      return morning; // 早班出發：晨曦破曉
+    } else if (totalMinutes >= 720 && totalMinutes < 1020) {
+      return midday; // 午班出發：豔陽碧海
+    } else if (totalMinutes >= 1020 && totalMinutes < 1320) {
+      return sunset; // 晚班出發：金暉落日
     } else {
-      return night; // 00 夜班：星夜深邃
+      return night; // 夜班出發：星夜深邃
     }
   }
 
-  /// 根據當前真實世界時間（自然時辰）取得海天大氣：
-  /// - 03:00–08:59（06 晨曦）：晨曦朝霞旭日東升
-  /// - 09:00–14:59（12 日照）：豔陽碧海晴空高照
-  /// - 15:00–20:59（18 晚霞）：金暉落日夕陽餘暉
-  /// - 21:00–02:59（00 子夜）：星夜深邃暗海與藍眼淚
+  /// 根據當前真實世界時間（自然時辰出發體感）取得海天大氣：
+  /// - 05:00–10:59（早班出發 05:00~07:00）：天剛矇矇亮、晨曦露臉
+  /// - 11:00–16:29（午班出發 11:00~14:30）：正午頂頭烈日、晴空萬里
+  /// - 16:30–21:29（晚班出發 16:30~18:30）：夕陽西下、金暉落日暮光
+  /// - 21:30–04:59（夜班出發 21:30~23:30）：萬籟俱寂、暗夜星空與藍眼淚
   static OceanAtmoState fromCurrentTime([DateTime? time]) {
     final now = time ?? DateTime.now();
-    final hour = now.hour;
-    if (hour >= 3 && hour < 9) {
-      return morning; // 06 晨曦破曉
-    } else if (hour >= 9 && hour < 15) {
-      return midday; // 12 豔陽碧海
-    } else if (hour >= 15 && hour < 21) {
-      return sunset; // 18 金暉落日
+    final totalMinutes = now.hour * 60 + now.minute;
+    if (totalMinutes >= 300 && totalMinutes < 660) {
+      return morning; // 05:00 - 10:59: 晨曦破曉
+    } else if (totalMinutes >= 660 && totalMinutes < 990) {
+      return midday; // 11:00 - 16:29: 豔陽碧海
+    } else if (totalMinutes >= 990 && totalMinutes < 1290) {
+      return sunset; // 16:30 - 21:29: 金暉落日
     } else {
-      return night; // 00 星夜深邃
+      return night; // 21:30 - 04:59: 星夜深邃
     }
   }
 
