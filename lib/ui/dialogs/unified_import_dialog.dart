@@ -12,7 +12,7 @@ Future<void> showUnifiedImportDialog({
   required BuildContext context,
   required ShiftStore store,
   required AlarmService alarms,
-  void Function(List<String> importedDates)? onImportDone,
+  dynamic onImportDone,
 }) async {
   await showDialog<void>(
     context: context,
@@ -27,7 +27,7 @@ Future<void> showUnifiedImportDialog({
 class _UnifiedImportDialog extends StatefulWidget {
   final ShiftStore store;
   final AlarmService alarms;
-  final void Function(List<String> importedDates)? onImportDone;
+  final dynamic onImportDone;
 
   const _UnifiedImportDialog({
     required this.store,
@@ -59,6 +59,24 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _notifyImportDone([List<String> dates = const []]) {
+    final cb = widget.onImportDone;
+    if (cb == null) return;
+    if (cb is void Function(List<String>)) {
+      cb(dates);
+    } else if (cb is void Function()) {
+      cb();
+    } else if (cb is Function) {
+      try {
+        (cb as dynamic)(dates);
+      } catch (_) {
+        try {
+          (cb as dynamic)();
+        } catch (_) {}
+      }
+    }
   }
 
   /// 從網址或原始文字中提取口令或排班內容
@@ -179,7 +197,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         await importConfigText(widget.store, clean);
         if (mounted) {
           Navigator.pop(context);
-          widget.onImportDone?.call(const []);
+          _notifyImportDone(const []);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -231,7 +249,7 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
 
         if (mounted) {
           Navigator.pop(context);
-          widget.onImportDone?.call([for (final r in rows) r.date]);
+          _notifyImportDone([for (final r in rows) r.date]);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('排班導入成功：共 ${rows.length} 日排班（$alarmSuccessCount 個鬧鐘已同步）'),

@@ -383,7 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       store: widget.store,
       alarms: widget.alarms,
-      onImportDone: () => setState(() {}),
+      onImportDone: ([_]) => setState(() {}),
     );
   }
 
@@ -497,7 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       store: widget.store,
       alarms: widget.alarms,
-      onImportDone: () => setState(() {}),
+      onImportDone: ([_]) => setState(() {}),
     );
   }
 

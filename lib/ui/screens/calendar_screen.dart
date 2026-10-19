@@ -484,7 +484,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               context: context,
               store: widget.store,
               alarms: widget.alarms,
-              onImportDone: (dates) {
+              onImportDone: (List<String> dates) {
                 _playSequentialImportAnimation(dates);
               },
             ),
