@@ -12,6 +12,7 @@ import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
 import '../widgets/ocean_atmosphere.dart';
+import '../widgets/ocean_import_transition.dart';
 import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
 
@@ -179,7 +180,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
     _cardFloatAnimCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 1400),
+      value: 1.0,
     )..addListener(() {
         if (mounted) setState(() {});
       });
@@ -590,15 +592,20 @@ class _CalendarScreenState extends State<CalendarScreen>
                       Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(right: d < 6 ? 3.0 : 0),
-                          child: _dayCell(
-                            t,
-                            DateTime(firstSunday.year, firstSunday.month,
-                                firstSunday.day + w * 7 + d),
-                            today,
-                            year,
-                            month,
-                            row: w,
-                            col: d,
+                          child: OceanStaggeredCellTransition(
+                            index: w * 7 + d,
+                            controller: _cardFloatAnimCtrl,
+                            mode: OceanImportMode.tidalWave,
+                            child: _dayCell(
+                              t,
+                              DateTime(firstSunday.year, firstSunday.month,
+                                  firstSunday.day + w * 7 + d),
+                              today,
+                              year,
+                              month,
+                              row: w,
+                              col: d,
+                            ),
                           ),
                         ),
                       ),
@@ -922,51 +929,6 @@ class _CalendarScreenState extends State<CalendarScreen>
         ],
       ),
     );
-
-    // 破浪浮力 3D 拋起、旋轉與落位物理動效（深度參考 shiftalarm_web_ocean）
-    if (isWaveSurging) {
-      double transY = 0.0;
-      double transZ = 0.0;
-      double rotX = 0.0;
-      double scale = 1.0;
-      double cellOpacity = 1.0;
-
-      if (waveT < 0.55) {
-        final p = Curves.easeOutCubic.transform(waveT / 0.55);
-        transY = 36.0 * (1.0 - p) - 9.0 * p;
-        transZ = -65.0 * (1.0 - p) + 26.0 * p;
-        rotX = 0.62 * (1.0 - p) - 0.16 * p;
-        scale = 0.80 + 0.26 * p;
-        cellOpacity = 0.25 + 0.75 * p;
-      } else if (waveT < 0.80) {
-        final p = Curves.easeInOut.transform((waveT - 0.55) / 0.25);
-        transY = -9.0 * (1.0 - p) + 2.5 * p;
-        transZ = 26.0 * (1.0 - p) - 5.0 * p;
-        rotX = -0.16 * (1.0 - p) + 0.05 * p;
-        scale = 1.06 - 0.075 * p;
-        cellOpacity = 1.0;
-      } else {
-        final p = Curves.easeOut.transform((waveT - 0.80) / 0.20);
-        transY = 2.5 * (1.0 - p);
-        transZ = -5.0 * (1.0 - p);
-        rotX = 0.05 * (1.0 - p);
-        scale = 0.985 + 0.015 * p;
-        cellOpacity = 1.0;
-      }
-
-      cell = Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.0016)
-          ..translate(0.0, transY, transZ)
-          ..rotateX(rotX)
-          ..scale(scale),
-        child: Opacity(
-          opacity: cellOpacity,
-          child: cell,
-        ),
-      );
-    }
 
     return _HapticCell(
       onTap: () {
