@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../config.dart';
 import '../../domain/alarm_service.dart';
 import '../../domain/config_io.dart';
 import '../../domain/csv_import.dart';
@@ -542,7 +543,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 Text(
-                  '版本 3.3.12 (Build 28)',
+                  kAppVersionDisplay,
                   style: TextStyle(
                     fontSize: 12,
                     color: t.neutralFg2,
