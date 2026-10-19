@@ -1,5 +1,8 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'ocean_bridge.dart';
 
 /// 海洋大氣物理與視覺參數（深度參考 shiftalarm_web_ocean 規格）
 class OceanAtmoState {
@@ -130,6 +133,24 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
   /// 導入排更時的巨浪增強控制器（2000ms）
   late final AnimationController _surgeCtrl;
 
+  void _syncWebAtmosphere(OceanAtmoState state) {
+    if (!kIsWeb) return;
+    String code = 'M';
+    if (state.mood == '金暉落日') {
+      code = 'A';
+    } else if (state.mood == '星夜藍眼淚') {
+      code = 'N';
+    } else if (state.mood == '碧海晴空') {
+      code = 'O';
+    }
+    jsSetOceanAtmosphere(
+      code,
+      state.sunElevation * 60.0,
+      state.sunAzimuth * 180.0,
+      state.nightGlow,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -150,6 +171,8 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
+
+    _syncWebAtmosphere(widget.targetState);
   }
 
   @override
@@ -162,6 +185,7 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
       _prevState = _currentInterpolatedState;
       _currentState = widget.targetState;
       _transitionCtrl.forward(from: 0.0);
+      _syncWebAtmosphere(widget.targetState);
     }
   }
 
@@ -176,6 +200,9 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
   /// 觸發導入排更時的海面波浪激盪效果
   void triggerSurge() {
     _surgeCtrl.forward(from: 0.0);
+    if (kIsWeb) {
+      jsTriggerOceanSurge();
+    }
   }
 
   @override
@@ -188,6 +215,13 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      // 在 Web 瀏覽器端：底層由原版 WebGL 著色器硬體滿幀渲染真 3D 物理海洋！
+      return SizedBox.expand(
+        child: widget.child,
+      );
+    }
+
     return AnimatedBuilder(
       animation: Listenable.merge([_waveCycleCtrl, _transitionCtrl, _surgeCtrl]),
       builder: (context, child) {
