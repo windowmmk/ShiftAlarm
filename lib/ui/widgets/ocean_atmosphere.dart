@@ -74,38 +74,17 @@ class OceanAtmoState {
     desc: '暗夜深邃 • 星月沉靜 • 璀璨藍眼淚螢光',
   );
 
-  /// 根據班次名稱與開始時間綜合判斷對應大氣（體現用戶出發通勤時的天空）：
-  /// - 早班出發（約 05:00~07:00 出門，上班約 05:00~11:59）：天剛矇矇亮、晨曦露臉 -> 晨曦破曉
-  /// - 午班出發（約 11:00~14:30 出門，上班約 12:00~16:59）：正午頂頭烈日、晴空萬里 -> 豔陽碧海
-  /// - 晚班出發（約 16:30~18:30 出門，上班約 17:00~21:59）：夕陽西下、金暉落日暮光 -> 金暉落日
-  /// - 夜班出發（約 21:30~23:30 出門，上班約 22:00~04:59）：萬籟俱寂、暗夜星空深邃 -> 星夜深邃
+  /// 根據班次時間（或真實世界時間）取得海天大氣：
+  /// 完全依「時間」匹配，不使用名稱文字模糊比對（避免「凌晨更」、「夜更(18:00)」、「中更(12:00)」等文字衝突誤判）：
+  /// - 05:00 ~ 10:59（早班出發 05:00~07:00）：天剛矇矇亮、晨曦露臉 -> 晨曦破曉 (M)
+  /// - 11:00 ~ 16:29（午班出發 11:00~14:30）：正午頂頭烈日、晴空萬里 -> 豔陽碧海 (A)
+  /// - 16:30 ~ 21:29（晚班出發 16:30~18:30）：夕陽西下、金暉落日暮光 -> 金暉落日 (S)
+  /// - 21:30 ~ 04:59（夜班出發 21:30~23:30）：萬籟俱寂、暗夜星空深邃 -> 星夜深邃 (N)
   static OceanAtmoState fromShift(String? shiftName, String? startTime) {
-    if (shiftName != null && shiftName.isNotEmpty) {
-      final name = shiftName.trim();
-      if (name.contains('夜') || name.contains('通宵') || name.contains('大夜') || name.contains('深')) {
-        return night; // 夜班：星夜深邃
-      }
-      if (name.contains('晚') || name.contains('夕') || name.contains('落日') || name.contains('黃昏')) {
-        return sunset; // 晚班：金暉落日
-      }
-      if (name.contains('中')) {
-        return startTime != null ? fromStartTime(startTime) : sunset; // 中班若有時間依開始時間，否則偏晚班
-      }
-      if (name.contains('午') || name.contains('日') || name.contains('晴') || name.contains('休')) {
-        return midday; // 午班：豔陽碧海
-      }
-      if (name.contains('早') || name.contains('晨')) {
-        return morning; // 早班：晨曦破曉
-      }
-    }
     return fromStartTime(startTime);
   }
 
-  /// 根據班次開始時間（"HH:mm"）判斷對應大氣（以通勤出發時空為準，約提早 30~60 分鐘出發）：
-  /// - 05:00–11:59 上班（對應出發 05:00~07:00）：晨曦破曉
-  /// - 12:00–16:59 上班（對應出發 11:00~14:30）：豔陽碧海
-  /// - 17:00–21:59 上班（對應出發 16:30~18:30）：金暉落日
-  /// - 22:00–04:59 上班（對應出發 21:30~23:30）：星夜深邃
+  /// 根據班次開始時間（"HH:mm"）精確匹配大氣：
   static OceanAtmoState fromStartTime(String? startTime) {
     if (startTime == null || startTime.isEmpty) {
       return midday;
@@ -115,14 +94,14 @@ class OceanAtmoState {
     final minute = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
     final totalMinutes = hour * 60 + minute;
 
-    if (totalMinutes >= 300 && totalMinutes < 720) {
-      return morning; // 早班出發：晨曦破曉
-    } else if (totalMinutes >= 720 && totalMinutes < 1020) {
-      return midday; // 午班出發：豔陽碧海
-    } else if (totalMinutes >= 1020 && totalMinutes < 1320) {
-      return sunset; // 晚班出發：金暉落日
+    if (totalMinutes >= 300 && totalMinutes < 660) {
+      return morning; // 05:00 - 10:59 早更/早班 (例如 06:00)：晨曦破曉
+    } else if (totalMinutes >= 660 && totalMinutes < 990) {
+      return midday; // 11:00 - 16:29 午更/中更 (例如 12:00)：豔陽碧海
+    } else if (totalMinutes >= 990 && totalMinutes < 1290) {
+      return sunset; // 16:30 - 21:29 晚更/夜更 (例如 18:00)：金暉落日
     } else {
-      return night; // 夜班出發：星夜深邃
+      return night; // 21:30 - 04:59 凌晨更/夜班 (例如 00:00)：星夜深邃
     }
   }
 
@@ -189,14 +168,13 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
 
   void _syncWebAtmosphere(OceanAtmoState state) {
     if (!kIsWeb) return;
-    String code = 'O';
-    if (state.mood == '晨曦破曉') {
+    if (state.mood.contains('晨曦')) {
       code = 'M';
-    } else if (state.mood == '碧海晴空') {
+    } else if (state.mood.contains('碧海') || state.mood.contains('晴空') || state.mood.contains('豔陽')) {
       code = 'A'; // 午班：豔陽高照，天足夠亮！
-    } else if (state.mood == '金暉落日') {
+    } else if (state.mood.contains('金暉') || state.mood.contains('落日') || state.mood.contains('黃昏')) {
       code = 'S'; // 黃昏落日
-    } else if (state.mood == '星夜藍眼淚') {
+    } else if (state.mood.contains('星夜') || state.mood.contains('暗夜')) {
       code = 'N'; // 夜班：深邃暗夜，天足夠暗！
     }
     jsSetOceanAtmosphere(

@@ -148,7 +148,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// - 當沒有選中日期時，嚴格按照目前真實世界時間（自然時辰）顯示大海；
   /// - 當選中日期時，依該日班次時間呈現對應海天；若該日未排班，亦還原為當前時間的大海。
   OceanAtmoState _getCurrentAtmoState() {
-    if (!_showDetailPanel) {
+    if (!_showDetailPanel && !_schedPanelOpen) {
       return OceanAtmoState.fromCurrentTime();
     }
     final key = ShiftStore.ymd(_selectedDate);
@@ -158,7 +158,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     if (def == null) {
       return OceanAtmoState.fromCurrentTime();
     }
-    return OceanAtmoState.fromShift(def.name, def.startTime);
+    return OceanAtmoState.fromStartTime(def.startTime);
   }
 
   /// 備註便利貼 inline 編輯狀態
@@ -619,7 +619,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               const SizedBox(height: 4),
               for (int w = 0; w < weekCount; w++)
                 SizedBox(
-                  height: 70.0,
+                  height: 75.0,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 1.5),
                     child: Row(
@@ -816,7 +816,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(9),
                 color: t.brand.withValues(alpha: 0.22 * intensity),
                 border: Border.all(
                   color: t.brand.withValues(alpha: 0.55 * intensity),
@@ -837,7 +837,7 @@ class _CalendarScreenState extends State<CalendarScreen>
           color: borderColor,
           width: (isSelected || isToday) ? 1.5 : 1.0,
         ),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(9),
         boxShadow: [
           if (todayPulseShadow != null) todayPulseShadow,
           if (surgeGlowShadow != null) surgeGlowShadow,
@@ -939,7 +939,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             Positioned.fill(
               child: IgnorePointer(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(9),
                   child: Transform.translate(
                     offset: Offset((sheenT * 2.4 - 1.2) * 55.0, 0),
                     child: Transform.rotate(
