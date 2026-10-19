@@ -26,53 +26,73 @@ class OceanAtmoState {
     required this.desc,
   });
 
-  /// 晨更（05:00–10:59）：旭日東升、金輝破曉、次表面翡翠微浪
+  /// 晨更（05:00–10:59）：旭日東升、晨曦金光、粉金朝霞
   static const OceanAtmoState morning = OceanAtmoState(
-    sunElevation: 0.14,
-    sunAzimuth: 0.75,
+    sunElevation: 0.18,
+    sunAzimuth: 0.70,
     nightFactor: 0.0,
     nightGlow: 0.0,
-    waveAmp: 0.95,
+    waveAmp: 0.90,
     waveSpeed: 1.0,
     mood: '晨曦破曉',
-    desc: '太陽仰角 9.5° • 晨曦金光 • 翡翠次表面微浪',
+    desc: '旭日東升 • 晨曦金光 • 朝霞翡翠浪湧',
   );
 
-  /// 正午／休假（11:00–14:59 或休假）：碧海晴空、豔陽高照、清澈粼粼波光
+  /// 午班（11:00–16:59 或休假）：豔陽高照、碧海晴空、明朗清亮（天特別亮！）
   static const OceanAtmoState midday = OceanAtmoState(
-    sunElevation: 0.75,
-    sunAzimuth: 0.10,
+    sunElevation: 0.92,
+    sunAzimuth: 0.05,
     nightFactor: 0.0,
     nightGlow: 0.0,
-    waveAmp: 0.75,
-    waveSpeed: 0.85,
-    mood: '碧海晴空',
-    desc: '太陽仰角 34° • 清澈天藍 • 碧海粼粼日光',
-  );
-
-  /// 中更／黃昏（15:00–20:59）：金暉落日、夕陽晚霞、波光粼粼夕陽霞光
-  static const OceanAtmoState sunset = OceanAtmoState(
-    sunElevation: 0.06,
-    sunAzimuth: -0.65,
-    nightFactor: 0.0,
-    nightGlow: 0.0,
-    waveAmp: 1.25,
-    waveSpeed: 1.15,
-    mood: '金暉落日',
-    desc: '太陽仰角 4.8° • 湧浪波光 • 夕陽餘暉金霞',
-  );
-
-  /// 夜更（21:00–04:59）：星夜深海、月色靜海、藍眼淚螢光長湧
-  static const OceanAtmoState night = OceanAtmoState(
-    sunElevation: -0.16,
-    sunAzimuth: 0.40,
-    nightFactor: 1.0,
-    nightGlow: 0.90,
     waveAmp: 0.70,
-    waveSpeed: 0.75,
-    mood: '星夜藍眼淚',
-    desc: '暮光仰角 -2.2° • 星夜深海 • 藍眼淚螢光長湧',
+    waveSpeed: 0.80,
+    mood: '碧海晴空',
+    desc: '豔陽高照 • 碧海晴空 • 耀眼碎鑽波光',
   );
+
+  /// 中更／黃昏（17:00–19:59）：金暉落日、夕陽晚霞、熔金海面
+  static const OceanAtmoState sunset = OceanAtmoState(
+    sunElevation: 0.05,
+    sunAzimuth: -0.75,
+    nightFactor: 0.0,
+    nightGlow: 0.0,
+    waveAmp: 1.30,
+    waveSpeed: 1.20,
+    mood: '金暉落日',
+    desc: '夕陽餘暉 • 金暉落日 • 緋紅暮光熔金',
+  );
+
+  /// 夜更（20:00–04:59）：深邃暗夜、星月沉靜、璀璨藍眼淚（天特別暗！）
+  static const OceanAtmoState night = OceanAtmoState(
+    sunElevation: -0.32,
+    sunAzimuth: 0.35,
+    nightFactor: 1.0,
+    nightGlow: 1.0,
+    waveAmp: 0.85,
+    waveSpeed: 0.70,
+    mood: '星夜藍眼淚',
+    desc: '暗夜深邃 • 星月沉靜 • 璀璨藍眼淚螢光',
+  );
+
+  /// 根據班次名稱與開始時間綜合判斷對應大氣
+  static OceanAtmoState fromShift(String? shiftName, String? startTime) {
+    if (shiftName != null && shiftName.isNotEmpty) {
+      final name = shiftName.trim();
+      if (name.contains('夜') || name.contains('通宵') || name.contains('晚')) {
+        return night;
+      }
+      if (name.contains('午') || name.contains('中')) {
+        return midday; // 午班：豔陽晴空高照（天足夠亮）
+      }
+      if (name.contains('早') || name.contains('晨')) {
+        return morning;
+      }
+      if (name.contains('休')) {
+        return midday;
+      }
+    }
+    return fromStartTime(startTime);
+  }
 
   /// 根據班次開始時間（"HH:mm"）判斷對應大氣
   static OceanAtmoState fromStartTime(String? startTime) {
@@ -82,12 +102,12 @@ class OceanAtmoState {
     final hour = int.tryParse(startTime.split(':').firstOrNull ?? '') ?? 12;
     if (hour >= 5 && hour < 11) {
       return morning;
-    } else if (hour >= 11 && hour < 15) {
-      return midday;
-    } else if (hour >= 15 && hour < 21) {
-      return sunset;
+    } else if (hour >= 11 && hour < 17) {
+      return midday; // 午班／日間：豔陽高照
+    } else if (hour >= 17 && hour < 20) {
+      return sunset; // 黃昏暮光
     } else {
-      return night;
+      return night; // 夜更：深邃星夜
     }
   }
 
@@ -135,13 +155,15 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
 
   void _syncWebAtmosphere(OceanAtmoState state) {
     if (!kIsWeb) return;
-    String code = 'M';
-    if (state.mood == '金暉落日') {
-      code = 'A';
-    } else if (state.mood == '星夜藍眼淚') {
-      code = 'N';
+    String code = 'O';
+    if (state.mood == '晨曦破曉') {
+      code = 'M';
     } else if (state.mood == '碧海晴空') {
-      code = 'O';
+      code = 'A'; // 午班：豔陽高照，天足夠亮！
+    } else if (state.mood == '金暉落日') {
+      code = 'S'; // 黃昏落日
+    } else if (state.mood == '星夜藍眼淚') {
+      code = 'N'; // 夜班：深邃暗夜，天足夠暗！
     }
     jsSetOceanAtmosphere(
       code,
@@ -285,22 +307,22 @@ class _OceanPainter extends CustomPainter {
     final Color horizonCol;
 
     if (night > 0.5) {
-      // 深邃星夜天空
-      zenithCol = const Color(0xFF070D1E);
-      horizonCol = const Color(0xFF142038);
+      // 深邃星夜天空（夜更：天特別暗）
+      zenithCol = const Color(0xFF020409);
+      horizonCol = const Color(0xFF080F1E);
     } else if (elev < 0.20) {
       // 晨曦／金暉落日橘紅與霞光
       final isMorning = atmo.sunAzimuth > 0;
       if (isMorning) {
-        zenithCol = const Color(0xFF3B82F6);
+        zenithCol = const Color(0xFF2563EB);
         horizonCol = const Color(0xFFFDBA74);
       } else {
-        zenithCol = const Color(0xFF6366F1);
-        horizonCol = const Color(0xFFFB7185);
+        zenithCol = const Color(0xFF4C1D95);
+        horizonCol = const Color(0xFFFB923C);
       }
     } else {
-      // 碧海晴空天藍
-      zenithCol = const Color(0xFF38BDF8);
+      // 碧海晴空天藍（午更：天特別亮）
+      zenithCol = const Color(0xFF0284C7);
       horizonCol = const Color(0xFFBAE6FD);
     }
 
@@ -393,8 +415,8 @@ class _OceanPainter extends CustomPainter {
     final Color waterBottomColor;
 
     if (night > 0.5) {
-      waterTopColor = const Color(0xFF0F1A2F);
-      waterBottomColor = const Color(0xFF060B14);
+      waterTopColor = const Color(0xFF040914);
+      waterBottomColor = const Color(0xFF010308);
     } else if (elev < 0.20) {
       waterTopColor = const Color(0xFF0284C7);
       waterBottomColor = const Color(0xFF082F49);
