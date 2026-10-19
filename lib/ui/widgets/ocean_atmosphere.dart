@@ -168,6 +168,7 @@ class OceanAtmosphereWidgetState extends State<OceanAtmosphereWidget>
 
   void _syncWebAtmosphere(OceanAtmoState state) {
     if (!kIsWeb) return;
+    String code = 'O';
     if (state.mood.contains('晨曦')) {
       code = 'M';
     } else if (state.mood.contains('碧海') || state.mood.contains('晴空') || state.mood.contains('豔陽')) {
