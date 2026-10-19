@@ -5,64 +5,78 @@
 
   const SHIFT_OCEAN_PRESETS = {
     M: {
-      sunElev: 9.5,
-      sunAzimuth: 168.0,
-      windSpeed: 8.5,
-      swellHs: 1.2,
-      choppiness: 1.05,
-      turbidity: 0.68,
-      foam: 0.75,
-      haze: 0.42,
-      clouds: 0.36,
-      exposure: 1.08,
-      bloom: 0.72,
+      sunElev: 10.5,
+      sunAzimuth: 142.0,
+      windSpeed: 7.5,
+      swellHs: 1.0,
+      choppiness: 0.95,
+      turbidity: 0.72,
+      foam: 0.65,
+      haze: 0.45,
+      clouds: 0.30,
+      exposure: 1.15,
+      bloom: 0.80,
       nightGlow: 0.0,
     },
     A: {
-      sunElev: 4.8,
-      sunAzimuth: 185.0,
-      windSpeed: 12.5,
-      swellHs: 1.8,
+      sunElev: 55.0,
+      sunAzimuth: 178.0,
+      windSpeed: 6.0,
+      swellHs: 0.70,
+      choppiness: 0.82,
+      turbidity: 0.92,
+      foam: 0.38,
+      haze: 0.14,
+      clouds: 0.16,
+      exposure: 1.38,
+      bloom: 0.95,
+      nightGlow: 0.0,
+    },
+    S: {
+      sunElev: 3.5,
+      sunAzimuth: 195.0,
+      windSpeed: 11.5,
+      swellHs: 1.7,
       choppiness: 1.35,
-      turbidity: 0.52,
+      turbidity: 0.50,
       foam: 1.15,
-      haze: 0.55,
-      clouds: 0.50,
-      exposure: 1.06,
-      bloom: 0.85,
+      haze: 0.60,
+      clouds: 0.48,
+      exposure: 1.08,
+      bloom: 1.20,
       nightGlow: 0.0,
     },
     N: {
-      sunElev: -2.2,
-      sunAzimuth: 200.0,
-      windSpeed: 10.0,
-      swellHs: 2.1,
-      choppiness: 1.20,
-      turbidity: 0.35,
-      foam: 1.10,
-      haze: 0.58,
-      clouds: 0.42,
-      exposure: 1.38,
-      bloom: 0.90,
-      nightGlow: 0.85,
+      sunElev: -16.0,
+      sunAzimuth: 215.0,
+      windSpeed: 8.5,
+      swellHs: 1.7,
+      choppiness: 1.10,
+      turbidity: 0.16,
+      foam: 1.40,
+      haze: 0.18,
+      clouds: 0.14,
+      exposure: 0.82,
+      bloom: 0.85,
+      nightGlow: 1.0,
     },
     O: {
-      sunElev: 34.0,
-      sunAzimuth: 175.0,
-      windSpeed: 6.5,
-      swellHs: 0.8,
-      choppiness: 0.85,
-      turbidity: 0.88,
-      foam: 0.45,
-      haze: 0.22,
-      clouds: 0.25,
-      exposure: 0.96,
-      bloom: 0.55,
+      sunElev: 48.0,
+      sunAzimuth: 172.0,
+      windSpeed: 5.6,
+      swellHs: 0.65,
+      choppiness: 0.78,
+      turbidity: 0.95,
+      foam: 0.35,
+      haze: 0.14,
+      clouds: 0.20,
+      exposure: 1.30,
+      bloom: 0.85,
       nightGlow: 0.0,
     },
     OT: {
-      sunElev: 3.2,
-      sunAzimuth: 192.0,
+      sunElev: 2.5,
+      sunAzimuth: 202.0,
       windSpeed: 18.5,
       swellHs: 3.1,
       choppiness: 1.65,
@@ -185,36 +199,47 @@
         float zenithCos = max(rd.y, 0.0);
         float sunCos = clamp(dot(rd, sunDir), -1.0, 1.0);
 
-        float dayF = smoothstep(-0.06, 0.35, sunElev);
-        float nightF = smoothstep(0.05, -0.08, sunElev);
+        float dayF = smoothstep(0.00, 0.28, sunElev);
+        float nightF = smoothstep(0.02, -0.10, sunElev);
 
-        vec3 zenithCol = mix(vec3(0.08, 0.15, 0.36), vec3(0.06, 0.24, 0.60), dayF);
-        zenithCol = mix(zenithCol, vec3(0.012, 0.022, 0.065), nightF);
+        // Zenith color:
+        // Midday (午班): bright radiant sapphire azure
+        // Dawn/Sunset: warm deep twilight
+        // Night (夜班): deep pitch dark midnight void
+        vec3 zenithCol = mix(vec3(0.08, 0.16, 0.42), vec3(0.04, 0.28, 0.82), dayF);
+        zenithCol = mix(zenithCol, vec3(0.001, 0.002, 0.006), nightF);
 
-        vec3 horizCol = mix(vec3(0.96, 0.42, 0.15), vec3(0.42, 0.68, 0.92), smoothstep(0.02, 0.35, sunElev));
-        horizCol = mix(horizCol, vec3(0.12, 0.18, 0.38), nightF);
+        // Horizon color:
+        // Midday (午班): bright clear azure sky mist
+        // Dawn/Sunset: fiery golden-peach / crimson sunrise/sunset
+        // Night (夜班): deep obsidian night mist
+        vec3 sunriseSunsetHoriz = mix(vec3(1.0, 0.38, 0.12), vec3(1.0, 0.62, 0.28), clamp(sunDir.x * 0.5 + 0.5, 0.0, 1.0));
+        vec3 dayHoriz = vec3(0.50, 0.80, 1.0);
+        vec3 horizCol = mix(sunriseSunsetHoriz, dayHoriz, smoothstep(0.04, 0.32, sunElev));
+        horizCol = mix(horizCol, vec3(0.003, 0.006, 0.016), nightF);
 
         vec3 sky = mix(zenithCol, horizCol, pow(1.0 - zenithCos, 3.0));
 
         // Mie aerosol glow
-        float g = 0.78;
+        float g = 0.80;
         float mie = (1.0 - g * g) / (4.0 * PI * pow(max(1.0 + g * g - 2.0 * g * sunCos, 0.0001), 1.5));
-        vec3 sunTint = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.94, 0.84), smoothstep(-0.02, 0.30, sunElev));
-        sunTint = mix(sunTint, vec3(0.35, 0.55, 0.95), nightF);
-        sky += sunTint * mie * (0.4 + 0.55 * uHaze);
+        vec3 sunTint = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.98, 0.92), smoothstep(-0.02, 0.25, sunElev));
+        sunTint = mix(sunTint, vec3(0.28, 0.50, 0.95), nightF);
+        // Suppress atmospheric haze at night so the sky stays deeply dark
+        sky += sunTint * mie * ((0.35 + 0.65 * uHaze) * (1.0 - nightF * 0.88));
 
         // Clouds
         if (rd.y > 0.008 && uClouds > 0.01) {
           vec2 uv = rd.xz / max(rd.y, 0.03) * 0.24 + vec2(uTime * 0.015, uTime * 0.008);
           float n = fbm(uv);
           float cov = smoothstep(0.60 - uClouds * 0.35, 0.78, n) * smoothstep(0.01, 0.12, rd.y);
-          vec3 cloudCol = mix(vec3(0.18, 0.24, 0.38), sunTint * 0.95, 0.55 + 0.45 * max(sunCos, 0.0));
+          vec3 cloudCol = mix(vec3(0.18, 0.24, 0.38) * (1.0 - nightF * 0.92), sunTint * 0.95, (0.55 + 0.45 * max(sunCos, 0.0)) * (1.0 - nightF * 0.85));
           sky = mix(sky, cloudCol, cov * 0.78);
         }
 
         // Solar or Lunar Disc
-        float halo = pow(max(sunCos, 0.0), 180.0) * 1.8 + pow(max(sunCos, 0.0), 24.0) * 0.30;
-        sky += sunTint * halo * uBloom;
+        float halo = pow(max(sunCos, 0.0), 220.0) * 2.2 + pow(max(sunCos, 0.0), 30.0) * 0.40;
+        sky += sunTint * halo * uBloom * (1.0 - nightF * 0.60);
         return sky;
       }
 
@@ -280,23 +305,23 @@
         vec3 reflSky = renderSky(normalize(R), sunDir);
 
         // Water body & subsurface glow
-        float dayLight = smoothstep(-0.10, 0.25, sunDir.y);
-        vec3 deepCol = mix(vec3(0.006, 0.028, 0.068), vec3(0.015, 0.095, 0.115), uTurbidity) * (0.22 + 0.85 * dayLight);
-        vec3 sssCol = vec3(0.05, 0.48, 0.42) * crest * (0.35 + 0.65 * uTurbidity) * (0.3 + 0.7 * dayLight);
+        float dayLight = smoothstep(-0.06, 0.25, sunDir.y);
+        vec3 deepCol = mix(vec3(0.001, 0.005, 0.014), vec3(0.016, 0.11, 0.14), uTurbidity) * (0.06 + 0.96 * dayLight);
+        vec3 sssCol = vec3(0.04, 0.54, 0.46) * crest * (0.35 + 0.65 * uTurbidity) * (0.12 + 0.88 * dayLight);
 
         vec3 sea = mix(deepCol + sssCol, reflSky, fresnel);
 
         // Anisotropic sun/moon glitter
         vec3 H = normalize(V + sunDir);
-        float spec = pow(max(dot(effN, H), 0.0), 140.0) * 3.2;
-        vec3 sunTint = mix(vec3(1.0, 0.45, 0.15), vec3(1.0, 0.95, 0.85), smoothstep(0.0, 0.28, sunDir.y));
-        sunTint = mix(sunTint, vec3(0.45, 0.68, 1.0), uNightGlow);
-        sea += sunTint * spec * fresnel * uBloom;
+        float spec = pow(max(dot(effN, H), 0.0), 140.0) * 3.5;
+        vec3 sunTint = mix(vec3(1.0, 0.45, 0.15), vec3(1.0, 0.98, 0.92), smoothstep(0.0, 0.28, sunDir.y));
+        sunTint = mix(sunTint, vec3(0.25, 0.48, 0.90), uNightGlow);
+        sea += sunTint * spec * fresnel * uBloom * (0.15 + 0.85 * dayLight);
 
         // Whitecap foam + Night Shift Bioluminescence ("藍眼淚") + Import Shockwave Golden-Cyan Crest
-        float foamMask = smoothstep(0.42, 0.88, crest * uFoam) * lod;
-        vec3 foamCol = mix(vec3(0.85, 0.88, 0.92) * (0.35 + 0.65 * dayLight), vec3(0.12, 0.78, 1.0) * 1.6, uNightGlow);
-        sea = mix(sea, foamCol, clamp(foamMask, 0.0, 0.88));
+        float foamMask = smoothstep(0.40, 0.86, crest * uFoam) * lod;
+        vec3 foamCol = mix(vec3(0.88, 0.92, 0.96) * (0.22 + 0.78 * dayLight), vec3(0.06, 0.95, 1.0) * 3.2, uNightGlow);
+        sea = mix(sea, foamCol, clamp(foamMask, 0.0, 0.92));
 
         if (shockRing > 0.005) {
           vec3 waveEnergyCol = mix(vec3(0.22, 0.88, 1.0), vec3(1.0, 0.78, 0.28), 0.5 + 0.5 * sin(dist * 0.25 - uTime * 8.0));
