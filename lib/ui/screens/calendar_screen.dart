@@ -11,6 +11,7 @@ import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
+import '../widgets/ocean_atmosphere.dart';
 import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
 
@@ -134,6 +135,22 @@ class _CalendarScreenState extends State<CalendarScreen>
   bool _schedPanelOpen = false;
   final GlobalKey<ShiftPickerPanelState> _panelKey =
       GlobalKey<ShiftPickerPanelState>();
+
+  /// 海天背景元件 Key（支援導入時觸發波浪激盪）
+  final GlobalKey<OceanAtmosphereWidgetState> _oceanKey =
+      GlobalKey<OceanAtmosphereWidgetState>();
+
+  /// 依選中日期的班次時間取得海天大氣狀態（早更晨曦 / 中更落日 / 夜更星空 / 休假晴空）
+  OceanAtmoState _getCurrentAtmoState() {
+    final key = ShiftStore.ymd(_selectedDate);
+    final assignment = widget.store.assignments[key];
+    final def =
+        assignment != null ? widget.store.defs[assignment.shiftId] : null;
+    if (def == null) {
+      return OceanAtmoState.midday;
+    }
+    return OceanAtmoState.fromStartTime(def.startTime);
+  }
 
   /// 備註便利貼 inline 編輯狀態
   bool _editingRemark = false;
@@ -412,6 +429,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               onImportDone: () {
                 setState(() {});
                 _cardFloatAnimCtrl.forward(from: 0.0);
+                _oceanKey.currentState?.triggerSurge();
               },
             ),
             style: FilledButton.styleFrom(
@@ -444,38 +462,49 @@ class _CalendarScreenState extends State<CalendarScreen>
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          _weekHeader(t),
-          Expanded(
-            child: ScrollConfiguration(
-              behavior: const _CalendarScrollBehavior(),
-              child: PageView.builder(
-                scrollDirection: Axis.horizontal, // 左右翻月
-                physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                itemBuilder: (_, page) {
-                  final m = _monthForPage(page);
-                  // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
-                  return RepaintBoundary(
-                    key: ValueKey('month_${m.year}_${m.month}'),
-                    child: _monthGrid(t, m.year, m.month),
-                  );
-                },
-              ),
+          // 海天連動動態背景（隨選取日期班次時間，呈現對應太陽高度與海浪形態）
+          Positioned.fill(
+            child: OceanAtmosphereWidget(
+              key: _oceanKey,
+              targetState: _getCurrentAtmoState(),
             ),
           ),
-          // 排班面板或精簡詳情板
-          _schedPanelOpen
-              ? ShiftPickerPanel(
-                  key: _panelKey,
-                  initialDate: _selectedDate,
-                  store: widget.store,
-                  alarms: widget.alarms,
-                  onClose: () => setState(() => _schedPanelOpen = false),
-                )
-              : _detailPanel(t),
+          Column(
+            children: [
+              _weekHeader(t),
+              Expanded(
+                child: ScrollConfiguration(
+                  behavior: const _CalendarScrollBehavior(),
+                  child: PageView.builder(
+                    scrollDirection: Axis.horizontal, // 左右翻月
+                    physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
+                    controller: _pageController,
+                    onPageChanged: _onPageChanged,
+                    itemBuilder: (_, page) {
+                      final m = _monthForPage(page);
+                      // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
+                      return RepaintBoundary(
+                        key: ValueKey('month_${m.year}_${m.month}'),
+                        child: _monthGrid(t, m.year, m.month),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // 排班面板或精簡詳情板
+              _schedPanelOpen
+                  ? ShiftPickerPanel(
+                      key: _panelKey,
+                      initialDate: _selectedDate,
+                      store: widget.store,
+                      alarms: widget.alarms,
+                      onClose: () => setState(() => _schedPanelOpen = false),
+                    )
+                  : _detailPanel(t),
+            ],
+          ),
         ],
       ),
     );
@@ -508,6 +537,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                           today,
                           year,
                           month,
+                          row: w,
+                          col: d,
                         ),
                       ),
                     ),
@@ -525,8 +556,10 @@ class _CalendarScreenState extends State<CalendarScreen>
     DateTime date,
     DateTime today,
     int activeYear,
-    int activeMonth,
-  ) {
+    int activeMonth, {
+    required int row,
+    required int col,
+  }) {
     final day = date.day;
     final key = ShiftStore.ymd(date);
     final assignment = widget.store.assignments[key];
@@ -554,7 +587,9 @@ class _CalendarScreenState extends State<CalendarScreen>
     final Color noteColor;
 
     if (isCurrentMonth) {
-      cellBg = baseBg;
+      cellBg = def != null
+          ? slot!.bg.withValues(alpha: 0.88)
+          : Colors.white.withValues(alpha: 0.78);
       borderColor = isSelected
           ? t.brand
           : (isToday ? t.brand.withValues(alpha: 0.65) : (slot?.border ?? t.neutralStroke));
@@ -564,8 +599,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     } else {
       // 鄰月淡化處理：再微調淺約 15%，保持柔和層次區分
       cellBg = def != null
-          ? slot!.bg.withValues(alpha: 0.48)
-          : t.neutralBg2.withValues(alpha: 0.45);
+          ? slot!.bg.withValues(alpha: 0.45)
+          : Colors.white.withValues(alpha: 0.35);
       borderColor = isSelected
           ? t.brand
           : (isToday
@@ -589,35 +624,39 @@ class _CalendarScreenState extends State<CalendarScreen>
       );
     }
 
-    // 排班卡片從無到有飄入計算（Staggered Float In）
-    final bool isCardFloating =
+    // 導入排更波浪式推進計算（自底排斜向上如海浪翻湧浮入）
+    final bool isWaveSurging =
         _cardFloatAnimCtrl.isAnimating && isCurrentMonth && def != null;
-    double cardT = 1.0;
-    if (isCardFloating) {
-      final dayRatio = ((day - 1) * 0.022).clamp(0.0, 0.70);
-      final endRatio = (dayRatio + 0.30).clamp(0.0, 1.0);
+    double waveT = 1.0;
+    double sheenT = 0.0;
+    if (isWaveSurging) {
+      final waveStart = (((5 - row) * 0.09 + col * 0.032)).clamp(0.0, 0.65);
+      final waveEnd = (waveStart + 0.35).clamp(0.0, 1.0);
       final animVal = _cardFloatAnimCtrl.value;
-      if (animVal < dayRatio) {
-        cardT = 0.0;
-      } else if (animVal >= endRatio) {
-        cardT = 1.0;
+      if (animVal < waveStart) {
+        waveT = 0.0;
+        sheenT = 0.0;
+      } else if (animVal >= waveEnd) {
+        waveT = 1.0;
+        sheenT = 0.0;
       } else {
-        final localT = (animVal - dayRatio) / (endRatio - dayRatio);
-        cardT = Curves.easeOutBack.transform(localT);
+        final localT = (animVal - waveStart) / (waveEnd - waveStart);
+        waveT = Curves.easeOutBack.transform(localT);
+        sheenT = localT.clamp(0.0, 1.0);
       }
     }
 
-    Widget wrapFloatingCard(Widget child) {
-      if (!isCardFloating) return child;
-      if (cardT <= 0.001) return const SizedBox.shrink();
-      final clampedT = cardT.clamp(0.0, 1.0);
+    Widget wrapWaveContent(Widget child) {
+      if (!isWaveSurging) return child;
+      if (waveT <= 0.001) return const SizedBox.shrink();
+      final clampedT = waveT.clamp(0.0, 1.0);
       return Transform(
         alignment: Alignment.center,
         transform: Matrix4.identity()
           ..setEntry(3, 2, 0.001)
-          ..translate(0.0, -24.0 * (1.0 - clampedT))
-          ..rotateX(0.18 * (1.0 - clampedT))
-          ..scale(0.92 + 0.08 * clampedT),
+          ..translate(0.0, 24.0 * (1.0 - clampedT))
+          ..rotateX(0.16 * (1.0 - clampedT))
+          ..scale(0.88 + 0.12 * clampedT),
         child: Opacity(
           opacity: clampedT,
           child: child,
@@ -687,11 +726,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                     ),
                   ),
                 ),
-                // 第二行：班次縮寫（清晰適中 17.0px w600，支援從無到有飄入）
+                // 第二行：班次縮寫（清晰適中 17.0px w600，支援波浪式浮入）
                 Expanded(
                   child: Center(
                     child: def != null
-                        ? wrapFloatingCard(
+                        ? wrapWaveContent(
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
@@ -709,11 +748,11 @@ class _CalendarScreenState extends State<CalendarScreen>
                         : const SizedBox.shrink(),
                   ),
                 ),
-                // 第三行：地點（常規字重 17.0px normal，支援從無到有飄入）
+                // 第三行：地點（常規字重 17.0px normal，支援波浪式浮入）
                 Expanded(
                   child: Center(
                     child: (def != null && note.isNotEmpty)
-                        ? wrapFloatingCard(
+                        ? wrapWaveContent(
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
@@ -748,6 +787,34 @@ class _CalendarScreenState extends State<CalendarScreen>
                       : t.danger.withValues(alpha: 0.50),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(3.0),
+                  ),
+                ),
+              ),
+            ),
+          // 導入排更波浪流光掠過
+          if (isWaveSurging && sheenT > 0.01 && sheenT < 0.99)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Transform.translate(
+                    offset: Offset((sheenT * 2.4 - 1.2) * 55.0, 0),
+                    child: Transform.rotate(
+                      angle: 0.22,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              t.brand.withValues(alpha: 0.25),
+                              const Color(0xFFFDE047).withValues(alpha: 0.35),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.42, 0.58, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1302,6 +1369,8 @@ class _CalendarScreenState extends State<CalendarScreen>
           }
         }
         if (mounted) {
+          _cardFloatAnimCtrl.forward(from: 0.0);
+          _oceanKey.currentState?.triggerSurge();
           showTopNotification(context, '成功導入 $count 天排班！');
         }
       }
