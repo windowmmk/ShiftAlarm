@@ -3,7 +3,7 @@
   "short_name": "ShiftAlarm",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#FFFFFF",
+  "background_color": "#EDF2F7",
   "theme_color": "#0078D4",
   "description": "專為輪班人士打造的極致隱私、純離線排班日曆",
   "orientation": "portrait-primary",

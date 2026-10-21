@@ -1,3 +1,7 @@
+// 【v3.5】本檔已由 shaders/ocean.frag 取代，僅作移植參照與回滾比對，不參與執行。
+// 保留原因：489 行 GLSL 是本專案唯一的原始光源參考實作，重寫成本極高。
+// 若日後要調整 ocean.frag 的著色，請以本檔為對照基準。
+//
 // Web-Ocean 3D Real-Time Physical Sky & Ocean Shader (WebGL2 / WebGL1)
 // Extracted from ShiftAlarm x Web-Ocean reference specification
 (function () {
