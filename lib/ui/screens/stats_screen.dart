@@ -65,6 +65,9 @@ class _StatsScreenState extends State<StatsScreen> {
             shiftId: a.shiftId,
             venue: a.note,
             slotIndex: slotIndexForTime(def.startTime),
+            // 工時按該班次實際長度計（支援跨午夜）；設定非法回 0。
+            durationMinutes:
+                shiftDurationMinutes(def.startTime, def.endTime),
           ));
         }
       }
@@ -165,13 +168,16 @@ class _StatsScreenState extends State<StatsScreen> {
       children: [
         _overviewCard(t, '返工', '${r.workDays}', '日'),
         const SizedBox(width: 8),
-        _overviewCard(t, '總工時', '${r.workHours}', '小時'),
+        _overviewCard(t, '總工時', r.durationLabel, ''),
         const SizedBox(width: 8),
         _overviewCard(t, '休息', '${r.restDays}', '日'),
       ],
     );
   }
 
+  /// 總覽卡。`unit` 為空字串時**不輸出** unit TextSpan（否則會留一個多餘空格）。
+  /// 數值區用 `FittedBox(scaleDown)` ＋ 單行：320 邏輯像素寬的三分卡在
+  /// `fontTitle` 字級下放不下「19 小時 30 分」，寧可等比縮小也不換行或溢出。
   Widget _overviewCard(ShiftTokens t, String label, String value, String unit) {
     return Expanded(
       child: Card(
@@ -184,22 +190,28 @@ class _StatsScreenState extends State<StatsScreen> {
                   style:
                       TextStyle(fontSize: t.fontCaption, color: t.neutralFg2)),
               const SizedBox(height: 4),
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                      fontSize: t.fontTitle,
-                      fontWeight: FontWeight.w700,
-                      color: t.neutralFg),
-                  children: [
-                    TextSpan(text: value),
-                    TextSpan(
-                      text: ' $unit',
-                      style: TextStyle(
-                          fontSize: t.fontCaption,
-                          fontWeight: FontWeight.normal,
-                          color: t.neutralFg2),
-                    ),
-                  ],
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: RichText(
+                  maxLines: 1,
+                  softWrap: false,
+                  text: TextSpan(
+                    style: TextStyle(
+                        fontSize: t.fontTitle,
+                        fontWeight: FontWeight.w700,
+                        color: t.neutralFg),
+                    children: [
+                      TextSpan(text: value),
+                      if (unit.isNotEmpty)
+                        TextSpan(
+                          text: ' $unit',
+                          style: TextStyle(
+                              fontSize: t.fontCaption,
+                              fontWeight: FontWeight.normal,
+                              color: t.neutralFg2),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -61,36 +61,94 @@ void main() {
 
     test('日數／工時／休息：10天區間，排咗6日更', () {
       final r = computeStats(tenDays(), [
-        const ShiftRecord(ymd: '2026-10-05', shiftId: 's00', slotIndex: 0),
-        const ShiftRecord(ymd: '2026-10-06', shiftId: 's06', slotIndex: 1),
-        const ShiftRecord(ymd: '2026-10-08', shiftId: 's12', slotIndex: 2),
-        const ShiftRecord(ymd: '2026-10-10', shiftId: 's18', slotIndex: 3),
-        const ShiftRecord(ymd: '2026-10-12', shiftId: 's00', slotIndex: 0),
-        const ShiftRecord(ymd: '2026-10-14', shiftId: 's06', slotIndex: 1),
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's00',
+            slotIndex: 0,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-08',
+            shiftId: 's12',
+            slotIndex: 2,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-10',
+            shiftId: 's18',
+            slotIndex: 3,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-12',
+            shiftId: 's00',
+            slotIndex: 0,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-14',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 360),
       ]);
       expect(r.totalDays, 10);
       expect(r.workDays, 6);
-      expect(r.workHours, 36); // 6 × 6
+      expect(r.workHours, 36); // 6 × 6（每筆 360 分鐘）——舊行為回歸鎖
+      expect(r.totalMinutes, 2160);
       expect(r.restDays, 4); // 10 − 6
     });
 
     test('區間外紀錄忽略、同一日多筆只計一次', () {
       final r = computeStats(tenDays(), [
-        const ShiftRecord(ymd: '2026-10-04', shiftId: 's00', slotIndex: 0), // 前一日
-        const ShiftRecord(ymd: '2026-10-15', shiftId: 's06', slotIndex: 1), // 後一日
-        const ShiftRecord(ymd: '2026-10-10', shiftId: 's12', slotIndex: 2),
-        const ShiftRecord(ymd: '2026-10-10', shiftId: 's18', slotIndex: 3), // 同日重複
+        const ShiftRecord(
+            ymd: '2026-10-04',
+            shiftId: 's00',
+            slotIndex: 0,
+            durationMinutes: 360), // 前一日
+        const ShiftRecord(
+            ymd: '2026-10-15',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 360), // 後一日
+        const ShiftRecord(
+            ymd: '2026-10-10',
+            shiftId: 's12',
+            slotIndex: 2,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-10',
+            shiftId: 's18',
+            slotIndex: 3,
+            durationMinutes: 360), // 同日重複
       ]);
       expect(r.workDays, 1);
       expect(r.slotDays, [0, 0, 1, 0]);
+      expect(r.totalMinutes, 360); // 同日重複只計第一筆
     });
 
     test('班次分佈日數＋百分比', () {
       final r = computeStats(tenDays(), [
-        const ShiftRecord(ymd: '2026-10-05', shiftId: 's00', slotIndex: 0),
-        const ShiftRecord(ymd: '2026-10-06', shiftId: 's06', slotIndex: 1),
-        const ShiftRecord(ymd: '2026-10-08', shiftId: 's06', slotIndex: 1),
-        const ShiftRecord(ymd: '2026-10-10', shiftId: 's18', slotIndex: 3),
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's00',
+            slotIndex: 0,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-08',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-10',
+            shiftId: 's18',
+            slotIndex: 3,
+            durationMinutes: 360),
       ]);
       expect(r.slotDays, [1, 2, 0, 1]);
       expect(r.slotPercent(0), 25.0);
@@ -103,20 +161,171 @@ void main() {
       final r = computeStats(tenDays(), []);
       expect(r.workDays, 0);
       expect(r.workHours, 0);
+      expect(r.totalMinutes, 0);
+      expect(r.durationLabel, '0 小時');
       expect(r.restDays, 10);
       expect(r.slotPercent(0), 0);
     });
 
     test('場所分佈按次數降序、空場所唔計', () {
       final r = computeStats(tenDays(), [
-        const ShiftRecord(ymd: '2026-10-05', shiftId: 's00', slotIndex: 0, venue: 'SITE_A'),
-        const ShiftRecord(ymd: '2026-10-06', shiftId: 's06', slotIndex: 1, venue: 'SITE_B'),
-        const ShiftRecord(ymd: '2026-10-08', shiftId: 's12', slotIndex: 2, venue: 'SITE_A'),
-        const ShiftRecord(ymd: '2026-10-10', shiftId: 's18', slotIndex: 3, venue: ''),
-        const ShiftRecord(ymd: '2026-10-12', shiftId: 's00', slotIndex: 0, venue: 'SITE_A'),
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's00',
+            slotIndex: 0,
+            venue: 'SITE_A',
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's06',
+            slotIndex: 1,
+            venue: 'SITE_B',
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-08',
+            shiftId: 's12',
+            slotIndex: 2,
+            venue: 'SITE_A',
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-10',
+            shiftId: 's18',
+            slotIndex: 3,
+            venue: '',
+            durationMinutes: 360),
+        const ShiftRecord(
+            ymd: '2026-10-12',
+            shiftId: 's00',
+            slotIndex: 0,
+            venue: 'SITE_A',
+            durationMinutes: 360),
       ]);
       expect(r.venueCounts.map((e) => e.key).toList(), ['SITE_A', 'SITE_B']);
       expect(r.venueCounts.map((e) => e.value).toList(), [3, 1]);
+    });
+  });
+
+  group('shiftDurationMinutes（班次實際長度）', () {
+    test('同日：09:00–17:30 → 510 分鐘（8.5 小時）', () {
+      expect(shiftDurationMinutes('09:00', '17:30'), 510);
+    });
+
+    test('跨午夜：22:00–06:00 → 480 分鐘', () {
+      expect(shiftDurationMinutes('22:00', '06:00'), 480);
+    });
+
+    test('跨午夜極短：23:59–00:01 → 2 分鐘', () {
+      expect(shiftDurationMinutes('23:59', '00:01'), 2);
+    });
+
+    test('同起同訖視為未設定 → 0（刻意不放大成 24 小時）', () {
+      expect(shiftDurationMinutes('00:00', '00:00'), 0);
+      expect(shiftDurationMinutes('08:00', '08:00'), 0);
+    });
+
+    test('非法輸入一律回 0，不拋異常', () {
+      for (final bad in ['abc', '9', '24:00', '09:60', '09:0', '']) {
+        expect(shiftDurationMinutes(bad, '17:30'), 0, reason: 'start=$bad');
+        expect(shiftDurationMinutes('09:00', bad), 0, reason: 'end=$bad');
+      }
+      expect(shiftDurationMinutes('', ''), 0);
+      expect(shiftDurationMinutes('09:00:00', '17:30'), 0);
+    });
+  });
+
+  group('StatsResult 工時聚合（實際班次長度）', () {
+    DateRange threeDays() =>
+        DateRange(DateTime(2026, 10, 5), DateTime(2026, 10, 7));
+
+    test('三個 6.5 小時班 → 1170 分鐘／「19 小時 30 分」／19 小時', () {
+      final r = computeStats(threeDays(), [
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 390),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 390),
+        const ShiftRecord(
+            ymd: '2026-10-07',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 390),
+      ]);
+      expect(r.totalMinutes, 1170);
+      expect(r.durationLabel, '19 小時 30 分');
+      expect(r.workHours, 19); // 向下取整
+    });
+
+    test('8 小時 + 12 小時 → 「20 小時」，證明沒有殘留固定 6 小時', () {
+      final r = computeStats(threeDays(), [
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 480),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's18',
+            slotIndex: 3,
+            durationMinutes: 720),
+      ]);
+      expect(r.totalMinutes, 1200);
+      expect(r.durationLabel, '20 小時');
+      expect(r.workHours, 20);
+      // 若仍按 workDays × 6 計算會是 12
+      expect(r.workHours, isNot(12));
+    });
+
+    test('同一日兩筆不同時長：只計第一筆一次', () {
+      final r = computeStats(threeDays(), [
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 480),
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's18',
+            slotIndex: 3,
+            durationMinutes: 720), // 同日第二筆，不累加
+      ]);
+      expect(r.workDays, 1);
+      expect(r.totalMinutes, 480);
+      expect(r.durationLabel, '8 小時');
+    });
+
+    test('時長 0 的紀錄仍然計返工日，但不加分鐘數', () {
+      final r = computeStats(threeDays(), [
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 0),
+      ]);
+      expect(r.workDays, 1);
+      expect(r.totalMinutes, 0);
+      expect(r.durationLabel, '0 小時');
+    });
+
+    test('負時長當 0，不會倒扣總工時', () {
+      final r = computeStats(threeDays(), [
+        const ShiftRecord(
+            ymd: '2026-10-05',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: 480),
+        const ShiftRecord(
+            ymd: '2026-10-06',
+            shiftId: 's06',
+            slotIndex: 1,
+            durationMinutes: -120),
+      ]);
+      expect(r.totalMinutes, 480);
+      expect(r.durationLabel, '8 小時');
     });
   });
 
