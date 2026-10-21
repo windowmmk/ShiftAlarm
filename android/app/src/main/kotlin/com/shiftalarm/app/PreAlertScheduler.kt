@@ -32,7 +32,15 @@ object PreAlertScheduler {
     /** 預告提前量（分鐘）。必須同 Dart `AlarmService.preAlertLeadMinutes` 一致。 */
     const val LEAD_MINUTES = 60
 
-    /** 預留欄位（P2-2 點擊跳日期用），現階段只寫入 extra 不消費。 */
+    /**
+     * 預留欄位（P2-2「點擊通知跳該日」用），現階段**只寫入 extra 不消費**。
+     *
+     * 刻意**不**共用 [AlarmScheduler.EXTRA_DATE]（值 `"alarm_date"`）：
+     * 兩者語意唔同（一個係預告要跳嘅日期、一個係真鬧鐘嘅日期），
+     * 若日後有人把預告 Intent 誤交 [AlarmActivity]（例如共用一個 helper），
+     * 共用 key 會令 AlarmActivity 讀到預告嘅日期而顯示錯誤嘅班次。
+     * 呢個「刻意唔共用」寫喺度，免得下次「統一命名」嘅善意重構把它改掉。
+     */
     const val EXTRA_PRE_ALERT_DATE = "pre_alert_date"
 
     /** 註冊表 prefs 檔名（key "ids"，JSON int 陣列，內容係已偏移 id）。 */
@@ -78,6 +86,11 @@ object PreAlertScheduler {
                 putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
                 putExtra(AlarmScheduler.EXTRA_TITLE, title)
                 putExtra(AlarmScheduler.EXTRA_BODY, body)
+                // 以下四個 extra 現階段**只寫不讀**（PreAlertReceiver 唔會讀），
+                // 係 P2-2「點擊通知跳該日」嘅預留欄位——到時 PreAlertReceiver
+                // 會用佢哋砌一條帶日期嘅 Intent 交 MainActivity。
+                // ⚠️ 唔係死碼，唔好見到「寫咗但冇人讀」就刪：刪咗之後 P2-2
+                // 要由 Dart 層重新打通整條解析鏈路（bridge → channel → intent）。
                 putExtra(EXTRA_PRE_ALERT_DATE, date)
                 putExtra(AlarmScheduler.EXTRA_SHIFT_NAME, shiftName)
                 putExtra(AlarmScheduler.EXTRA_START_TIME, startTime)

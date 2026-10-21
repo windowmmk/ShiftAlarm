@@ -24,6 +24,11 @@ import androidx.core.app.NotificationCompat
  *  - ②鬧鐘真正響：由 [AlarmReceiver] / [GentleAlarmReceiver] 呼叫
  *    [PreAlertScheduler.cancelNotification]
  *  - ③App 內取消／轉更：Dart `AlarmService._cancelAllFor` → `cancelPreAlert`
+ *
+ * 本 receiver **只讀三個 extra**（`alarm_id` / `title` / `body`）。Intent 內另有
+ * `pre_alert_date` / `shift_name` / `start_time` / `note` 四個 extra，係 P2-2
+ * 「點擊通知跳該日」嘅預留欄位，現階段刻意只寫不讀——寫入點在
+ * [PreAlertScheduler.schedule]，原因寫喺嗰度，唔好當死碼刪。
  */
 class PreAlertReceiver : BroadcastReceiver() {
     companion object {
