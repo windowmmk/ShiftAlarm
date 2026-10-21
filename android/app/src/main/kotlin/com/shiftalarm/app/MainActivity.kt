@@ -23,7 +23,17 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "schedule" -> {
-                    val id = call.argument<Int>("id")
+                    // ⚠️ 跨端數字參數一律用 Number 讀，再用 toInt()／toLong() 轉型。
+                    // 理由：MethodCall.argument<T> 的實作是 `arguments[key] as? T`，
+                    // 而 Flutter 的 StandardMessageCodec 會把落在 [-2^31, 2^31-1] 的
+                    // Dart int 編成 INT32（Kotlin 收到 Integer），超出才編成 INT64（Long）。
+                    // 若型別參數寫 Int 而實際收到 Long，`as? Int` 會**靜默回 null**
+                    // ——不拋異常、不寫 log、編譯器也不會紅，然後這裡走 result.error，
+                    // Dart 側 try/catch 吞掉，功能就無聲消失。
+                    // 用 Number 當中介，Integer／Long 兩種編碼都吃，成本零。
+                    // 本檔再無以 Int 為型別參數的 argument 讀法（保持這個狀態，
+                    // 新增 channel method 時照抄本段即可）。
+                    val id = (call.argument<Number>("id"))?.toInt()
                     val triggerAtMillis =
                         (call.argument<Number>("triggerAtMillis"))?.toLong()
                     val title = call.argument<String>("title") ?: ""
@@ -50,7 +60,8 @@ class MainActivity : FlutterActivity() {
                     result.success(filesDir.absolutePath)
                 }
                 "cancel" -> {
-                    val id = call.argument<Int>("id")
+                    // id 用 Number 讀，理由見 "schedule" 分支的說明
+                    val id = (call.argument<Number>("id"))?.toInt()
                     if (id == null) {
                         result.error("ARG", "missing id", null)
                     } else {
@@ -59,7 +70,8 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "scheduleGentle" -> {
-                    val id = call.argument<Int>("id")
+                    // id 用 Number 讀，理由見 "schedule" 分支的說明
+                    val id = (call.argument<Number>("id"))?.toInt()
                     val triggerAtMillis =
                         (call.argument<Number>("triggerAtMillis"))?.toLong()
                     val title = call.argument<String>("title") ?: ""
@@ -74,7 +86,8 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "cancelGentle" -> {
-                    val id = call.argument<Int>("id")
+                    // id 用 Number 讀，理由見 "schedule" 分支的說明
+                    val id = (call.argument<Number>("id"))?.toInt()
                     if (id == null) {
                         result.error("ARG", "missing id", null)
                     } else {
@@ -147,13 +160,7 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "schedulePreAlert" -> {
-                    // 用 Number 而非 Int 讀 alarmId：Flutter 的 StandardMessageCodec 對
-                    // [-2^31, 2^31-1] 的 Dart int 編成 INT32（Kotlin 收到 Integer），
-                    // 超出範圍才編成 INT64（Long）。call.argument<Int> 內部是
-                    // `arguments[key] as? Int`，遇到 Long 會**靜默回 null**（不拋異常），
-                    // 然後這裡會走 result.error，Dart 側 try/catch 吞掉 → 預告無聲消失。
-                    // 現行 alarmId 上限 202612319（YYYYMMDD*10+9）恆在 Int 範圍，但 id
-                    // 方案日後一改就會踩中；Number.toInt() 兩種編碼都吃，成本零。
+                    // alarmId 用 Number 讀，理由見 "schedule" 分支的說明。
                     val alarmId = (call.argument<Number>("alarmId"))?.toInt()
                     val triggerAtMillis =
                         (call.argument<Number>("triggerAtMillis"))?.toLong()
@@ -174,8 +181,9 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "cancelPreAlert" -> {
-                    // 同上：Int 讀法遇 Long 會靜默回 null，而取消失敗 = 幽靈通知
-                    // 留在通知欄（正是本功能最要防的失敗模式），故用 Number。
+                    // alarmId 用 Number 讀，理由見 "schedule" 分支的說明。
+                    // 這條尤其要緊：取消失敗 = 幽靈通知永遠留在通知欄，
+                    // 比「預告沒排到」更難被使用者察覺（要等到下次看通知欄）。
                     val alarmId = (call.argument<Number>("alarmId"))?.toInt()
                     if (alarmId == null) {
                         result.error("ARG", "missing alarmId", null)
