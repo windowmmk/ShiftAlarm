@@ -147,7 +147,14 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "schedulePreAlert" -> {
-                    val alarmId = call.argument<Int>("alarmId")
+                    // 用 Number 而非 Int 讀 alarmId：Flutter 的 StandardMessageCodec 對
+                    // [-2^31, 2^31-1] 的 Dart int 編成 INT32（Kotlin 收到 Integer），
+                    // 超出範圍才編成 INT64（Long）。call.argument<Int> 內部是
+                    // `arguments[key] as? Int`，遇到 Long 會**靜默回 null**（不拋異常），
+                    // 然後這裡會走 result.error，Dart 側 try/catch 吞掉 → 預告無聲消失。
+                    // 現行 alarmId 上限 202612319（YYYYMMDD*10+9）恆在 Int 範圍，但 id
+                    // 方案日後一改就會踩中；Number.toInt() 兩種編碼都吃，成本零。
+                    val alarmId = (call.argument<Number>("alarmId"))?.toInt()
                     val triggerAtMillis =
                         (call.argument<Number>("triggerAtMillis"))?.toLong()
                     val title = call.argument<String>("title") ?: ""
@@ -167,7 +174,9 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "cancelPreAlert" -> {
-                    val alarmId = call.argument<Int>("alarmId")
+                    // 同上：Int 讀法遇 Long 會靜默回 null，而取消失敗 = 幽靈通知
+                    // 留在通知欄（正是本功能最要防的失敗模式），故用 Number。
+                    val alarmId = (call.argument<Number>("alarmId"))?.toInt()
                     if (alarmId == null) {
                         result.error("ARG", "missing alarmId", null)
                     } else {
