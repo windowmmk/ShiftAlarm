@@ -5,12 +5,22 @@
 // 本檔改以 Flutter runtime effect 執行，Android（Impeller／Skia）與 Web（CanvasKit／skwasm）
 // 共用同一份著色器，做到「兩端一致嘅真實光影」。
 //
-// 相對原版只改三處：
+// 相對原版只改三處（③ 係原版冇、但 Flutter 上必須嘅座標系修正）：
 //   ① 前置宣告：#include <flutter/runtime_effect.glsl> + out vec4 fragColor
 //      （刪走 #version 與 precision，因為 runtime_effect.glsl 已經提供）
 //   ② 投影：固定「水平半角」，垂直半角由 aspect 反推（見 mainImage 註解）。
 //      原式 ndc.x *= aspect 喺 464×96（aspect 4.83）會令水平半角變成 70°，魚眼＋太陽變橢圓。
-//   ③ 入口：mainImage 由 void(out vec4, in vec2) 改為回傳 vec4，main() 一行轉發。
+//   ③ y 軸反轉：`ndc.y = -ndc.y;` —— 呢行唔係原版有嘅，但**必須**。
+//      WebGL 的 gl_FragCoord.y 由畫面**底部**起算（向上為正）；
+//      Flutter 的 FlutterFragCoord().y 由**頂部**起算（向下為正）。兩者相差一個垂直鏡像。
+//      唔反轉就會成條帶上下倒轉（天空走到底部、海面走到頂部），
+//      而且 pitch 推導（海平線落 45%）會變成 55%。**呢個唔係「睇落似抄錯」，係量出嚟嘅。**
+//      量測依據（test/ocean_shader_render_test.dart，離屏渲染 464×96 後讀回像素，
+//      取「相鄰兩行亮度差最大的一行」為海平線）：
+//        · 有呢行 → 海平線落在 row 44 → 44/96 = 45.8%（目標 45%，容差 ±3 行）
+//        · 註釋掉呢行 → 海平線落在 row 53 → 53/96 = 55.2%（即上下倒轉）
+//      所以回歸測試斷言 horizonRow ∈ [40, 48]：一移除呢行就會紅，唔會靜默倒轉。
+//   ④ 入口：mainImage 由 void(out vec4, in vec2) 改為回傳 vec4，main() 一行轉發。
 // 其餘（hash12 / noise2D / fbm / renderSky / const mat2 m2 / 9 波迴圈 / ACES tone map）一字不改。
 //
 // ⚠️ 19 個 uniform 全部都有被 body 真正引用。impellerc 會剔除「宣告但未引用」嘅 uniform，
@@ -131,7 +141,8 @@ vec4 mainImage(vec2 fragCoord) {
   // 太陽／月亮維持正圓（兩軸共用同一角比例），海平線維持水平（只有 rd.y 決定天海分界）。
   vec2 ndc = (fragCoord / uResolution) * 2.0 - 1.0;
   // Flutter 的 FlutterFragCoord().y 由頂部向下遞增；原版 gl_FragCoord.y 由底部向上遞增。
-  // 唔反轉就會成條帶上下倒轉（天空走到底部），所以呢一行係必要嘅座標系修正。
+  // 註釋掉呢行 → 海平線由 row 44（45.8%）跳到 row 53（55.2%），即整條帶上下倒轉。
+  // 檔頭 ③ 有完整推導與量測依據；回歸測試：horizonRow ∈ [40, 48]。
   ndc.y = -ndc.y;
   float aspect = uResolution.x / max(uResolution.y, 1.0);
   const float kHorizHalfTan = 1.03;              // 與 16:9 原版等價（1.778 × 0.58 ≈ 1.03）
