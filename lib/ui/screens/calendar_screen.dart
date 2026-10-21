@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/alarm_service.dart';
+import '../../domain/calendar_layout.dart';
 import '../../domain/config_io.dart';
 import '../../domain/holidays.dart';
 import '../../domain/roster_io.dart';
@@ -132,16 +133,14 @@ class _CalendarScreenState extends State<CalendarScreen>
   /// 詳情板選中日期（預設今日）；㩒日曆格更新
   late DateTime _selectedDate;
 
-  /// 排班面板開關（固定 widget，擺喺日曆下方，唔遮日曆格）
-  bool _schedPanelOpen = false;
+  /// 底部區模式：`false` = 排班詳情，`true` = 排班編輯。
+  /// 兩者共用底部區同一格高度，原地切換，無彈出／彈入動畫。
+  bool _pickerMode = false;
   final GlobalKey<ShiftPickerPanelState> _panelKey =
       GlobalKey<ShiftPickerPanelState>();
 
   /// 海平線帶 Key（導入排更時觸發浪湧，shader 與 2D fallback 共用同一個入口）
   final GlobalKey<OceanBandState> _oceanKey = GlobalKey<OceanBandState>();
-
-  /// 詳情排班欄展開狀態（預設隱藏，點選日期彈出，支援下划隱去）
-  bool _showDetailPanel = false;
 
   /// 備註便利貼 inline 編輯狀態
   bool _editingRemark = false;
@@ -283,9 +282,6 @@ class _CalendarScreenState extends State<CalendarScreen>
       _currentPage = page;
       _activeYear = m.year;
       _activeMonth = m.month;
-      if (_selectedDate.year != m.year || _selectedDate.month != m.month) {
-        _showDetailPanel = false;
-      }
     });
   }
 
@@ -297,7 +293,6 @@ class _CalendarScreenState extends State<CalendarScreen>
       _activeYear = now.year;
       _activeMonth = now.month;
       _currentPage = targetPage;
-      _showDetailPanel = true;
     });
     if (_pageController.hasClients) {
       final curPage = _pageController.page?.round() ?? _currentPage;
@@ -326,13 +321,18 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  /// 開排班面板：取代詳情板，擺喺日曆下方
-  void _openPanel() {
+  /// 底部區切換去排班編輯：原地換內容，高度唔變、無彈出動畫。
+  void _openPicker() {
     if (_editingRemark) {
       _saveInlineRemark();
     }
     ScaffoldMessenger.of(context).clearSnackBars();
-    setState(() => _schedPanelOpen = true);
+    setState(() => _pickerMode = true);
+  }
+
+  /// 排班編輯完成／返回：底部區換返排班詳情，同樣原地切換。
+  void _closePicker() {
+    setState(() => _pickerMode = false);
   }
 
   /// 彈出年月選擇器（快速跳轉指定月份）
@@ -514,77 +514,65 @@ class _CalendarScreenState extends State<CalendarScreen>
           ),
         ],
       ),
+      // 三區固定：① 頂部海洋線 ② 中間日曆 ③ 底部排班詳情。
+      // 高度全部由 CalendarLayout 一次算定，切換排班編輯只係原地換內容，無彈出彈入。
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // 月曆網格硬需求（_monthGrid）：Padding 8 + 星期列 ≈24 + SizedBox 4 + 6 × 75 = 486
-          const double kGridMinHeight = 486.0;
-          // 底部導航欄留白
-          const double kNavReserved = 72.0;
-
-          final double avail = constraints.maxHeight - kNavReserved;
-          final double slack = avail - kGridMinHeight;
-          final double bandH = slack.clamp(0.0, kOceanBandHeight);
-          final bool panelOpen = _schedPanelOpen || _showDetailPanel;
-          // 低於 48px 時天空只剩 21px，連半徑 11 的太陽都放唔落，不如唔顯示。
-          final bool showBand = bandH >= 48.0 && !panelOpen;
+          final layout = CalendarLayout.compute(constraints.maxHeight);
 
           return Column(
             children: [
-              Expanded(
-                child: ScrollConfiguration(
-                  behavior: const _CalendarScrollBehavior(),
-                  child: PageView.builder(
-                    scrollDirection: Axis.horizontal, // 左右翻月
-                    physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
-                    controller: _pageController,
-                    onPageChanged: _onPageChanged,
-                    itemBuilder: (_, page) {
-                      final m = _monthForPage(page);
-                      // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
-                      return RepaintBoundary(
-                        key: ValueKey('month_${m.year}_${m.month}'),
-                        child: _monthGrid(t, m.year, m.month),
-                      );
-                    },
+              // ① 頂部海洋線
+              OceanBand(
+                key: _oceanKey,
+                visible: layout.bandHeight >= 48.0,
+                height: layout.bandHeight,
+              ),
+              // ② 中間日曆：高度寫死，格高由佈局算式實算（理想 75，唔夠位先縮）
+              SizedBox(
+                height: layout.gridHeight,
+                child: ClipRect(
+                  child: ScrollConfiguration(
+                    behavior: const _CalendarScrollBehavior(),
+                    child: PageView.builder(
+                      scrollDirection: Axis.horizontal, // 左右翻月
+                      physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
+                      controller: _pageController,
+                      onPageChanged: _onPageChanged,
+                      itemBuilder: (_, page) {
+                        final m = _monthForPage(page);
+                        // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
+                        return RepaintBoundary(
+                          key: ValueKey('month_${m.year}_${m.month}'),
+                          child: _monthGrid(
+                            t,
+                            m.year,
+                            m.month,
+                            cellHeight: layout.cellHeight,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
-              // 96px 海平線帶（真光影線步進；面板打開時 200ms 收合至 0 並淡出）
-              OceanBand(
-                key: _oceanKey,
-                visible: showBand,
-                height: bandH,
+              // ③ 底部排班詳情／排班編輯：同一格高度，原地切換
+              SizedBox(
+                height: layout.detailHeight,
+                child: ClipRect(
+                  child: _pickerMode
+                      ? ShiftPickerPanel(
+                          key: _panelKey,
+                          initialDate: _selectedDate,
+                          store: widget.store,
+                          alarms: widget.alarms,
+                          onClose: _closePicker,
+                        )
+                      : _detailPanel(t),
+                ),
               ),
-              // 排班面板或精簡詳情板（沒選日期時隱去，選日期時從下彈出，支援下划隱去）
-              AnimatedSize(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.bottomCenter,
-                child: _schedPanelOpen
-                    ? ShiftPickerPanel(
-                        key: _panelKey,
-                        initialDate: _selectedDate,
-                        store: widget.store,
-                        alarms: widget.alarms,
-                        onClose: () => setState(() => _schedPanelOpen = false),
-                      )
-                    : (_showDetailPanel
-                        ? AnimatedSlide(
-                            offset: _showDetailPanel
-                                ? Offset.zero
-                                : const Offset(0, 1.2),
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                            child: AnimatedOpacity(
-                              opacity: _showDetailPanel ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 220),
-                              child: _detailPanel(t),
-                            ),
-                          )
-                        : const SizedBox.shrink()),
-              ),
-              // 預留底部半透明導航欄高度，使詳情卡片浮於導航欄上方且海浪自然流經底部
-              const SizedBox(height: 72),
+              // ④ 預留底部半透明導航欄高度（HomeScreen 用 extendBody，body 伸到欄底）
+              SizedBox(height: layout.navHeight),
             ],
           );
         },
@@ -593,7 +581,15 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   /// 一個月固定 6 週（42 格）標準網格：四周留白，破浪光潮推進時整個月曆容器如甲板般 3D 俯仰
-  Widget _monthGrid(ShiftTokens t, int year, int month) {
+  ///
+  /// [cellHeight] 由 [CalendarLayout] 實算（理想 75，空間唔夠先縮細），
+  /// 唔再寫死 75 —— 寫死會令三區固定佈局喺細機溢出。
+  Widget _monthGrid(
+    ShiftTokens t,
+    int year,
+    int month, {
+    required double cellHeight,
+  }) {
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
     final firstSunday = DateTime(year, month, 1 - firstWeekday);
@@ -612,7 +608,7 @@ class _CalendarScreenState extends State<CalendarScreen>
               const SizedBox(height: 4),
               for (int w = 0; w < weekCount; w++)
                 SizedBox(
-                  height: 75.0,
+                  height: cellHeight,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 1.5),
                     child: Row(
@@ -983,21 +979,13 @@ class _CalendarScreenState extends State<CalendarScreen>
         if (_editingRemark) {
           _saveInlineRemark();
         }
-        if (_schedPanelOpen) {
-          _panelKey.currentState?.goToDate(date);
-          setState(() {
-            _selectedDate = DateTime(date.year, date.month, date.day);
-            _showDetailPanel = true;
-          });
-          if (!isCurrentMonth) {
-            _jumpToYearMonth(date.year, date.month);
-          }
-          return;
-        }
         setState(() {
           _selectedDate = DateTime(date.year, date.month, date.day);
-          _showDetailPanel = true;
         });
+        // 底部區處於排班編輯時，直接將編輯器跳去呢一日（原地換內容，無動畫）
+        if (_pickerMode) {
+          _panelKey.currentState?.goToDate(date);
+        }
         if (!isCurrentMonth) {
           _jumpToYearMonth(date.year, date.month);
         }
@@ -1006,7 +994,8 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  /// 日曆下方精簡詳情面板（自適應緊湊高度，零多餘空白，支援下划或點擊隱去）
+  /// 底部區（固定第三區）：所選日期嘅排班詳情。
+  /// 常駐顯示、高度由 [CalendarLayout] 定死，無彈出、無下划隱去。
   Widget _detailPanel(ShiftTokens t) {
     final key = ShiftStore.ymd(_selectedDate);
     final assignment = widget.store.assignments[key];
@@ -1019,53 +1008,33 @@ class _CalendarScreenState extends State<CalendarScreen>
     final weekdayName = weekdays[_selectedDate.weekday % 7];
     final slot = def != null ? t.slotForTime(def.startTime) : null;
 
-    return GestureDetector(
-      onVerticalDragUpdate: (details) {
-        if ((details.primaryDelta ?? 0) > 4) {
-          setState(() => _showDetailPanel = false);
-        }
-      },
-      onVerticalDragEnd: (details) {
-        if ((details.primaryVelocity ?? 0) > 80) {
-          setState(() => _showDetailPanel = false);
-        }
-      },
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.95),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 14,
-              offset: const Offset(0, 3),
-            ),
-          ],
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.95),
+          width: 1.2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      // 永久防線：底部區高度固定，若用戶開咗大字級、或者日後加多一行令內容變高，
+      // 呢度會變成可捲動，而唔會 RenderFlex 溢出彈黃黑間條。
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 下划隱去手柄指示條（Drag handle pill）
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            // 第一行：日期、星期、節日標籤 與 右側收起下箭頭
+            // 第一行：日期、星期、節日標籤
             Row(
               children: [
                 Text(
@@ -1104,19 +1073,6 @@ class _CalendarScreenState extends State<CalendarScreen>
                     ),
                   ),
                 ],
-                const Spacer(),
-                InkWell(
-                  onTap: () => setState(() => _showDetailPanel = false),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2.0),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 22,
-                      color: t.neutralFg2,
-                    ),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -1185,7 +1141,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
-                  onPressed: _openPanel,
+                  onPressed: _openPicker,
                   style: FilledButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

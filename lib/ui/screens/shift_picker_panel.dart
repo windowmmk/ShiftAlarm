@@ -247,8 +247,9 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 126,
+        // v3.6：高度改由外層底部區（`CalendarLayout.detailHeight`）決定，
+        // 唔再寫死 126 —— 寫死會喺三鍵導航機（SafeArea 墊高）被裁掉完成掣。
+        child: SizedBox.expand(
           child: Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 8, left: 10, right: 10),
             child: Column(
