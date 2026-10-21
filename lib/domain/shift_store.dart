@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'shift_time.dart';
 
 /// 縮寫單位：全形字＝2，半形字＝1
 int abbrUnits(String s) {
@@ -200,16 +201,11 @@ class ShiftDef {
 
   /// 班次時長（分鐘）：收工早過開工視為跨日（如 18:00–00:00 → 360）。
   /// startTime == endTime 屬無效（UI 層唔畀存），呢度回 0。
-  static int durationMinutes(String startTime, String endTime) {
-    int mins(String s) {
-      final p = s.split(':');
-      final h = int.tryParse(p.isNotEmpty ? p[0].trim() : '') ?? 0;
-      final m = p.length > 1 ? int.tryParse(p[1].trim()) ?? 0 : 0;
-      return h * 60 + m;
-    }
-
-    return (mins(endTime) - mins(startTime)) % 1440;
-  }
+  ///
+  /// v3.5.0 起委派 [shiftDurationMinutes]（`shift_time.dart`），全專案只剩一份
+  /// 時長規則；本方法保留為公開 API（`clockin_test`、UI 都在用），行為不變。
+  static int durationMinutes(String startTime, String endTime) =>
+      shiftDurationMinutes(startTime, endTime);
 
   /// 確保固定打卡鬧鐘存在且欄位正確。
   /// 只修 label／offsetMinutes／notificationOnly，用戶嘅 enabled 開關原樣保留；
