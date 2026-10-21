@@ -2,6 +2,13 @@
 /// UI 層（stats_screen.dart）只負責由 ShiftStore 組裝 [ShiftRecord]＋畫圖。
 library;
 
+import 'shift_time.dart';
+
+/// 轉出時長計算，令既有 `import '../domain/stats.dart';` 的呼叫點
+/// （`stats_screen.dart`、`stats_test.dart`）不必改 import。
+/// 實作只有一份：`shift_time.dart`。
+export 'shift_time.dart' show shiftDurationMinutes;
+
 /// 統計區間（按顯示順序）
 enum StatsRange {
   thisMonth, // 本月：當月1號 → 今日
@@ -69,46 +76,6 @@ int slotIndexForHour(int hour) {
 int slotIndexForTime(String hhmm) {
   final hour = int.tryParse(hhmm.split(':').firstOrNull ?? '') ?? 0;
   return slotIndexForHour(hour.clamp(0, 23));
-}
-
-/// 嚴格 "HH:mm" 解析：必須剛好兩段、兩位數字、h 0–23、m 0–59。
-/// 不合格式回 null，**永不拋異常**。
-///
-/// 刻意比 `ShiftDef.durationMinutes`（`shift_store.dart`，寬鬆版）嚴格：
-/// 寬鬆版用 `int.tryParse` + `% 1440`，'09:60' 會被讀成 10:00、
-/// '24:00' 會被讀成 0:00。那套寬鬆規則用於「由爛設定推一個盡量可用的
-/// 收工打卡 offset」，可以接受；但統計頁要把分鐘數顯示給使用者看，
-/// 寧可顯示 0 也不可以顯示一個憑空捏造的精確數字。
-final RegExp _hhmmRe = RegExp(r'^([01][0-9]|2[0-3]):([0-5][0-9])$');
-
-/// 'HH:mm' → 當日分鐘數（0–1439）；格式非法回 null（不拋異常）
-int? _parseHm(String raw) {
-  final m = _hhmmRe.firstMatch(raw.trim());
-  if (m == null) return null;
-  final h = int.parse(m.group(1)!);
-  final min = int.parse(m.group(2)!);
-  return h * 60 + min;
-}
-
-/// 班次時長（分鐘）。支援跨午夜（22:00→06:00 = 480）；設定非法回 0。
-///
-/// 規則：
-/// - `e > s` → `e − s`
-/// - `e < s` → `e + 1440 − s`（跨午夜）
-/// - `e == s` → **0**
-/// - 任一解析失敗 → 0
-///
-/// 關於 `e == s` 的取捨：同起同訖有兩種可能解讀——「未設定」或「24 小時班」。
-/// 這裡刻意取「未設定 → 0」，不放大成 1440。理由：24 小時班在排班 App 中
-/// 幾乎不存在，而「使用者清空了結束時間」是常見的中間狀態；若放大成 24 小時，
-/// 統計頁會在設定尚未填完的瞬間顯示一個暴增的假工時，比顯示 0 更誤導。
-int shiftDurationMinutes(String startTime, String endTime) {
-  final s = _parseHm(startTime);
-  final e = _parseHm(endTime);
-  if (s == null || e == null) return 0;
-  if (e > s) return e - s;
-  if (e < s) return e + 1440 - s;
-  return 0;
 }
 
 /// 區間內有排班嘅一日

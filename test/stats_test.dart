@@ -224,12 +224,20 @@ void main() {
     });
 
     test('非法輸入一律回 0，不拋異常', () {
-      for (final bad in ['abc', '9', '24:00', '09:60', '09:0', '']) {
+      for (final bad in ['abc', '24:00', '09:60', '', ':30']) {
         expect(shiftDurationMinutes(bad, '17:30'), 0, reason: 'start=$bad');
         expect(shiftDurationMinutes('09:00', bad), 0, reason: 'end=$bad');
       }
       expect(shiftDurationMinutes('', ''), 0);
-      expect(shiftDurationMinutes('09:00:00', '17:30'), 0);
+    });
+
+    test('無補零寫法照收：「9」視為 09:00，與既有打卡鬧鐘語意一致', () {
+      // 這條寬容度必須保留：同一支函數也是打卡鬧鐘 dk_out offset 的來源，
+      // 把 '9' 打成 0 會令收工鐘在開工時刻響。
+      expect(shiftDurationMinutes('9', '17:30'), 510);
+      expect(shiftDurationMinutes('09:0', '17:30'), 510);
+      // 多於兩段沿用舊版行為：只取前兩段
+      expect(shiftDurationMinutes('09:00:00', '17:30'), 510);
     });
   });
 
