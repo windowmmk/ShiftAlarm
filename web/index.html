@@ -18,7 +18,7 @@
 
   <title>ShiftAlarm 排班鬧鐘</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1976D2">
+  <meta name="theme-color" content="#EDF2F7">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <style>
     html, body {
@@ -27,31 +27,21 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #040914;
+      /* 與 App 的 kCalendarPageBg 一致，避免載入瞬間閃一下深色 */
+      background-color: #EDF2F7;
       touch-action: pan-x pan-y;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    #oceanBgCanvas {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      display: block;
-      z-index: 0;
-      pointer-events: none;
-    }
-    /* Ensure Flutter Web canvas pane stays transparent so 3D WebGL Ocean shines through */
+    /* Flutter 畫布底色同 App 一致（v3.5 起海洋由 shaders/ocean.frag 繪製，唔再需要透明玻璃層） */
     flutter-view, flt-glass-pane {
-      background-color: transparent !important;
+      background-color: #EDF2F7 !important;
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #040914;">
-  <canvas id="oceanBgCanvas"></canvas>
-  <script src="ocean_shader.js"></script>
+<body style="margin: 0; padding: 0; background-color: #EDF2F7;">
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
