@@ -1,0 +1,187 @@
+%% ShiftAlarm v3.5.0 增量類別圖（Dart + Kotlin）
+%% 來源：docs/v3.5/ARCH.md §3.1
+classDiagram
+    direction LR
+
+    class AlarmService {
+        <<static const>>
+        +int preAlertLeadMinutes = 60
+        +int preAlertIdOffset = 900000
+        +int alarmBaseId(ymd) int
+        +int alarmIdFor(ymd, index) int
+        +int preAlertIdFor(ymd, index) int
+        +String preAlertTitle(shiftName, label) String
+        +String preAlertBody(alarmBody) String
+        +String formatAlarmBody(...) String
+        -_cancelAllFor(ymd) Future
+        +onAssigned(ymd, def, accentBg, accentFg, note) Future
+        +onUnassigned(ymd) Future
+        +syncOnLaunch(store, accentFor) Future
+    }
+
+    class AlarmBridge {
+        +schedule(...) Future
+        +cancel(id) Future
+        +scheduleGentle(...) Future
+        +cancelGentle(id) Future
+        +schedulePreAlert(PreAlertSchedule s) Future
+        +cancelPreAlert(int alarmId) Future
+        +rescheduleAll(full, gentle, preAlerts) Future
+    }
+
+    class PreAlertSchedule {
+        +int alarmId
+        +int triggerAtMillis
+        +String title
+        +String body
+        +String date
+        +String shiftName
+        +String startTime
+        +String note
+        +toMap() Map
+    }
+
+    class AlarmSchedule {
+        +int id
+        +int triggerAtMillis
+        +String title
+        +String body
+        +int accentBg
+        +int accentFg
+        +String shiftName
+        +String startTime
+        +String date
+        +String note
+    }
+
+    class GentleAlarmSchedule {
+        +int id
+        +int triggerAtMillis
+        +String title
+        +String body
+    }
+
+    class ShiftRecord {
+        +String ymd
+        +String shiftId
+        +String venue
+        +int slotIndex
+        +int durationMinutes
+        +bool durationIsFallback
+    }
+
+    class StatsResult {
+        +DateRange range
+        +int workDays
+        +List~int~ slotDays
+        +List~MapEntry~ venueCounts
+        +int totalMinutes
+        +int fallbackDays
+        +int workHours
+        +int averageMinutesPerShift
+        +String workDurationText
+        +String averagePerShiftText
+    }
+
+    class OceanBand {
+        +double kHeight = 96
+        +double kHorizontalInset = 8
+        +double kRadius = 16
+        +bool visible
+        +double? heightOverride
+        +GlobalKey oceanKey
+        +triggerSurge() void
+    }
+
+    class OceanShaderController {
+        <<singleton>>
+        +bool isReady
+        +String? failReason
+        +int totalFloats = 30
+        +Future~void~ load()$
+        +FragmentShader? acquireShader()
+        +void bindUniforms(shader, preset, size, elapsed, surge, waveProgress)
+    }
+
+    class OceanShaderPreset {
+        +double sunElev
+        +double sunAzimuth
+        +double windSpeed
+        +double swellHs
+        +double choppiness
+        +double turbidity
+        +double foam
+        +double haze
+        +double clouds
+        +double exposure
+        +double bloom
+        +double nightGlow
+        +forMood(mood)$ OceanShaderPreset
+    }
+
+    class OceanAtmosphereWidget {
+        +OceanAtmoState targetState
+        +Widget child
+        +bool compact96
+        +triggerSurge() void
+    }
+
+    class OceanAtmoState {
+        +double sunElevation
+        +double sunAzimuth
+        +double nightFactor
+        +double nightGlow
+        +double waveAmp
+        +double waveSpeed
+        +String mood
+        +String desc
+        +fromCurrentTime(time) OceanAtmoState
+        +fromStartTime(hhmm) OceanAtmoState
+        +lerp(a, b, t) OceanAtmoState
+    }
+
+    class _OceanPainter {
+        +double time
+        +OceanAtmoState atmo
+        +double surgeMultiplier
+        +double surgeProgress
+        +bool compact96
+        +paint(canvas, size) void
+        -_paintCompactSky(canvas, size) void
+        -_paintCompactSunOrMoon(canvas, size) void
+        -_paintCompactWater(canvas, size, horizonY) void
+    }
+
+    class PreAlertScheduler {
+        <<Kotlin object>>
+        +int PRE_ALERT_ID_OFFSET = 900000
+        +int LEAD_MINUTES = 60
+        +int preAlertId(alarmId) int
+        +schedule(ctx, alarmId, triggerAtMillis, title, body, date, shiftName, startTime, note) void
+        +cancel(ctx, alarmId) void
+        +cancelNotification(ctx, alarmId) void
+        +rescheduleAll(ctx, specs) void
+        +prune(ctx, keepIds) void
+    }
+
+    class PreAlertReceiver {
+        <<Kotlin BroadcastReceiver>>
+        +String ACTION_DISMISS
+        +String CHANNEL_ID = pre_alert_channel
+        +ensureChannel(ctx) void
+        +onReceive(ctx, intent) void
+    }
+
+    AlarmService --> AlarmBridge : 呼叫
+    AlarmService ..> PreAlertSchedule : 建立
+    AlarmBridge ..> PreAlertSchedule : 序列化
+    AlarmBridge ..> AlarmSchedule : 序列化
+    AlarmBridge ..> GentleAlarmSchedule : 序列化
+    StatsResult ..> ShiftRecord : 聚合
+    OceanBand ..> OceanAtmosphereWidget : fallback 時內含
+    OceanBand ..> OceanShaderController : 取 shader
+    OceanBand ..> OceanShaderPreset : 由 mood 查表
+    OceanShaderController ..> OceanShaderPreset : 讀參數餵 uniform
+    OceanAtmosphereWidget ..> _OceanPainter : 繪製
+    _OceanPainter ..> OceanAtmoState : 讀取
+    PreAlertReceiver ..> PreAlertScheduler : 共用 id 公式

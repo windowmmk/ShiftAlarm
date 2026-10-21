@@ -1,0 +1,189 @@
+%% ShiftAlarm v3.5.0 關鍵呼叫時序（三條）
+%% 來源：docs/v3.5/ARCH.md §4
+
+%% ─────────────────────────────────────────────
+%% 4.1 排更 → 預告彈出 → 鬧鐘響 → 預告消失
+%% ─────────────────────────────────────────────
+sequenceDiagram
+    autonumber
+    actor U as 使用者
+    participant P as ShiftPickerPanel
+    participant S as AlarmService
+    participant B as AlarmBridge
+    participant MA as MainActivity
+    participant PS as PreAlertScheduler
+    participant AM as AlarmManager
+    participant PAR as PreAlertReceiver
+    participant NM as NotificationManager
+    participant AR as AlarmReceiver
+
+    U->>P: 揀「早更 06:00」＋開工打卡（準時）
+    P->>S: onAssigned("2026-10-22", def, accentBg, accentFg, note)
+    S->>S: _cancelAllFor("2026-10-22")
+    loop index 0..9（含舊制 base）
+        S->>B: cancel(id) / cancelGentle(id) / cancelPreAlert(id)
+        B->>MA: invokeMethod("cancel"/"cancelGentle"/"cancelPreAlert")
+        MA->>PS: AlarmScheduler.cancel / cancelGentle / PreAlertScheduler.cancel
+        PS->>AM: am.cancel(pi)
+        PS->>NM: nm.cancel(id + 900000)
+    end
+    loop 每個 enabled 鬧鐘（兩條通道都排）
+        S->>B: schedule(id, triggerAt=09:00, title, body, …)
+        S->>B: schedulePreAlert(alarmId=id, triggerAtMillis=09:00, title="1 小時後：早更 開工打卡", body="仲有 1 小時響 · …")
+        B->>MA: invokeMethod("schedulePreAlert")
+        MA->>PS: schedule(alarmId, 09:00, …)
+        PS->>PS: leadAt = 09:00 − 60min = 08:00；08:00 > now
+        PS->>AM: setExactAndAllowWhileIdle(08:00, pi@id+900000)
+    end
+    Note over AM: ── 時間到 08:00 ──
+    AM->>PAR: onReceive(id+900000, title, body)
+    PAR->>PAR: ensureChannel()
+    PAR->>NM: notify(id+900000, ongoing + 「知道了」action)
+    NM-->>U: 通知欄掛住「1 小時後：早更 開工打卡」
+    Note over NM: ── 時間到 09:00 ──
+    AM->>AR: onReceive(id)
+    AR->>PS: cancelNotification(context, id)
+    PS->>NM: nm.cancel(id + 900000)
+    AR->>AR: 起 AlarmSoundService / 全屏
+    Note over U,NM: 預告自動消失，鬧鐘接管
+    U->>NM: （或提早按「知道了」）
+    NM->>PAR: ACTION_DISMISS
+    PAR->>NM: nm.cancel(id + 900000)
+    Note over AR: 原鬧鐘 PendingIntent 不受影響，09:00 照響
+
+%% ─────────────────────────────────────────────
+%% 4.2 App 啟動 syncOnLaunch 全量重排
+%% ─────────────────────────────────────────────
+sequenceDiagram
+    autonumber
+    participant M as main()
+    participant S as AlarmService
+    participant ST as ShiftStore
+    participant B as AlarmBridge
+    participant MA as MainActivity
+    participant PS as PreAlertScheduler
+    participant AM as AlarmManager
+
+    M->>ST: await store.load()
+    M->>S: syncOnLaunch(store)
+    S->>S: full=[], gentle=[], preAlerts=[]
+    loop store.assignments 每一日
+        S->>B: cancel(base)  // 清舊制幽靈
+        loop index 0..9 每個 enabled 鬧鐘
+            S->>S: t = triggerAtFor(ymd, def, alarm)；t==null → skip
+            alt notificationOnly
+                S->>S: gentle.add(GentleAlarmSchedule(...))
+            else 全屏
+                S->>S: full.add(AlarmSchedule(...))
+            end
+            S->>S: preAlerts.add(PreAlertSchedule(alarmId, t, preAlertTitle, preAlertBody))
+        end
+    end
+    alt full/gentle/preAlerts 全部為空
+        S-->>M: 直接返回，不呼叫原生
+    else 有嘢排
+        S->>B: rescheduleAll(full, gentle, preAlerts)
+        B->>MA: invokeMethod("rescheduleAll", {alarms, gentleAlarms, preAlerts})
+        MA->>MA: for a in alarms → AlarmScheduler.schedule(...)
+        MA->>MA: for a in gentleAlarms → AlarmScheduler.scheduleGentle(...)
+        MA->>PS: rescheduleAll(preAlerts)
+        loop 每條預告
+            PS->>PS: leadAt = triggerAt − 60min
+            alt leadAt <= now
+                PS->>PS: cancelNotification(alarmId)（清殘留），不排
+            else
+                PS->>AM: setExactAndAllowWhileIdle(leadAt, pi@id+900000)
+            end
+        end
+        PS->>PS: keep = {triggerAt > now 的 preAlertId}
+        PS->>PS: prune(keep)  // 取消註冊表內不在 keep 的舊預告
+    end
+    M->>M: runApp(...)
+
+%% ─────────────────────────────────────────────
+%% 4.3 開機 BootReceiver 重排
+%% ─────────────────────────────────────────────
+sequenceDiagram
+    autonumber
+    participant OS as Android
+    participant BR as BootReceiver
+    participant SP as SharedPreferences
+    participant AS as AlarmScheduler
+    participant PS as PreAlertScheduler
+    participant AM as AlarmManager
+    participant NM as NotificationManager
+
+    OS->>BR: BOOT_COMPLETED
+    BR->>BR: Thread { reschedule(context) }
+    BR->>SP: getString("flutter.shift_defs") / ("flutter.assignments")
+    SP-->>BR: JSON 字串（舊格式兼容讀取）
+    BR->>BR: keepIds = mutableSetOf()
+    loop 每個 assignment（ymd）
+        BR->>BR: baseId = ymd.replace("-","").toInt()
+        loop 每個 enabled alarm（index < 10）
+            BR->>BR: triggerMillis = triggerMillisWithOffset(ymd, startTime, offset)
+            alt triggerMillis <= now → skip
+            else
+                BR->>AS: schedule / scheduleGentle(id, triggerMillis, title, body)
+                AS->>AM: setAlarmClock(triggerMillis, pi)
+                BR->>BR: keepIds += PS.preAlertId(id)
+                BR->>PS: schedule(id, triggerMillis, preAlertTitle(...), preAlertBody(...))
+                alt leadAt <= now
+                    PS->>NM: nm.cancel(id + 900000)
+                else
+                    PS->>AM: setExactAndAllowWhileIdle(leadAt, pi@id+900000)
+                end
+            end
+        end
+    end
+    BR->>PS: prune(keepIds)  // 開機前殘留（例如停用鬧鐘後關機）在此清走
+
+%% ─────────────────────────────────────────────
+%% 4.4 海平線帶：shader 載入、繪製與 fallback
+%% ─────────────────────────────────────────────
+sequenceDiagram
+    autonumber
+    participant MAIN as main.dart
+    participant C as CalendarScreen
+    participant OB as OceanBand
+    participant SC as OceanShaderController
+    participant FP as FragmentProgram
+    participant FS as FragmentShader
+    participant P as _OceanShaderPainter
+    participant FB as _OceanPainter（fallback）
+
+    MAIN->>SC: debugPrint('[OCEAN] renderer=pending')
+    MAIN->>SC: load()  // 不 await，不阻塞啟動
+    C->>OB: build(OceanBand(visible, heightOverride))
+    OB->>OB: initState：_atmo = fromCurrentTime()
+    OB->>OB: Timer.periodic(60s, _pollMood)
+    OB->>SC: load()  // 首次才真正載入，之後立即返回
+    alt 首次載入
+        SC->>FP: await FragmentProgram.fromAsset('shaders/ocean.frag')
+        alt 成功
+            FP-->>SC: program
+            SC->>SC: _program = program; isReady = true
+        else 拋異常（舊機／後端不支援／編譯失敗）
+            FP-->>SC: throw
+            SC->>SC: failReason = 'asset-missing'|'unsupported'|'compile-error'; isReady = false（永不 rethrow）
+        end
+        SC-->>OB: notifyListeners()
+        SC-->>MAIN: debugPrint('[OCEAN] renderer=shader|fallback reason=…')
+    end
+    OB->>OB: setState → 重建
+
+    alt SC.isReady == true
+        OB->>SC: acquireShader()
+        OB->>P: CustomPaint(painter: _OceanShaderPainter(shader, preset))
+        loop 每 33ms（30fps）
+            P->>SC: bindUniforms(shader, preset, size, _elapsed, surge, waveProgress)
+            SC->>FS: setFloat(_U.*, …)  // 30 格，見 ARCH §9.2
+            P->>P: canvas.drawRect(rect, Paint()..shader = FS)
+        end
+    else SC.isReady == false（fallback）
+        OB->>FB: OceanAtmosphereWidget(compact96: true)
+        Note over FB: v3.4.5 的 2D CustomPainter，96px 參數<br/>功能不減、只是沒有光線步進
+    end
+
+    OB->>OB: dispose：_timer.cancel()、shader.dispose()
+    Note over SC: FragmentProgram 是全域單例，app 生命週期內不釋放
