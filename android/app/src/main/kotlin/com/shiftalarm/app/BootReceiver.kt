@@ -39,6 +39,24 @@ class BootReceiver : BroadcastReceiver() {
     )
 
     private fun reschedule(context: Context) {
+        val keepIds = mutableSetOf<Int>()
+        try {
+            scheduleAll(context, keepIds)
+        } finally {
+            // 重排完之後對帳：唔再存在嘅預告喺呢度清走
+            // （例如使用者停用咗個鬧鐘之後關機，開機時就唔會再排佢）。
+            // 注意 keepIds 收嘅係「鬧鐘未響」嘅 id，唔係「leadAt 未到」，
+            // 否則會誤殺已經彈出、正掛喺通知欄嘅預告。
+            PreAlertScheduler.prune(context, keepIds)
+        }
+    }
+
+    /**
+     * 逐個 assignment 重排鬧鐘同對應預告；[keepIds] 收集所有仲未響嘅預告 id。
+     * 預告嘅時間同文案全部重用本檔已有嘅 [triggerMillisWithOffset] 與
+     * [formatAlarmBody]，唔准另寫第三份。
+     */
+    private fun scheduleAll(context: Context, keepIds: MutableSet<Int>) {
         val prefs = context.getSharedPreferences(
             "FlutterSharedPreferences", Context.MODE_PRIVATE
         )
@@ -128,9 +146,29 @@ class BootReceiver : BroadcastReceiver() {
                         note
                     )
                 }
+                // 響鬧預告（第三條通道）：全屏／只通知兩條都要排
+                keepIds.add(PreAlertScheduler.preAlertId(id))
+                PreAlertScheduler.schedule(
+                    context,
+                    id,
+                    triggerMillis,
+                    preAlertTitle(name, alarm.label),
+                    preAlertBody(body),
+                    ymd,
+                    name,
+                    startTime,
+                    note
+                )
             }
         }
     }
+
+    /** 預告標題：「1 小時後：早更 開工打卡」（同 Dart AlarmService.preAlertTitle 一致） */
+    private fun preAlertTitle(shiftName: String, label: String): String =
+        "1 小時後：$shiftName $label"
+
+    /** 預告內文：「仲有 1 小時響 · <formatAlarmBody 輸出>」（同 Dart preAlertBody 一致） */
+    private fun preAlertBody(alarmBody: String): String = "仲有 1 小時響 · $alarmBody"
 
     private fun formatAlarmBody(
         startTime: String,

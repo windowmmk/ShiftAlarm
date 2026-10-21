@@ -29,6 +29,58 @@ class AlarmService {
   /// 新制鬧鐘 id
   static int alarmIdFor(String ymd, int index) => alarmBaseId(ymd) * 10 + index;
 
+  /// 響鬧預告提前量（分鐘）。固定 60，不做可配置。
+  /// ⚠️ 必須與 Kotlin `PreAlertScheduler.LEAD_MINUTES` 保持一致。
+  ///
+  /// 放喺 domain 唔放 config.dart：config 係「App 身分」（版本／開源旗標），
+  /// 鬧鐘業務常數屬於 domain。
+  ///
+  /// Dart 側**不用**這個常數做判斷（`leadAt <= now` 只在 Kotlin 判斷一處），
+  /// 它只用於文件、測試與未來若要做 Dart 端預檢。
+  static const int preAlertLeadMinutes = 60;
+
+  /// 預告 id 命名空間偏移。全鬧鐘／只通知用 id，預告用 id + 900000。
+  /// ⚠️ 必須與 Kotlin `PreAlertScheduler.PRE_ALERT_ID_OFFSET` 保持一致。
+  static const int preAlertIdOffset = 900000;
+
+  /// 預告 id（**僅供測試**斷言三組 id 互斥）。
+  /// 實際轉換由 Kotlin `PreAlertScheduler.preAlertId()` 做，權威轉換點在原生側。
+  static int preAlertIdFor(String ymd, int index) =>
+      alarmIdFor(ymd, index) + preAlertIdOffset;
+
+  /// 預告標題：「1 小時後：早更 開工打卡」
+  static String preAlertTitle(String shiftName, String label) =>
+      '1 小時後：$shiftName $label';
+
+  /// 預告內文：「仲有 1 小時響 · 開工時間到了，記得打卡！ (06:00)」
+  ///
+  /// 必須**串接** [formatAlarmBody] 的輸出，不准另寫一份文案邏輯；
+  /// 內文只可以出現一次「1 小時」。
+  static String preAlertBody(String alarmBody) => '仲有 1 小時響 · $alarmBody';
+
+  /// 組一條預告排程（唯一組裝點，[onAssigned] 與 [syncOnLaunch] 共用）。
+  /// `triggerAt` 係鬧鐘**觸發**時刻，不是預告時刻；−60 分鐘由原生側做。
+  static PreAlertSchedule preAlertFor({
+    required String ymd,
+    required ShiftDef def,
+    required ShiftAlarm alarm,
+    required int alarmId,
+    required DateTime triggerAt,
+    required String alarmBody,
+    String note = '',
+  }) {
+    return PreAlertSchedule(
+      alarmId: alarmId,
+      triggerAtMillis: triggerAt.millisecondsSinceEpoch,
+      title: preAlertTitle(def.name, alarm.label),
+      body: preAlertBody(alarmBody),
+      date: ymd,
+      shiftName: def.name,
+      startTime: def.startTime,
+      note: note,
+    );
+  }
+
   /// 開工一刻（本地時區）
   static DateTime? shiftStart(String ymd, String hhmm) {
     try {
@@ -113,7 +165,10 @@ class AlarmService {
     return '$hhmm${alarmDayLabel(d)}';
   }
 
-  /// 取消該日所有鬧鐘：舊制 id＋新制 10 個 index（全鬧鐘＋只通知）。
+  /// 取消該日所有鬧鐘：舊制 id＋新制 10 個 index（全鬧鐘＋只通知＋響鬧預告）。
+  ///
+  /// 呢度係**唯一**取消入口：轉更／刪更／重新指派全部經呢度。
+  /// 漏咗預告就等於留低幽靈通知喺通知欄，所以三條通道都要逐個 index 清。
   Future<void> _cancelAllFor(String ymd) async {
     final base = alarmBaseId(ymd);
     try {
@@ -126,6 +181,9 @@ class AlarmService {
       } catch (_) {}
       try {
         await bridge.cancelGentle(id);
+      } catch (_) {}
+      try {
+        await bridge.cancelPreAlert(id);
       } catch (_) {}
     }
   }
@@ -175,6 +233,20 @@ class AlarmService {
           note: note,
         );
       }
+      // 響鬧預告：全屏／只通知兩條通道都要排（使用者原話「每次鬧鐘響之前 1 小時」）。
+      // 獨立 try/catch：預告排唔到（例如原生側舊版未實作呢個 channel method）
+      // 絕對唔可以令真鬧鐘排程失敗。
+      try {
+        await bridge.schedulePreAlert(preAlertFor(
+          ymd: ymd,
+          def: def,
+          alarm: alarm,
+          alarmId: id,
+          triggerAt: t,
+          alarmBody: body,
+          note: note,
+        ));
+      } catch (_) {}
     }
   }
 
@@ -189,6 +261,7 @@ class AlarmService {
   }) async {
     final full = <AlarmSchedule>[];
     final gentle = <GentleAlarmSchedule>[];
+    final preAlerts = <PreAlertSchedule>[];
     for (final e in store.assignments.entries) {
       final def = store.defs[e.value.shiftId];
       if (def == null) continue;
@@ -233,10 +306,20 @@ class AlarmService {
             note: note,
           ));
         }
+        // 響鬧預告：兩條通道都排（同 onAssigned 一致）
+        preAlerts.add(preAlertFor(
+          ymd: e.key,
+          def: def,
+          alarm: alarm,
+          alarmId: id,
+          triggerAt: t,
+          alarmBody: body,
+          note: note,
+        ));
       }
     }
-    if (full.isNotEmpty || gentle.isNotEmpty) {
-      await bridge.rescheduleAll(full, gentle);
+    if (full.isNotEmpty || gentle.isNotEmpty || preAlerts.isNotEmpty) {
+      await bridge.rescheduleAll(full, gentle, preAlerts);
     }
   }
 }

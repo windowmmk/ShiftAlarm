@@ -59,6 +59,10 @@
         <receiver
             android:name=".GentleAlarmReceiver"
             android:exported="false" />
+        <!-- v3.5 響鬧預告：鬧鐘響之前 1 小時掛一條 ongoing 通知 -->
+        <receiver
+            android:name=".PreAlertReceiver"
+            android:exported="false" />
         <service
             android:name=".AlarmSoundService"
             android:exported="false"

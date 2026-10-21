@@ -87,42 +87,93 @@ class MainActivity : FlutterActivity() {
                     val alarms =
                         call.argument<List<Map<String, Any>>>("alarms")
                             ?: emptyList()
+                    // 每條各自 try/catch（T07-AC4）：使用者撤銷精確鬧鐘授權時
+                    // （Android 12+ SCHEDULE_EXACT_ALARM 未授權會拋 SecurityException），
+                    // 代價只可以係「冇預告」，絕不可以變成「鬧鐘全部唔響」。
                     for (a in alarms) {
-                        val id = (a["id"] as? Number)?.toInt() ?: continue
-                        val triggerAtMillis =
-                            (a["triggerAtMillis"] as? Number)?.toLong()
-                                ?: continue
-                        val title = a["title"] as? String ?: ""
-                        val body = a["body"] as? String ?: ""
-                        val accentBg = (a["accentBg"] as? Number)?.toInt()
-                            ?: AlarmScheduler.DEFAULT_ACCENT_BG
-                        val accentFg = (a["accentFg"] as? Number)?.toInt()
-                            ?: AlarmScheduler.DEFAULT_ACCENT_FG
-                        val shiftName = a["shiftName"] as? String ?: ""
-                        val startTime = a["startTime"] as? String ?: ""
-                        val date = a["date"] as? String ?: ""
-                        val note = a["note"] as? String ?: ""
-                        AlarmScheduler.schedule(
-                            this, id, triggerAtMillis, title, body,
-                            accentBg, accentFg, shiftName, startTime, date, note
-                        )
+                        try {
+                            val id = (a["id"] as? Number)?.toInt() ?: continue
+                            val triggerAtMillis =
+                                (a["triggerAtMillis"] as? Number)?.toLong()
+                                    ?: continue
+                            val title = a["title"] as? String ?: ""
+                            val body = a["body"] as? String ?: ""
+                            val accentBg = (a["accentBg"] as? Number)?.toInt()
+                                ?: AlarmScheduler.DEFAULT_ACCENT_BG
+                            val accentFg = (a["accentFg"] as? Number)?.toInt()
+                                ?: AlarmScheduler.DEFAULT_ACCENT_FG
+                            val shiftName = a["shiftName"] as? String ?: ""
+                            val startTime = a["startTime"] as? String ?: ""
+                            val date = a["date"] as? String ?: ""
+                            val note = a["note"] as? String ?: ""
+                            AlarmScheduler.schedule(
+                                this, id, triggerAtMillis, title, body,
+                                accentBg, accentFg, shiftName, startTime, date, note
+                            )
+                        } catch (_: Exception) {
+                            AlarmDebugLog.append(
+                                this, "[RESCHEDULE_FAIL] full"
+                            )
+                        }
                     }
                     @Suppress("UNCHECKED_CAST")
                     val gentleAlarms =
                         call.argument<List<Map<String, Any>>>("gentleAlarms")
                             ?: emptyList()
                     for (a in gentleAlarms) {
-                        val id = (a["id"] as? Number)?.toInt() ?: continue
-                        val triggerAtMillis =
-                            (a["triggerAtMillis"] as? Number)?.toLong()
-                                ?: continue
-                        val title = a["title"] as? String ?: ""
-                        val body = a["body"] as? String ?: ""
-                        AlarmScheduler.scheduleGentle(
-                            this, id, triggerAtMillis, title, body
-                        )
+                        try {
+                            val id = (a["id"] as? Number)?.toInt() ?: continue
+                            val triggerAtMillis =
+                                (a["triggerAtMillis"] as? Number)?.toLong()
+                                    ?: continue
+                            val title = a["title"] as? String ?: ""
+                            val body = a["body"] as? String ?: ""
+                            AlarmScheduler.scheduleGentle(
+                                this, id, triggerAtMillis, title, body
+                            )
+                        } catch (_: Exception) {
+                            AlarmDebugLog.append(
+                                this, "[RESCHEDULE_FAIL] gentle"
+                            )
+                        }
                     }
+                    // 預告要喺 full／gentle 兩個迴圈之後才排：
+                    // PreAlertScheduler 嘅 prune 要見到完整狀態才計得出 keep。
+                    @Suppress("UNCHECKED_CAST")
+                    val preAlerts =
+                        call.argument<List<Map<String, Any>>>("preAlerts")
+                            ?: emptyList()
+                    PreAlertScheduler.rescheduleAll(this, preAlerts)
                     result.success(null)
+                }
+                "schedulePreAlert" -> {
+                    val alarmId = call.argument<Int>("alarmId")
+                    val triggerAtMillis =
+                        (call.argument<Number>("triggerAtMillis"))?.toLong()
+                    val title = call.argument<String>("title") ?: ""
+                    val body = call.argument<String>("body") ?: ""
+                    val date = call.argument<String>("date") ?: ""
+                    val shiftName = call.argument<String>("shiftName") ?: ""
+                    val startTime = call.argument<String>("startTime") ?: ""
+                    val note = call.argument<String>("note") ?: ""
+                    if (alarmId == null || triggerAtMillis == null) {
+                        result.error("ARG", "missing alarmId/triggerAtMillis", null)
+                    } else {
+                        PreAlertScheduler.schedule(
+                            this, alarmId, triggerAtMillis, title, body,
+                            date, shiftName, startTime, note
+                        )
+                        result.success(null)
+                    }
+                }
+                "cancelPreAlert" -> {
+                    val alarmId = call.argument<Int>("alarmId")
+                    if (alarmId == null) {
+                        result.error("ARG", "missing alarmId", null)
+                    } else {
+                        PreAlertScheduler.cancel(this, alarmId)
+                        result.success(null)
+                    }
                 }
                 "canScheduleExactAlarms" -> {
                     val am =
