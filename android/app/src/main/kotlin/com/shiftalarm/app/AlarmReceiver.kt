@@ -38,6 +38,10 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val id = intent.getIntExtra(AlarmScheduler.EXTRA_ALARM_ID, 0)
+
+        // 鬧鐘真係響：先清走仲掛喺通知欄嘅預告（生命週期 ②）
+        PreAlertScheduler.cancelNotification(context, id)
+
         val title = intent.getStringExtra(AlarmScheduler.EXTRA_TITLE) ?: "排班鬧鐘"
         val body = intent.getStringExtra(AlarmScheduler.EXTRA_BODY) ?: ""
 

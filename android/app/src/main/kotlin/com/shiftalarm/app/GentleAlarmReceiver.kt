@@ -76,6 +76,9 @@ class GentleAlarmReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(AlarmScheduler.EXTRA_TITLE) ?: "提醒"
         val body = intent.getStringExtra(AlarmScheduler.EXTRA_BODY) ?: ""
 
+        // 只通知鬧鐘真係響：清走仲掛喺通知欄嘅預告（生命週期 ②）
+        PreAlertScheduler.cancelNotification(context, id)
+
         try {
             ensureChannel(context)
 

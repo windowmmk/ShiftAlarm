@@ -67,6 +67,51 @@ class GentleAlarmSchedule {
       };
 }
 
+/// 響鬧預告排程（第三條通道）。
+/// 每個 enabled 鬧鐘（全屏／只通知兩條都算）喺真正觸發前 1 小時，
+/// 由原生側掛一條 ongoing 通知喺狀態欄。
+///
+/// `alarmId` 係**原始鬧鐘 id**（未加偏移）：+900000 同 −60 分鐘都由原生側做，
+/// 令 id 公式只有一個權威轉換點（Kotlin `PreAlertScheduler.preAlertId`）。
+class PreAlertSchedule {
+  /// 原始鬧鐘 id（= alarmBaseId(ymd) * 10 + index）
+  final int alarmId;
+
+  /// 鬧鐘**觸發**時刻（不是預告時刻）
+  final int triggerAtMillis;
+
+  final String title;
+  final String body;
+
+  /// 以下四個只為 P2-2（點擊跳日期）預留，現階段原生側只寫入 log 不消費。
+  final String date;
+  final String shiftName;
+  final String startTime;
+  final String note;
+
+  const PreAlertSchedule({
+    required this.alarmId,
+    required this.triggerAtMillis,
+    required this.title,
+    required this.body,
+    this.date = '',
+    this.shiftName = '',
+    this.startTime = '',
+    this.note = '',
+  });
+
+  Map<String, Object?> toMap() => {
+        'alarmId': alarmId,
+        'triggerAtMillis': triggerAtMillis,
+        'title': title,
+        'body': body,
+        'date': date,
+        'shiftName': shiftName,
+        'startTime': startTime,
+        'note': note,
+      };
+}
+
 class AlarmBridge {
   static const MethodChannel _ch = MethodChannel('shift_alarm/alarm');
 
@@ -120,6 +165,14 @@ class AlarmBridge {
   Future<void> cancelGentle(int id) =>
       _ch.invokeMethod('cancelGentle', {'id': id});
 
+  /// 排一條響鬧預告（原生側負責 +900000 與 −60 分鐘）
+  Future<void> schedulePreAlert(PreAlertSchedule s) =>
+      _ch.invokeMethod('schedulePreAlert', s.toMap());
+
+  /// 取消響鬧預告（PendingIntent 與通知一併清）
+  Future<void> cancelPreAlert(int alarmId) =>
+      _ch.invokeMethod('cancelPreAlert', {'alarmId': alarmId});
+
   /// 原生 filesDir 絕對路徑（CrashApp.kt 寫 crash.log 嘅目錄）
   Future<String> getFilesDir() async {
     final r = await _ch.invokeMethod<String>('getFilesDir');
@@ -127,12 +180,19 @@ class AlarmBridge {
   }
 
   /// 重排全部（開機後／App 啟動時保險用）。Dart 傳完整列表，原生側逐個 schedule。
-  /// full 走全鬧鐘流程，gentle 走只通知流程。
+  /// full 走全鬧鐘流程，gentle 走只通知流程，preAlerts 走響鬧預告流程。
+  ///
+  /// 第三個參數為 required，令漏傳即刻編譯失敗（唔會靜默冇預告）。
+  /// 原生側處理完三個列表之後會按 `preAlerts` 對帳（prune），
+  /// 清走唔再存在嘅舊預告，避免幽靈通知。
   Future<void> rescheduleAll(
-          List<AlarmSchedule> full, List<GentleAlarmSchedule> gentle) =>
+          List<AlarmSchedule> full,
+          List<GentleAlarmSchedule> gentle,
+          List<PreAlertSchedule> preAlerts) =>
       _ch.invokeMethod('rescheduleAll', {
         'alarms': full.map((a) => a.toMap()).toList(),
         'gentleAlarms': gentle.map((a) => a.toMap()).toList(),
+        'preAlerts': preAlerts.map((p) => p.toMap()).toList(),
       });
 
   /// Android 12+ 是否已授權精確鬧鐘
