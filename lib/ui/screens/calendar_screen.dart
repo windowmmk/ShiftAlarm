@@ -11,7 +11,7 @@ import '../../domain/roster_io.dart';
 import '../../domain/shift_store.dart';
 import '../../theme/app_theme.dart';
 import '../dialogs/unified_import_dialog.dart';
-import '../widgets/ocean_atmosphere.dart';
+import '../widgets/ocean_band.dart';
 import '../widgets/ocean_import_transition.dart';
 import '../widgets/top_notification.dart';
 import 'shift_picker_panel.dart';
@@ -137,29 +137,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   final GlobalKey<ShiftPickerPanelState> _panelKey =
       GlobalKey<ShiftPickerPanelState>();
 
-  /// 海天背景元件 Key（支援導入時觸發波浪激盪）
-  final GlobalKey<OceanAtmosphereWidgetState> _oceanKey =
-      GlobalKey<OceanAtmosphereWidgetState>();
+  /// 海平線帶 Key（導入排更時觸發浪湧，shader 與 2D fallback 共用同一個入口）
+  final GlobalKey<OceanBandState> _oceanKey = GlobalKey<OceanBandState>();
 
   /// 詳情排班欄展開狀態（預設隱藏，點選日期彈出，支援下划隱去）
   bool _showDetailPanel = false;
-
-  /// 依選中日期的班次時間取得海天大氣狀態：
-  /// - 當沒有選中日期時，嚴格按照目前真實世界時間（自然時辰）顯示大海；
-  /// - 當選中日期時，依該日班次時間呈現對應海天；若該日未排班，亦還原為當前時間的大海。
-  OceanAtmoState _getCurrentAtmoState() {
-    if (!_showDetailPanel && !_schedPanelOpen) {
-      return OceanAtmoState.fromCurrentTime();
-    }
-    final key = ShiftStore.ymd(_selectedDate);
-    final assignment = widget.store.assignments[key];
-    final def =
-        assignment != null ? widget.store.defs[assignment.shiftId] : null;
-    if (def == null) {
-      return OceanAtmoState.fromCurrentTime();
-    }
-    return OceanAtmoState.fromStartTime(def.startTime);
-  }
 
   /// 備註便利貼 inline 編輯狀態
   bool _editingRemark = false;
@@ -201,13 +183,13 @@ class _CalendarScreenState extends State<CalendarScreen>
         if (mounted) setState(() {});
       });
 
+    // 今日呼吸圈：**唔加 addListener(setState)**。
+    // 佢係 repeat(reverse: true)，若喺呢度 setState 就會令整個 CalendarScreen 每幀重建；
+    // 改由 _dayCell 內一個局部 AnimatedBuilder 消費呢個 controller（只重畫今日格的外陰影）。
     _todayPulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _todayPulseCtrl.addListener(() {
-      if (mounted) setState(() {});
-    });
 
     _remarkCtrl = TextEditingController();
     _remarkFocus = FocusNode();
@@ -472,7 +454,7 @@ class _CalendarScreenState extends State<CalendarScreen>
     final t = context.tokens;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: kCalendarPageBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -532,16 +514,21 @@ class _CalendarScreenState extends State<CalendarScreen>
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // 海天連動動態背景（鋪滿整個介面，延伸至狀態欄與導航欄底層）
-          Positioned.fill(
-            child: OceanAtmosphereWidget(
-              key: _oceanKey,
-              targetState: _getCurrentAtmoState(),
-            ),
-          ),
-          Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // 月曆網格硬需求（_monthGrid）：Padding 8 + 星期列 ≈24 + SizedBox 4 + 6 × 75 = 486
+          const double kGridMinHeight = 486.0;
+          // 底部導航欄留白
+          const double kNavReserved = 72.0;
+
+          final double avail = constraints.maxHeight - kNavReserved;
+          final double slack = avail - kGridMinHeight;
+          final double bandH = slack.clamp(0.0, kOceanBandHeight);
+          final bool panelOpen = _schedPanelOpen || _showDetailPanel;
+          // 低於 48px 時天空只剩 21px，連半徑 11 的太陽都放唔落，不如唔顯示。
+          final bool showBand = bandH >= 48.0 && !panelOpen;
+
+          return Column(
             children: [
               Expanded(
                 child: ScrollConfiguration(
@@ -561,6 +548,12 @@ class _CalendarScreenState extends State<CalendarScreen>
                     },
                   ),
                 ),
+              ),
+              // 96px 海平線帶（真光影線步進；面板打開時 200ms 收合至 0 並淡出）
+              OceanBand(
+                key: _oceanKey,
+                visible: showBand,
+                height: bandH,
               ),
               // 排班面板或精簡詳情板（沒選日期時隱去，選日期時從下彈出，支援下划隱去）
               AnimatedSize(
@@ -593,8 +586,8 @@ class _CalendarScreenState extends State<CalendarScreen>
               // 預留底部半透明導航欄高度，使詳情卡片浮於導航欄上方且海浪自然流經底部
               const SizedBox(height: 72),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -732,16 +725,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       noteColor = (slot?.fg ?? t.neutralFg2).withValues(alpha: 0.48);
     }
 
-    // 今日 (Today) 柔和微呼吸圈
-    BoxShadow? todayPulseShadow;
-    if (isToday && isCurrentMonth) {
-      final pulseVal = _todayPulseCtrl.value;
-      todayPulseShadow = BoxShadow(
-        color: t.brand.withValues(alpha: 0.12 + 0.26 * pulseVal),
-        blurRadius: 4.0 + 3.0 * pulseVal,
-        spreadRadius: 0.5 + 1.2 * pulseVal,
-      );
-    }
+    // 今日 (Today) 柔和微呼吸圈：改由下面一個**局部** AnimatedBuilder 繪製外陰影，
+    // 唔再喺呢度計（若喺呢度讀 _todayPulseCtrl.value，就等於整個 CalendarScreen 每幀重建）。
 
     // 導入排更波浪式推進計算（自底排斜向上如海浪翻湧浮入）
     final bool isWaveSurging =
@@ -839,7 +824,6 @@ class _CalendarScreenState extends State<CalendarScreen>
         ),
         borderRadius: BorderRadius.circular(9),
         boxShadow: [
-          if (todayPulseShadow != null) todayPulseShadow,
           if (surgeGlowShadow != null) surgeGlowShadow,
         ],
       ),
@@ -967,6 +951,32 @@ class _CalendarScreenState extends State<CalendarScreen>
         ],
       ),
     );
+
+    // 今日呼吸圈：只包住今日那一格的**外陰影**，唔碰尺寸／顏色／文字。
+    // 咁樣 60fps 的 repeat 動畫只會重畫呢一個小 DecoratedBox，唔會令整個月曆陪跑。
+    if (isToday && isCurrentMonth) {
+      final Widget baseCell = cell;
+      cell = AnimatedBuilder(
+        animation: _todayPulseCtrl,
+        child: baseCell,
+        builder: (context, child) {
+          final pulseVal = _todayPulseCtrl.value;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: [
+                BoxShadow(
+                  color: t.brand.withValues(alpha: 0.12 + 0.26 * pulseVal),
+                  blurRadius: 4.0 + 3.0 * pulseVal,
+                  spreadRadius: 0.5 + 1.2 * pulseVal,
+                ),
+              ],
+            ),
+            child: child,
+          );
+        },
+      );
+    }
 
     return _HapticCell(
       onTap: () {
