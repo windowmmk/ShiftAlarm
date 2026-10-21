@@ -10,6 +10,7 @@ import 'domain/alarm_service.dart';
 import 'domain/shift_store.dart';
 import 'theme/app_theme.dart';
 import 'ui/screens/home_screen.dart';
+import 'ui/widgets/ocean_shader_controller.dart';
 
 /// 排班鬧鐘 App（原型 v1）
 /// 四更固定（00–06／06–12／12–18／18–00），月曆選更，到時經原生鬧鐘響。
@@ -39,6 +40,12 @@ Future<void> main() async {
     } catch (_) {
       // 原生橋未就緒都唔阻開 App
     }
+
+    // v3.5 海洋著色器預熱：**非阻塞**（await 會拖慢啟動 100-300ms）。
+    // 載入完成前海平線帶顯示 2D fallback，完成後自動切換成真光影 shader。
+    // 注意：`[OCEAN] renderer=…` 這行機器可讀標記由 OceanBandState 統一印出
+    // （ARCH §7.12，只印一次），呢度刻意唔印，避免出現兩行互相矛盾。
+    unawaited(OceanShaderController.load());
 
     runApp(ShiftAlarmApp(store: store, alarms: alarms));
   }, (error, stack) {

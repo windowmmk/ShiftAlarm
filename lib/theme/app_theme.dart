@@ -332,3 +332,52 @@ ThemeData buildAppTheme() {
     extensions: const [ShiftTokens()],
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.5 海平線帶（Ocean Band）常數 —— 唯一來源，UI 與測試都用呢組
+// 見 docs/v3.5/ARCH.md §6.4 / §6.8
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 帶高（logical px）。使用者裁示 96（56 → 96）。
+const double kOceanBandHeight = 96.0;
+
+/// 左右內縮，令圓角唔會貼住螢幕邊。
+const double kOceanBandInset = 8.0;
+
+/// 圓角半徑。
+const double kOceanBandRadius = 16.0;
+
+/// 最大寬度（與月曆一致，寬屏居中）。
+const double kOceanBandMaxWidth = 480.0;
+
+/// 面板開合時帶的收合／淡出時長（ms）。
+const int kOceanCollapseMs = 200;
+
+/// 大氣 mood 檢查間隔（秒）。只喺 mood 真係變嘅時候才 setState。
+const int kOceanMoodPollSeconds = 60;
+
+/// shader 資產路徑。
+///
+/// ⚠️ 必須與 `pubspec.yaml` 的 `flutter.shaders` 條目係同一個字串，改名要兩邊一齊改。
+const String kOceanShaderAsset = 'shaders/ocean.frag';
+
+/// 固定水平半角 tan（≈46°，與 16:9 原版等價：1.778 × 0.58 ≈ 1.03）。
+///
+/// 垂直半角 = `kOceanHorizHalfTan / aspect`，所以太陽／月亮永遠正圓、海平線永遠水平。
+const double kOceanHorizHalfTan = 1.03;
+
+/// 海平線在帶內的垂直位置（0 = 頂部，1 = 底部）。0.45 即天空佔 45%。
+const double kOceanHorizonRatio = 0.45;
+
+/// 浪湧（導入排更衝擊波）時長（ms）。對齊 `web/ocean_shader.js` 的 `importFx.duration = 2.2`。
+const int kOceanSurgeDurationMs = 2200;
+
+/// 預設集逐參數插值速度（每秒收斂係數）：`lerpSpeed = min(1.0, dt * 3.8)`。
+const double kOceanPresetLerp = 3.8;
+
+/// 頁面靜態底色（P0-2）。**已裁示用此值，勿改回 PRD 原值 #F8FAFC。**
+///
+/// 理由：空白格是 `Colors.white.withValues(alpha: 0.84)`，疊在 #F8FAFC 上混合後
+/// 每通道只差約 5/255，格線肉眼看不見、月曆會變一塊白板（違反 G1）。
+/// #EDF2F7 下差約 14/255，格線清楚而底色仍極淺。詳見 ARCH §6.5 / §8-Q1。
+const Color kCalendarPageBg = Color(0xFFEDF2F7);
