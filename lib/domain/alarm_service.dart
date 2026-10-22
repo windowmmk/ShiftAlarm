@@ -48,15 +48,19 @@ class AlarmService {
   static int preAlertIdFor(String ymd, int index) =>
       alarmIdFor(ymd, index) + preAlertIdOffset;
 
-  /// 預告標題：「1 小時後：早更 開工打卡」
+  /// 預告標題：「早更 開工鬧鐘」
+  ///
+  /// ⚠️ **不准**再加「1 小時後：」之類嘅剩餘時間前綴。預告通知由 v3.6.1 起
+  /// 用 `setUsesChronometer(true)` 做狀態欄倒計時，剩餘時間由系統實時渲染；
+  /// 文案若寫死「1 小時」，開機 47 分鐘後就會同倒計時顯示嘅「13:00」互相矛盾。
   static String preAlertTitle(String shiftName, String label) =>
-      '1 小時後：$shiftName $label';
+      '$shiftName $label';
 
-  /// 預告內文：「仲有 1 小時響 · 開工時間到了，記得打卡！ (06:00)」
+  /// 預告內文：直接串 [formatAlarmBody] 的輸出，唔加任何前綴。
   ///
   /// 必須**串接** [formatAlarmBody] 的輸出，不准另寫一份文案邏輯；
-  /// 內文只可以出現一次「1 小時」。
-  static String preAlertBody(String alarmBody) => '仲有 1 小時響 · $alarmBody';
+  /// 剩餘時間一律交由倒計時顯示，文案內**不准**出現「仲有 N 小時響」。
+  static String preAlertBody(String alarmBody) => alarmBody;
 
   /// 組一條預告排程（唯一組裝點，[onAssigned] 與 [syncOnLaunch] 共用）。
   /// `triggerAt` 係鬧鐘**觸發**時刻，不是預告時刻；−60 分鐘由原生側做。
@@ -233,20 +237,24 @@ class AlarmService {
           note: note,
         );
       }
-      // 響鬧預告：全屏／只通知兩條通道都要排（使用者原話「每次鬧鐘響之前 1 小時」）。
+      // 響鬧預告：**只給真正的鬧鐘**（`notificationOnly == false`）。
+      // 打卡開工／收工同使用者自建嘅「只通知」鬧鐘一律唔排預告——佢哋本身
+      // 就係「到點提你一下」，再提前一小時預告只會變成噪音（v3.6.1 裁示）。
       // 獨立 try/catch：預告排唔到（例如原生側舊版未實作呢個 channel method）
       // 絕對唔可以令真鬧鐘排程失敗。
-      try {
-        await bridge.schedulePreAlert(preAlertFor(
-          ymd: ymd,
-          def: def,
-          alarm: alarm,
-          alarmId: id,
-          triggerAt: t,
-          alarmBody: body,
-          note: note,
-        ));
-      } catch (_) {}
+      if (!alarm.notificationOnly) {
+        try {
+          await bridge.schedulePreAlert(preAlertFor(
+            ymd: ymd,
+            def: def,
+            alarm: alarm,
+            alarmId: id,
+            triggerAt: t,
+            alarmBody: body,
+            note: note,
+          ));
+        } catch (_) {}
+      }
     }
   }
 
@@ -306,20 +314,34 @@ class AlarmService {
             note: note,
           ));
         }
-        // 響鬧預告：兩條通道都排（同 onAssigned 一致）
-        preAlerts.add(preAlertFor(
-          ymd: e.key,
-          def: def,
-          alarm: alarm,
-          alarmId: id,
-          triggerAt: t,
-          alarmBody: body,
-          note: note,
-        ));
+        // 響鬧預告：只給真正的鬧鐘（同 onAssigned 一致，`notificationOnly` 唔排）
+        if (!alarm.notificationOnly) {
+          preAlerts.add(preAlertFor(
+            ymd: e.key,
+            def: def,
+            alarm: alarm,
+            alarmId: id,
+            triggerAt: t,
+            alarmBody: body,
+            note: note,
+          ));
+        }
       }
     }
-    if (full.isNotEmpty || gentle.isNotEmpty || preAlerts.isNotEmpty) {
-      await bridge.rescheduleAll(full, gentle, preAlerts);
-    }
+    // **無條件**呼叫，即使三個 list 全空都要叫。
+    //
+    // 三個 list 全空 = 而家一條未來鬧鐘都冇，呢個時候最需要跑一次對帳：
+    // 原生側 `PreAlertScheduler.rescheduleAll` 尾段會 `prune(keep = ∅)`，
+    // 把註冊表裡面所有殘留預告（例如升級前為打卡鬧鐘排落、或者使用者啱啱
+    // 刪晒所有排班）連 AlarmManager 排程帶通知一齊清走。
+    //
+    // 以前寫成 `if (full.isNotEmpty || ...)` 就係漏咗呢個情況：使用者清空排班
+    // 之後，舊預告會永遠掛喺通知欄，直到佢手動清（v3.6.1 修）。
+    //
+    // 副作用檢查（已驗證）：`prune` 嘅 keep 條件係 `triggerAtMillis > now`，
+    // 而 keep 由 Dart 傳上去嘅 `preAlerts` 逐條砌出嚟；正在倒數、鬧鐘未響嘅
+    // 預告一定仍然喺 `preAlerts` 裡面，所以空 list 只會殺「真係冇人要」嘅 id，
+    // 唔會誤殺倒數中嘅通知。
+    await bridge.rescheduleAll(full, gentle, preAlerts);
   }
 }
