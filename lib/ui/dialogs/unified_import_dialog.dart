@@ -278,7 +278,16 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
         children: [
           Icon(Icons.file_download_outlined, color: t.brand),
           const SizedBox(width: 8),
-          const Text('導入排班 / 配置', style: TextStyle(fontWeight: FontWeight.bold)),
+          // 標題要可以縮：320×640 @2.0x 實測橫向溢出 114px。圖示保持固定大細
+          // （縮圖示會令辨識度變差），只讓文字讓位。
+          Flexible(
+            child: Text(
+              '導入排班 / 配置',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
       content: SizedBox(
@@ -324,9 +333,17 @@ class _UnifiedImportDialogState extends State<_UnifiedImportDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    '貼上排班內容：',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  // 「貼上排班內容：」+ 貼上按鈕。
+                  // 360×800 @1.3x 實測橫向溢出 6px、320 @2.0x 溢出 53px。
+                  // 標籤讓位、按鈕保持原大細（按鈕縮細會變難㩒）。
+                  Flexible(
+                    child: Text(
+                      '貼上排班內容：',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
                   ),
                   OutlinedButton.icon(
                     onPressed: () async {

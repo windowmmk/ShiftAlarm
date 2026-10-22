@@ -263,12 +263,20 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 height: 42,
                 child: Row(
                   children: [
-                    Text(
-                      _dateLabel,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: t.neutralFg,
+                    // 日期標籤要可以縮：360×800 @1.3x 實測橫向溢出 14px、
+                    // 320 @2.0x 溢出 26px。以前係死板 Text，會連「完成」按鈕
+                    // 一齊推出畫面外；改成 Flexible 之後，唔夠位時日期先讓位，
+                    // 地點欄（Expanded）同「完成」按鈕永遠保得住。
+                    Flexible(
+                      child: Text(
+                        _dateLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: t.neutralFg,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -519,24 +527,34 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.delete_outline,
-                size: 20,
-                color: currentId != null ? t.danger : t.neutralFg2,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '清除',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.normal,
+          // 圖示 + 「清除」字。
+          //
+          // 按鈕高度由外層 58px 固定（`CalendarLayout.detailHeight` 分落嚟），
+          // 2.0x 字體時 Icon 20 + 間距 2 + 字 26 = 53px，但只有 50px 可用
+          // → 直向溢出 3px。用 `FittedBox(scaleDown)` 等比收 6%：
+          // 圖示同文字的比例唔變，比起夾硬縮字或砍掉文字更易讀。
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.delete_outline,
+                  size: 20,
                   color: currentId != null ? t.danger : t.neutralFg2,
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  '清除',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.normal,
+                    color: currentId != null ? t.danger : t.neutralFg2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
