@@ -158,6 +158,13 @@ class PreAlertReceiver : BroadcastReceiver() {
                 // 使用者原話「頂欄掛着」：划得走就等於功能失效
                 .setOngoing(true)
                 .setAutoCancel(false)
+                // 只提示一次：`PreAlertScheduler` 分支 2 每次 App 啟動都會用
+                // `set(now+1s)` 重新派發同一個 PendingIntent，即係同一條通知會被
+                // `notify()` 多次。同一 id 只會「更新」不會「新增」，加上頻道係
+                // IMPORTANCE_LOW（無聲、無震）本身已經唔會響；`setOnlyAlertOnce`
+                // 係第二層保險——即使日後有人把頻道調高重要度，重複 notify 都
+                // 唔會再次發聲／震動／彈 heads-up。
+                .setOnlyAlertOnce(true)
                 // 頻道已無聲，唔再喺 builder 指定 sound（見 ensureChannel KDoc）
 
             if (useCountdown) {
