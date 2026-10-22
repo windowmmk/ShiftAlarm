@@ -146,9 +146,37 @@ class StatsResult {
 
 final _ymdRe = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$');
 
-bool _inRange(String ymd, DateTime start, DateTime end) {
+/// 嚴格驗證 `yyyy-MM-dd`：格式必須完全規範，而且日子要真實存在。
+///
+/// **為什麼唔可以只靠 RegExp 或字串比較：**
+/// - `2026-02-30` 格式完全正確，但 2 月冇 30 日。`DateTime(2026, 2, 30)`
+///   會靜默進位成 3 月 2 日，所以要用「回讀比對」方式驗證真偽
+///   （回讀到嘅 year/month/day 同輸入唔一致＝非法）。
+/// - `2026-2-1` 缺前導零：字串比較 `'2026-2-1'.compareTo('2026-10-01')`
+///   會因為 `'2' > '1'` 而得出錯嘅相對次序，令該筆被歸入錯誤區間。
+///   呢度用 `\d{2}` 硬性要求前導零，缺零一律視為非法（行為一致、可測試）。
+///
+/// 非法 ymd 一律「跳過該筆」，唔拋異常——單一筆爛數據唔應該令整個統計爆掉。
+bool isValidYmd(String ymd) {
   final m = _ymdRe.firstMatch(ymd.trim());
   if (m == null) return false;
+  final y = int.parse(m.group(1)!);
+  final mo = int.parse(m.group(2)!);
+  final d = int.parse(m.group(3)!);
+  if (mo < 1 || mo > 12) return false;
+  if (d < 1 || d > 31) return false;
+  final dt = DateTime(y, mo, d);
+  // 回讀比對：DateTime 會把 2026-02-30 進位成 2026-03-02，回讀就對唔上。
+  return dt.year == y && dt.month == mo && dt.day == d;
+}
+
+bool _inRange(String ymd, DateTime start, DateTime end) {
+  // P1-5：舊版直接 `ymd.compareTo(...)` 用字串比較日期。非法日期
+  // （`2026-2-30`）或格式唔規範（`2026-2-1`）嘅字串排序結果同真實
+  // 時間次序無關，會令該筆被歸入錯誤區間 → 工時統計數字靜默出錯。
+  // 現在先做嚴格驗證，非法就回 false（跳過該筆），再用 DateTime 比較。
+  if (!isValidYmd(ymd)) return false;
+  final m = _ymdRe.firstMatch(ymd.trim())!;
   final d = DateTime(
       int.parse(m.group(1)!), int.parse(m.group(2)!), int.parse(m.group(3)!));
   return !d.isBefore(start) && !d.isAfter(end);
