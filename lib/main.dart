@@ -34,13 +34,6 @@ Future<void> main() async {
     final bridge = AlarmBridge();
     final alarms = AlarmService(bridge);
 
-    // 啟動保險：將未響嘅更次鬧鐘交原生側重排（同 id 覆蓋）
-    try {
-      await alarms.syncOnLaunch(store);
-    } catch (_) {
-      // 原生橋未就緒都唔阻開 App
-    }
-
     // v3.5 海洋著色器預熱：**非阻塞**（await 會拖慢啟動 100-300ms）。
     // 載入完成前海平線帶顯示 2D fallback，完成後自動切換成真光影 shader。
     // 注意：`[OCEAN] renderer=…` 這行機器可讀標記由 OceanBandState 統一印出
@@ -48,6 +41,21 @@ Future<void> main() async {
     unawaited(OceanShaderController.load());
 
     runApp(ShiftAlarmApp(store: store, alarms: alarms));
+
+    // 啟動保險：將未響嘅更次鬧鐘交原生側重排（同 id 覆蓋）。
+    //
+    // ⚠️ v3.6.2 之前呢度係 `await alarms.syncOnLaunch(store)` 擺喺 runApp **之前**，
+    // 即係「白屏等到全部鬧鐘排完先出第一幀」。syncOnLaunch 會逐條經 MethodChannel
+    // 落原生，一個月排班可以有幾百個鬧鐘 → 幾百次 round-trip，慢機上白屏 1 秒以上。
+    //
+    // 改到 runApp 之後、而且用 post-frame callback：畫面先出，重排喺背景做。
+    // 安全性：syncOnLaunch 係 idempotent（同 id 覆蓋），遲少少跑唔會漏鬧鐘；
+    // 而鬧鐘本身已經喺原生 AlarmManager 排好，App 重開唔會令佢消失。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(alarms.syncOnLaunch(store).catchError((Object _) {
+        // 原生橋未就緒都唔阻用 App
+      }));
+    });
   }, (error, stack) {
     _writeDartCrashLog('Uncaught: $error\n$stack');
   });
