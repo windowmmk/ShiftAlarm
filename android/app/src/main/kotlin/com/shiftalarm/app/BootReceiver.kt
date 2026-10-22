@@ -146,29 +146,47 @@ class BootReceiver : BroadcastReceiver() {
                         note
                     )
                 }
-                // 響鬧預告（第三條通道）：全屏／只通知兩條都要排
-                keepIds.add(PreAlertScheduler.preAlertId(id))
-                PreAlertScheduler.schedule(
-                    context,
-                    id,
-                    triggerMillis,
-                    preAlertTitle(name, alarm.label),
-                    preAlertBody(body),
-                    ymd,
-                    name,
-                    startTime,
-                    note
-                )
+                // 響鬧預告（第三條通道）：**只給真正的鬧鐘**（notificationOnly == false）。
+                // 打卡開工／收工同使用者自建嘅「只通知」鬧鐘唔排預告——同 Dart
+                // AlarmService.onAssigned / syncOnLaunch 兩處完全一致（v3.6.1 裁示）。
+                // ⚠️ 呢度係原生獨立實作路徑，唔經 Dart；漏咗呢個 if，使用者一重開機
+                // 打卡預告就會復活，而且同 App 內行為唔一致。
+                if (!alarm.notificationOnly) {
+                    keepIds.add(PreAlertScheduler.preAlertId(id))
+                    PreAlertScheduler.schedule(
+                        context,
+                        id,
+                        triggerMillis,
+                        preAlertTitle(name, alarm.label),
+                        preAlertBody(body),
+                        ymd,
+                        name,
+                        startTime,
+                        note
+                    )
+                }
             }
         }
     }
 
-    /** 預告標題：「1 小時後：早更 開工打卡」（同 Dart AlarmService.preAlertTitle 一致） */
+    /**
+     * 預告標題：「早更 開工鬧鐘」。
+     *
+     * 必須同 Dart `AlarmService.preAlertTitle` **逐字一致**。
+     * ⚠️ 不准加「1 小時後：」之類嘅剩餘時間前綴：預告通知由 v3.6.1 起用
+     * `setUsesChronometer(true)` 做狀態欄倒計時，剩餘時間由系統實時渲染；
+     * 文案寫死「1 小時」會同倒計時顯示嘅數值互相矛盾。
+     */
     private fun preAlertTitle(shiftName: String, label: String): String =
-        "1 小時後：$shiftName $label"
+        "$shiftName $label"
 
-    /** 預告內文：「仲有 1 小時響 · <formatAlarmBody 輸出>」（同 Dart preAlertBody 一致） */
-    private fun preAlertBody(alarmBody: String): String = "仲有 1 小時響 · $alarmBody"
+    /**
+     * 預告內文：直接回傳 `formatAlarmBody` 的輸出，唔加任何前綴。
+     *
+     * 必須同 Dart `AlarmService.preAlertBody` **逐字一致**。
+     * 剩餘時間一律交由倒計時顯示，內文不准出現「仲有 N 小時響」。
+     */
+    private fun preAlertBody(alarmBody: String): String = alarmBody
 
     private fun formatAlarmBody(
         startTime: String,

@@ -68,8 +68,12 @@ class GentleAlarmSchedule {
 }
 
 /// 響鬧預告排程（第三條通道）。
-/// 每個 enabled 鬧鐘（全屏／只通知兩條都算）喺真正觸發前 1 小時，
-/// 由原生側掛一條 ongoing 通知喺狀態欄。
+/// 每個 enabled **而且係真正鬧鐘**（`notificationOnly == false`）嘅鬧鐘，
+/// 喺真正觸發前 1 小時，由原生側掛一條 ongoing 通知喺狀態欄，並以倒計時
+/// 顯示仲有幾耐響。
+///
+/// ⚠️ 純通知類鬧鐘（打卡開工／收工、使用者自建嘅「只通知」）**唔排預告**，
+/// 過濾喺 `AlarmService.onAssigned` / `syncOnLaunch` 兩處做（v3.6.1 裁示）。
 ///
 /// `alarmId` 係**原始鬧鐘 id**（未加偏移）：+900000 同 −60 分鐘都由原生側做，
 /// 令 id 公式只有一個權威轉換點（Kotlin `PreAlertScheduler.preAlertId`）。

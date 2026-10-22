@@ -12,8 +12,14 @@ import org.json.JSONArray
  * 響鬧預告排程器（第三條通知通道）。
  *
  * 使用者原話：「我想在每次鬧鐘響之前1小時, 像本地鬧鐘一樣, 會提前有一個通知頂欄掛着,
- * 讓用戶知道即將要響。」→ 每個 enabled 鬧鐘（全屏／只通知兩條通道都算），
- * 喺真正觸發時刻之前 60 分鐘排一條預告廣播，由 [PreAlertReceiver] 發 ongoing 通知。
+ * 讓用戶知道即將要響。」→ 每個 enabled **而且係真正鬧鐘**（`notificationOnly == false`）
+ * 嘅鬧鐘，喺真正觸發時刻之前 60 分鐘排一條預告廣播，由 [PreAlertReceiver] 發
+ * ongoing 通知並以狀態欄倒計時顯示剩餘時間。
+ *
+ * ⚠️ 純通知類鬧鐘（打卡開工／收工、使用者自建嘅「只通知」）**唔排預告**（v3.6.1 裁示）。
+ * 過濾喺三個呼叫點各自做：Dart `AlarmService.onAssigned`、Dart
+ * `AlarmService.syncOnLaunch`、原生 `BootReceiver.scheduleAll`。本 object 唔再重複判斷
+ * ——入得嚟就照排，保持「呼叫方決定排邊啲」嘅單一職責。
  *
  * 職責邊界：本 object **只碰 AlarmManager 同 id 註冊表**（例外係 [cancelNotification]，
  * 佢淨係清通知）。發通知嘅嘢全部喺 [PreAlertReceiver]。
@@ -42,6 +48,19 @@ object PreAlertScheduler {
      * 呢個「刻意唔共用」寫喺度，免得下次「統一命名」嘅善意重構把它改掉。
      */
     const val EXTRA_PRE_ALERT_DATE = "pre_alert_date"
+
+    /**
+     * 鬧鐘**觸發**時刻（毫秒，`RTC_WAKEUP` 時基）。
+     *
+     * [PreAlertReceiver] 用佢做 `Notification.setWhen()`，配合
+     * `setUsesChronometer(true)` + `setChronometerCountDown(true)` 就係狀態欄倒計時。
+     *
+     * ⚠️ 一定要傳真嘅 `triggerAtMillis`，**不准**喺 receiver 用
+     * `System.currentTimeMillis() + LEAD_MILLIS` 反推：`setExactAndAllowWhileIdle`
+     * 喺 Doze 下最多遲約 15 分鐘，反推出嚟嘅倒計時會比真鬧鐘遲 15 分鐘歸零，
+     * 即係「倒數仲有 3 分鐘」嗰陣鬧鐘已經響咗——使用者最不能接受嘅錯。
+     */
+    const val EXTRA_TRIGGER_AT = "pre_alert_trigger_at"
 
     /** 註冊表 prefs 檔名（key "ids"，JSON int 陣列，內容係已偏移 id）。 */
     private const val PREFS_NAME = "shiftalarm_prealerts"
@@ -86,6 +105,8 @@ object PreAlertScheduler {
                 putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
                 putExtra(AlarmScheduler.EXTRA_TITLE, title)
                 putExtra(AlarmScheduler.EXTRA_BODY, body)
+                // 倒計時終點：真鬧鐘觸發時刻（見 EXTRA_TRIGGER_AT KDoc）
+                putExtra(EXTRA_TRIGGER_AT, triggerAtMillis)
                 // 以下四個 extra 現階段**只寫不讀**（PreAlertReceiver 唔會讀），
                 // 係 P2-2「點擊通知跳該日」嘅預留欄位——到時 PreAlertReceiver
                 // 會用佢哋砌一條帶日期嘅 Intent 交 MainActivity。
