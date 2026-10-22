@@ -565,29 +565,76 @@ class _CalendarScreenState extends State<CalendarScreen>
                 ),
               ),
               // ② 中間日曆：高度寫死，格高由佈局算式實算（理想 75，唔夠位先縮）
+              //
+              // v3.6.3：整區包成一張**同天色帶成套**嘅卡 —— 同一個最大寬度、
+              // 同一條內縮、同一個圓角、同一條描邊。以前呢度只係一堆散格直接
+              // 浮喺頁面底色上，而天色帶係一張有圓角嘅卡，所以上下睇落係兩件嘢。
+              //
+              // ⚠️ 嵌套順序必須同 `OceanBand._buildBand()` **逐層相同**
+              // （`Center → ConstrainedBox → Padding → 容器`），否則 W > 480 時
+              // 兩條卡嘅左右邊會錯開（天色帶 480 vs 日曆 464，每邊差 8px）。
+              // 對齊由 `test/band_card_alignment_test.dart` 鎖住。
               SizedBox(
+                // v3.6.3：呢個 Key 係「② 區整體」的量度點。以前 `calendar_layout_measure_test.dart`
+                // 量 `find.byType(PageView)`，但日曆區包咗卡之後 PageView 會比區域矮
+                // （卡外間距 + 卡內邊距），量到嘅係**內容**而唔係**區域**，防線 c 就紅咗。
+                // 量區域先至係 `CalendarLayout.gridHeight` 嘅真正語義。
+                key: const Key('calendar-zone'),
                 height: layout.gridHeight,
-                child: ClipRect(
-                  child: ScrollConfiguration(
-                    behavior: const _CalendarScrollBehavior(),
-                    child: PageView.builder(
-                      scrollDirection: Axis.horizontal, // 左右翻月
-                      physics: const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
-                      controller: _pageController,
-                      onPageChanged: _onPageChanged,
-                      itemBuilder: (_, page) {
-                        final m = _monthForPage(page);
-                        // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
-                        return RepaintBoundary(
-                          key: ValueKey('month_${m.year}_${m.month}'),
-                          child: _monthGrid(
-                            t,
-                            m.year,
-                            m.month,
-                            cellHeight: layout.cellHeight,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: kOceanBandMaxWidth),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: kOceanBandInset,
+                        vertical: kOceanBandGap,
+                      ),
+                      child: Container(
+                        key: const Key('calendar-grid-card'),
+                        decoration: BoxDecoration(
+                          // ⚠️ 底色**唔可以**用 `t.neutralBg`（純白）或者其他比頁面
+                          // 更亮的色：空白格係 `Colors.white.withValues(alpha: 0.84)`，
+                          // 疊喺純白上混合後同卡片**完全同色**（通道差 0），成個月曆
+                          // 會變一塊白板、格線消失 —— 呢個正係當初揀 `kCalendarPageBg`
+                          // = #EDF2F7 而唔係 PRD 原值 #F8FAFC 嘅理由（見 app_theme.dart
+                          // 嘅註釋：#F8FAFC 只差約 5/255，格線肉眼睇唔見）。
+                          //
+                          // 用 `kOceanBandSurface`（#E3EAF1，比頁面深一檔）反而更好：
+                          // 通道差約 23/255，格線比舊版嘅 15/255 仲清楚，
+                          // 同時同天色帶共用同一個底色，成套感再強一層。
+                          // 由 `test/band_card_alignment_test.dart` 嘅對比度斷言鎖住。
+                          color: kOceanBandSurface,
+                          borderRadius: BorderRadius.circular(kOceanBandRadius),
+                          border: Border.all(color: kCardStroke),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: ClipRect(
+                          child: ScrollConfiguration(
+                            behavior: const _CalendarScrollBehavior(),
+                            child: PageView.builder(
+                              scrollDirection: Axis.horizontal, // 左右翻月
+                              physics:
+                                  const PageScrollPhysics(), // 確保按頁吸附與平滑過渡
+                              controller: _pageController,
+                              onPageChanged: _onPageChanged,
+                              itemBuilder: (_, page) {
+                                final m = _monthForPage(page);
+                                // RepaintBoundary 將每個月緩存為獨立 GPU 紋理圖層，滑動時零 CPU 重繪，達到原生級 60fps
+                                return RepaintBoundary(
+                                  key: ValueKey('month_${m.year}_${m.month}'),
+                                  child: _monthGrid(
+                                    t,
+                                    m.year,
+                                    m.month,
+                                    cellHeight: layout.cellHeight,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -649,7 +696,15 @@ class _CalendarScreenState extends State<CalendarScreen>
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
+          // v3.6.3：垂直留白改由外層日曆卡嘅 `kOceanBandGap` 提供（上下各 4），
+          // 呢度淨係留卡入面嘅水平內邊距（左右各 4）。
+          //
+          // ⚠️ 總**垂直**開銷一定要維持 8（4+4）：`CalendarLayout.gridOverhead`
+          // 嘅 36 = 卡外間距 8 + 星期列 24 + SizedBox 4，呢度若再落垂直 padding，
+          // 實算格高就會同預留對唔上（格仔會被 Expanded 壓細但算式唔知）。
+          // 水平由原本嘅 8+8 變成 卡外 8+8 ＋ 卡內 4+4，格仔窄咗約 1.1px/格，
+          // 換嚟嘅係卡入面有內邊距，格仔唔會直接貼住卡邊。
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(
             // ⚠️ 一定要 `max`：下面 6 列用 `Expanded` 平分剩餘高度，
             // 而 `Expanded` 要求 Column 有明確的高度上限（由外層 SizedBox 提供）。
