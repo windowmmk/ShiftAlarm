@@ -139,6 +139,16 @@ void main() {
           .constraints
           .maxHeight;
 
+  /// 量「② 區整體」的高度（=`CalendarLayout.gridHeight`）。
+  ///
+  /// ⚠️ 唔可以再量 `find.byType(PageView)`：v3.6.3 起日曆區包咗一張卡
+  /// （`Padding(vertical: kOceanBandGap)` ＋ `Container` 描邊），PageView 係**內容**，
+  /// 會比區域矮一截；而 `gridHeight` 嘅語義係**區域**。量內容會令防線 c 假紅
+  /// （實測 270 vs 280）——卡片內部點裝修都唔應該令「區域高度」嘅防線失效，
+  /// 所以改量 `calendar-zone` 嗰粒 `SizedBox`。
+  double zoneHeight(WidgetTester tester) =>
+      tester.getSize(find.byKey(const Key('calendar-zone'))).height;
+
   /// 三區本體（LayoutBuilder 底下那條 Column）的 children
   List<RenderBox> zoneChildren(WidgetTester tester) {
     final colFinder = find
@@ -572,12 +582,12 @@ void main() {
       final store = await makeStore();
       await pumpHome(tester, w: 360, h: 800, store: store, padBottom: 0);
       final bandBefore = tester.getSize(find.byType(OceanBand)).height;
-      final gridBefore = tester.getSize(find.byType(PageView)).height;
+      final gridBefore = zoneHeight(tester);
 
       await setKeyboard(tester, 300);
 
       final bandAfter = tester.getSize(find.byType(OceanBand)).height;
-      final gridAfter = tester.getSize(find.byType(PageView)).height;
+      final gridAfter = zoneHeight(tester);
       final bodyAfter = bodyHeightOf(tester);
       print('[M] C.bandBefore=${f(bandBefore)} bandAfter=${f(bandAfter)} '
           'gridBefore=${f(gridBefore)} gridAfter=${f(gridAfter)} '

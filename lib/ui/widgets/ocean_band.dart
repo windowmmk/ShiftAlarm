@@ -277,36 +277,52 @@ class OceanBandState extends State<OceanBand> {
   Widget _buildBand() {
     final shader = _shader;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: kOceanBandInset),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: kOceanBandMaxWidth),
-          // ⚠️ 層級刻意係 `RepaintBoundary → ClipRRect → ColoredBox(kCalendarPageBg) → 內容`，
-          // 同 ARCH §7.9 舉例的 `DecoratedBox → ClipRRect → RepaintBoundary` 次序相反：
-          // RepaintBoundary 放最外層係為咗把 30fps 的 shader 重繪完全隔離出月曆的圖層；
-          // 底色放 ClipRRect 之內係為咗「shader 靜默失敗／拋異常」時露出來的是淺灰頁底色，
-          // 而唔係一條刺眼黑條。兩者作用互不影響，唔係抄漏。
+    // ⚠️ 嵌套順序必須係 `Center → ConstrainedBox → Padding → 容器`，
+    // 同日曆卡（`calendar_screen.dart` ② 區）**逐層相同**。
+    //
+    // 以前呢度係 `Padding → Center → ConstrainedBox`（先縮再夾），
+    // 日曆嗰邊係 `Center → ConstrainedBox → Padding`（先夾再縮），
+    // 兩條路線喺 W > 480 時一定分叉：
+    //   天色帶 = min(W − 16, 480)   → W=900 得 480
+    //   日曆卡 = min(W, 480) − 16   → W=900 得 464
+    // 即係**每邊差 8px**，Web PWA 桌面闊屏必中（手機 ≤480 反而睇唔出）。
+    // `test/band_card_alignment_test.dart` 會用真 widget 量兩條邊鎖住呢個對齊。
+    //
+    // ⚠️ 容器用 `Container` + `clipBehavior` 取代舊嘅 `ClipRRect → ColoredBox`，
+    // 係為咗同時畫底色**同描邊**：成套感靠嘅就係「同一條邊」。
+    // 底色唔再用 `kCalendarPageBg`（同頁面同色 → shader pending 時睇落係空白），
+    // 改 `kOceanBandSurface`（深一檔霧藍灰）；shader 靜默失敗時露出来嘅
+    // 係協調色而唔係一條刺眼黑條，呢點同以前一樣。
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kOceanBandMaxWidth),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: kOceanBandInset),
+          // RepaintBoundary 放最外層：把 30fps 的 shader 重繪完全隔離出月曆的圖層，
+          // 唔會令成個日曆陪跑（同 ARCH §7.9 嘅理由一致）。
           child: RepaintBoundary(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(kOceanBandRadius),
-              child: ColoredBox(
-                color: kCalendarPageBg,
-                child: SizedBox.expand(
-                  child: shader != null
-                      ? CustomPaint(
-                          painter: _OceanShaderPainter(
-                            shader: shader,
-                            frame: _frame,
-                            repaint: _tick,
-                          ),
-                        )
-                      : OceanAtmosphereWidget(
-                          key: _fallbackKey,
-                          compact96: true,
-                          targetState: _atmo,
+            child: Container(
+              key: const Key('ocean-band-card'),
+              decoration: BoxDecoration(
+                color: kOceanBandSurface,
+                borderRadius: BorderRadius.circular(kOceanBandRadius),
+                border: Border.all(color: kCardStroke),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox.expand(
+                child: shader != null
+                    ? CustomPaint(
+                        painter: _OceanShaderPainter(
+                          shader: shader,
+                          frame: _frame,
+                          repaint: _tick,
                         ),
-                ),
+                      )
+                    : OceanAtmosphereWidget(
+                        key: _fallbackKey,
+                        compact96: true,
+                        targetState: _atmo,
+                      ),
               ),
             ),
           ),

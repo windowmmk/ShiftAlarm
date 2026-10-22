@@ -381,3 +381,29 @@ const double kOceanPresetLerp = 3.8;
 /// 每通道只差約 5/255，格線肉眼看不見、月曆會變一塊白板（違反 G1）。
 /// #EDF2F7 下差約 14/255，格線清楚而底色仍極淺。詳見 ARCH §6.5 / §8-Q1。
 const Color kCalendarPageBg = Color(0xFFEDF2F7);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.6.3 天色帶／日曆卡共用容器外觀 —— 令上下成套（一體化）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 天色帶的容器底色（shader 未就緒／靜默失敗時露出）。
+///
+/// 以前直接用 [kCalendarPageBg]，結果 shader pending 嗰幾百毫秒天色帶
+/// 同頁面**同色**，睇落係一條空白，`ClipRRect` 嘅 16px 圓角完全睇唔到。
+/// 呢度改用比頁面深一檔嘅霧藍灰：pending 時係「一條有料嘅帶」，
+/// fallback（2D 版）嘅邊緣抗鋸齒亦只會透出協調色，唔會有一圈死白。
+const Color kOceanBandSurface = Color(0xFFE3EAF1);
+
+/// 天色帶與日曆卡之間（以及日曆卡與底部詳情區之間）的垂直間距。
+///
+/// ⚠️ 呢個值**會計入 `CalendarLayout.gridOverhead`**：日曆卡的上下間距各 4
+/// （共 8）正係 `gridOverhead` 裡嗰 8。改呢個數就要同步改 `gridOverhead`，
+/// 否則格高實算會同預留對唔上（`test/calendar_layout_measure_test.dart` 會紅）。
+const double kOceanBandGap = 4.0;
+
+/// 天色帶與日曆卡**共用**的描邊色。
+///
+/// 兩者一定要同一個值：成套感嘅關鍵就係同一條邊、同一個圓角、同一條內縮。
+/// 值同 `ShiftTokens.neutralStroke` 一致，但呢度係純常數（唔使 `Theme.of`），
+/// 等 `OceanBand` 呢類裝飾 widget 唔使依賴 BuildContext。
+const Color kCardStroke = Color(0xFFD0D7DE);
