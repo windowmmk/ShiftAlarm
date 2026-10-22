@@ -26,6 +26,11 @@ object AlarmActions {
             AlarmScheduler.cancel(context, alarmId)
         } catch (_: Exception) {
         }
+        // 順手由註冊表除名：呢個 id 已經唔再係「排班鬧鐘」。
+        // 唔除名都唔會出錯（下一次對帳會發現佢唔喺 keep 而 cancel 一次），
+        // 但除名之後對帳就唔需要為一個已知死掉嘅 id 做一次多餘嘅
+        // PendingIntent 建立＋AlarmManager 查詢。
+        AlarmIdRegistry.forgetId(context, AlarmIdRegistry.KEY_FULL, alarmId)
         dismissNotification(context, alarmId)
         toast(context, "已停止")
     }
@@ -33,6 +38,18 @@ object AlarmActions {
     /**
      * 貪睡：只停而家響緊嘅聲，唔 cancel 未來鬧鐘；用同一個 alarmId
      * 5 分鐘後再排一次（schedule 會覆蓋舊 PendingIntent）。
+     *
+     * ⚠️ 貪睡之後必須由註冊表除名（v3.6.2）：貪睡之後嗰條鬧鐘嘅 trigger 係
+     * `now + 5 分鐘`，但 Dart 側完全唔知呢件事——`syncOnLaunch` 見到原本
+     * 嗰個開工時間已經過去，就唔會把呢個 id 放入 keep 清單。如果個 id 仍然
+     * 留喺註冊表，任何一次冷啟動（或「權限自檢 → 重新排程」）嘅對帳都會
+     * 判定佢係幽靈而 cancel 走，即係**用戶貪睡之後，鬧鐘靜靜雞唔會再響**。
+     * 除名之後呢條一次性計時器唔再受排班對帳管，只會由「停止」或自己響完
+     * 之後結束——語意上亦正確：貪睡鬧鐘本來就唔屬於排班鬧鐘。
+     *
+     * ⚠️ 除名嘅位置必須喺 `AlarmScheduler.schedule` **之後**，唔可以喺之前：
+     * `schedule` 自己會 `remember`，先 forget 再 schedule 等於冇 forget。
+     * 順序喺下面實作處再寫一次，唔好搬。
      */
     fun snooze(
         context: Context,
@@ -65,6 +82,13 @@ object AlarmActions {
             )
         } catch (_: Exception) {
         }
+        // ⚠️ 除名一定要放喺 `schedule` **之後**（v3.6.2 修正）。
+        // `AlarmScheduler.schedule` 內部會 `AlarmIdRegistry.remember`（任何排
+        // 得成嘅 id 都要入註冊表，否則對帳睇唔到佢）。所以如果照舊「先 forget
+        // 再 schedule」，schedule 會即刻把 id 寫返入去，forget 等於白做，
+        // 下面 KDoc 講嘅「貪睡後鬧鐘靜靜雞唔再響」會原封不動復發。
+        // 先排後忘，淨效果才是「呢個 id 唔再受排班對帳管」。
+        AlarmIdRegistry.forgetId(context, AlarmIdRegistry.KEY_FULL, alarmId)
         dismissNotification(context, alarmId)
         toast(context, "5 分鐘後再響")
     }

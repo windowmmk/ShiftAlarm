@@ -1,5 +1,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      精確鬧鐘權限：兩個一齊申請，唔係重複。
+
+      SCHEDULE_EXACT_ALARM 係「用戶可授權／可撤銷」版本；由 Android 14 起，
+      targetSdk 33+ 嘅**新安裝**唔再預授呢個權限，預設係拒絕，要用戶自己去
+      「設定 → 應用程式 → 特殊應用程式存取權 → 鬧鐘與提醒」手動開。
+
+      USE_EXACT_ALARM 係專為「核心功能就係鬧鐘／計時器／日曆」嘅 App 而設，
+      **安裝即授予、用戶不可撤銷**，正好補上上面嗰個缺口。
+
+      ⚠️ 呢個權限救嘅係**兩條通道**，唔止預告。`setAlarmClock` **冇**豁免
+      精確鬧鐘權限——兩個權限都冇嘅話，真鬧鐘（AlarmScheduler.schedule 同
+      scheduleGentle 都係用 setAlarmClock）同響鬧預告
+      （setExactAndAllowWhileIdle）一樣會拋 SecurityException。結果係
+      「新用戶裝完之後連真鬧鐘都唔響，而且 App 內零提示、crash.log 零記錄」。
+      以前有人以為 setAlarmClock 有豁免，所以低估咗嚴重性——唔好再寫錯。
+
+      兩者並存係合法嘅：USE_EXACT_ALARM 生效時 canScheduleExactAlarms()
+      一樣會回 true，所以 Dart 側現有嘅權限自檢邏輯唔需要改。
+    -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -70,8 +91,30 @@
         <receiver
             android:name=".BootReceiver"
             android:exported="false">
+            <!--
+              四個 action 全部係「AlarmManager 排程已經冇咗，而用戶以為仲有」
+              嘅情境，漏任何一個都等於靜默漏鬧鐘：
+
+              - BOOT_COMPLETED：重開機，排程全部清空。
+              - MY_PACKAGE_REPLACED：**覆蓋安裝／更新**。Android 更新 App 時
+                會清走該 package 所有 AlarmManager 排程（同 force-stop 一樣）。
+                v3.6.2 之前冇聽呢個 broadcast，結果係「更新完之後第二朝鬧鐘
+                完全唔響，直到用戶手動開一次 App」——對鬧鐘 App 嚟講係最傷
+                嘅失敗模式。呢個 broadcast 只會送畀 App 自己，唔需要額外權限。
+              - TIME_SET：用戶手動改系統時間。注意 manifest 寫 TIME_SET，
+                Java 常量叫 ACTION_TIME_CHANGED，兩者係同一個字串
+                "android.intent.action.TIME_SET"。
+              - TIMEZONE_CHANGED：跨時區。triggerAtMillis 係絕對 UTC 毫秒，
+                換時區之後同一個絕對時刻對應另一個當地鐘點，要按新時區重算。
+
+              ⚠️ BootReceiver.onReceive 有白名單檢查，加 action 落呢度之後
+              要確認 onReceive 都認得，否則會「filter 有但 handler 唔認」。
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

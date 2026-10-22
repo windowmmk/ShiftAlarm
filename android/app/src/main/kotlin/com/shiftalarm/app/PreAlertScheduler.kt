@@ -6,7 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 響鬧預告排程器（第三條通知通道）。
@@ -62,9 +62,48 @@ object PreAlertScheduler {
      */
     const val EXTRA_TRIGGER_AT = "pre_alert_trigger_at"
 
-    /** 註冊表 prefs 檔名（key "ids"，JSON int 陣列，內容係已偏移 id）。 */
+    /**
+     * 註冊表 key（＝ [AlarmIdRegistry.KEY_PRE_ALERT] ＝ `"ids"`）。
+     *
+     * v3.6.2 起註冊表嘅讀寫搬去 [AlarmIdRegistry]，令全鬧鐘／只通知兩條
+     * 通道可以共用同一套 remember／prune（見 [AlarmScheduler.cancelAllExcept]）。
+     * 呢個 key 嘅**字串值唔准改**，理由寫喺 [AlarmIdRegistry] 檔頭。
+     */
+    private const val KEY_IDS = AlarmIdRegistry.KEY_PRE_ALERT
+
+    /**
+     * 「已 dismiss」記錄嘅 key。同一個 prefs 檔，value 係 JSON 物件
+     * `{"<preAlertId>": <triggerAtMillis>}`。
+     *
+     * 為什麼要有呢份記錄（v3.6.2 修）：使用者喺通知欄㩒「知道了」或者掃走
+     * 條倒計時之後，以前只係 `nm.cancel`——**冇任何狀態**。於是任何一次
+     * `syncOnLaunch` / `onAssigned` / 重開機，只要 `triggerAtMillis` 仍在未來，
+     * `schedule()` 就會再 `notify` 一次，通知喺幾分鐘後自己復活。使用者明確
+     * 表達咗「唔想再見到」，App 卻再彈，屬信任問題。
+     *
+     * ⚠️ 版本號一定要用 `triggerAtMillis`，**唔可以**用 `alarmId` 單獨做 key：
+     * 咁樣會變成永久靜音——今日 09:00 㩒過「知道了」，明日同一 index 嘅預告
+     * 永遠唔再出現。用 triggerAtMillis 做版本號，同一個 index 嘅下一次鬧鐘
+     * 時間唔同，記錄自動失效；使用者改班次時間令 triggerAt 改變，舊記錄亦
+     * 自動失效。
+     */
+    private const val KEY_DISMISSED = "dismissed"
+
+    /**
+     * dismissed 記錄所用嘅 prefs 檔名。
+     *
+     * ⚠️ **必須同 [AlarmIdRegistry.PREFS_NAME] 逐字一致**（`"shiftalarm_prealerts"`）。
+     * 兩者唔一致嘅後果係：dismiss 記錄寫入另一個檔，`schedule()` 永遠讀唔到，
+     * 通知照樣復活——而且完全靜默，冇任何錯誤訊息。
+     *
+     * 為什麼唔直接引用 `AlarmIdRegistry.PREFS_NAME`（明明係同一個模組、
+     * 引用得到）：呢個檔已經有一條跨檔 `const val` 依賴（`KEY_IDS` ＝
+     * `AlarmIdRegistry.KEY_PRE_ALERT`），再加一條就等於把「預告通道嘅儲存
+     * 佈局」同 `AlarmIdRegistry` 嘅內部細節綁得更死。呢個字串由 v3.5 起就係
+     * 用戶機上嘅實際檔名，**永遠唔會改**，所以直接寫字面值＋呢段警告，比
+     * 多一條隱形耦合更實在。
+     */
     private const val PREFS_NAME = "shiftalarm_prealerts"
-    private const val KEY_IDS = "ids"
 
     private const val LEAD_MILLIS = LEAD_MINUTES * 60_000L
 
@@ -87,13 +126,17 @@ object PreAlertScheduler {
     fun preAlertId(alarmId: Int): Int = alarmId + PRE_ALERT_ID_OFFSET
 
     /**
-     * 排一條預告。三分支（v3.6.1 修訂）：
+     * 排一條預告。四分支（v3.6.2 加入分支 0）：
      *
      * | 條件 | 行為 |
      * |---|---|
+     * | `dismissed[preAlertId] == triggerAtMillis` | **使用者已 dismiss 過呢一次** → 直接 return（唔排、唔 notify） |
      * | `triggerAtMillis <= now` | 已響過／過期 → `cancelNotification` 後 return |
      * | `leadAt <= now < triggerAtMillis` | **已進入 1 小時窗口** → `set(now + 1s)` 立刻派發倒計時 |
      * | `leadAt > now` | 正常 → `setExactAndAllowWhileIdle(leadAt)` |
+     *
+     * ⚠️ 分支 0 一定要排喺最前，連分支 3 都要受保護——理由見下面 `schedule()`
+     * 開頭嘅註釋。
      *
      * ⚠️ 分支 2 係 v3.6.1 補嘅。舊版把「已進入窗口」同「已過期」混為一談，
      * 一律 `cancelNotification` 後 return，造成兩個直接違反功能原意嘅缺陷：
@@ -121,6 +164,22 @@ object PreAlertScheduler {
     ) {
         val now = System.currentTimeMillis()
         val leadAt = triggerAtMillis - LEAD_MILLIS
+
+        // ── 分支 0：使用者已經明確 dismiss 過「呢一次」 ────────────────
+        // 必須放喺**所有分支之前**（包括分支 3 嘅正常 setExact）。如果只保護
+        // 分支 2，「㩒知道了 → 改班次時間 → 重排 → 分支 3 照排 → 一小時後
+        // 又彈」會由另一個入口復發，同一個病換個入口。
+        //
+        // 防線一定要放喺 `schedule()` 內部而唔係呼叫端：
+        // `PreAlertScheduler.schedule` 有三個入口——[BootReceiver] 開機重建、
+        // `MainActivity` 嘅 `schedulePreAlert`、`MainActivity` 嘅 `rescheduleAll`
+        // 內部迴圈。任何一個漏咗就破功，而開機重建係最容易被漏嗰個。
+        //
+        // 版本號用 `triggerAtMillis`（見 [KEY_DISMISSED] 嘅 KDoc）：記錄存在
+        // 但數值唔同 ＝ 呢個係「另一次」鬧鐘，照樣要彈。
+        if (isDismissed(context, preAlertId(alarmId), triggerAtMillis)) {
+            return
+        }
 
         // ── 分支 1：已經響過／過期 ─────────────────────────────────────
         if (triggerAtMillis <= now) {
@@ -187,9 +246,18 @@ object PreAlertScheduler {
                     "[PRE_ALERT_SCHED] id=$alarmId mode=exact leadAt=$leadAt"
                 }
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Android 12+ 未授權精確鬧鐘會拋 SecurityException；任何異常嘅代價
             // 只可以係「冇預告」，絕不可以影響已經排好嘅真鬧鐘。
+            //
+            // ⚠️ 但唔可以**零痕跡**（v3.6.2 修）：Android 14 起，targetSdk 33+
+            // 嘅新安裝唔再預授 SCHEDULE_EXACT_ALARM，呢個 catch 會變成新用戶
+            // 嘅常態路徑。以前靜靜吞掉，結果係「預告由頭到尾冇出現過、App 內
+            // 零提示、crash.log 零記錄」，連 QA 都驗唔出。至少留一行 log，
+            // 令「權限自檢 → 當機紀錄」睇得到真正原因。
+            AlarmDebugLog.append(
+                context, "[PRE_ALERT_FAIL] id=$alarmId $e"
+            )
         }
     }
 
@@ -260,23 +328,19 @@ object PreAlertScheduler {
      *  3. `keepIds` 必須包含「leadAt 已過但鬧鐘未響」嘅 id（由呼叫方保證）。
      */
     fun prune(context: Context, keepIds: Set<Int>) {
-        try {
-            val previous = readIds(context)
-            for (staleId in previous - keepIds) {
-                cancelAlarmById(context, staleId)
-                try {
-                    val nm = context.getSystemService(
-                        Context.NOTIFICATION_SERVICE
-                    ) as NotificationManager
-                    nm.cancel(staleId)
-                } catch (_: Exception) {
-                }
+        AlarmIdRegistry.prune(context, KEY_IDS, keepIds) { staleId ->
+            cancelAlarmById(context, staleId)
+            // 預告嘅通知 id 就係已偏移 id，所以呢度 cancel 嘅係通知欄嗰條倒數。
+            // ⚠️ 唔可以照抄呢句去全鬧鐘／只通知兩條通道：佢哋嘅通知可能
+            // 正响緊，拆走就等於拆走用戶嘅「停止」掣（見
+            // [AlarmScheduler.cancelAllExcept] 嘅 KDoc）。
+            try {
+                val nm = context.getSystemService(
+                    Context.NOTIFICATION_SERVICE
+                ) as NotificationManager
+                nm.cancel(staleId)
+            } catch (_: Exception) {
             }
-            // 只有真正有變化才寫回，保證幂等（第二次呼叫一個字都唔改）
-            if (previous != keepIds) {
-                writeIds(context, keepIds)
-            }
-        } catch (_: Exception) {
         }
     }
 
@@ -297,52 +361,115 @@ object PreAlertScheduler {
         }
     }
 
-    private fun readIds(context: Context): Set<Int> {
-        val out = mutableSetOf<Int>()
+    /**
+     * 以下兩個係 [AlarmIdRegistry] 嘅薄轉接層。
+     *
+     * 保留（而唔係喺呼叫點直接寫 `AlarmIdRegistry.xxx(context, KEY_IDS, …)`）
+     * 嘅理由：預告通道嘅 id 語意（「已偏移 id」）只有本檔知，把 `KEY_IDS`
+     * 收喺呢度可以保證「預告永遠只會寫預告嗰條 key」，唔會有人手快寫錯
+     * 隔籬通道而令對帳互相踩。
+     */
+    private fun rememberId(context: Context, preId: Int) {
+        AlarmIdRegistry.remember(context, KEY_IDS, preId)
+    }
+
+    private fun forgetId(context: Context, preId: Int) {
+        AlarmIdRegistry.forgetId(context, KEY_IDS, preId)
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // 「已 dismiss」記錄（分支 0）
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * 記住「呢一次預告已經被使用者 dismiss」。
+     *
+     * 由 [PreAlertReceiver] 喺兩處呼叫：㩒「知道了」action、以及通知被使用者
+     * 掃走（`deleteIntent`）。兩者都係「使用者明確表達唔想再見到」。
+     *
+     * @param triggerAtMillis 呢一次預告對應嘅**鬧鐘觸發時刻**，同時做版本號。
+     *   傳 0 或者負數（例如升級前舊 PendingIntent 冇帶呢個 extra）就乜都唔寫
+     *   ——寧願漏記一次，都唔可以寫入一個錯誤版本號而令真正嘅下一次預告被
+     *   永久靜音。
+     */
+    fun markDismissed(context: Context, alarmId: Int, triggerAtMillis: Long) {
+        if (triggerAtMillis <= 0L) return
+        try {
+            val preId = preAlertId(alarmId)
+            val map = readDismissed(context)
+            if (map[preId] == triggerAtMillis) return
+            map[preId] = triggerAtMillis
+            writeDismissed(context, map)
+            AlarmDebugLog.append(
+                context,
+                "[PRE_ALERT_DISMISSED] id=$alarmId triggerAt=$triggerAtMillis"
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 呢一次預告係咪已經被 dismiss。
+     *
+     * ⚠️ 比較嘅係**數值**，唔係「key 存在」。記錄存在但 `triggerAtMillis`
+     * 唔同 ＝ 呢個係同一個 index 嘅「另一次」鬧鐘（例如明日 09:00，或者
+     * 使用者改咗班次時間），必須照樣派發。
+     */
+    private fun isDismissed(
+        context: Context,
+        preId: Int,
+        triggerAtMillis: Long
+    ): Boolean {
+        return try {
+            readDismissed(context)[preId] == triggerAtMillis
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 讀 dismissed 記錄，順手清走「觸發時刻已經過去」嘅條目。
+     *
+     * 清走係必要嘅：記錄嘅用途只係「阻止一條未響嘅預告復活」，一旦鬧鐘響過
+     * （`triggerAtMillis` 已過去），呢條記錄永遠唔會再被查，留住只會令 prefs
+     * 無限膨脹。清走之後記錄數量嘅上界 ＝ 未來預告嘅數量。
+     */
+    private fun readDismissed(context: Context): MutableMap<Int, Long> {
+        val out = mutableMapOf<Int, Long>()
         try {
             val prefs = context.getSharedPreferences(
                 PREFS_NAME, Context.MODE_PRIVATE
             )
-            val raw = prefs.getString(KEY_IDS, null) ?: return out
-            val arr = JSONArray(raw)
-            for (i in 0 until arr.length()) {
-                // 用 optLong 而非 optInt：JSON 數字若被解析成 Long／Double，
-                // optInt 會走 Number.intValue() 靜默截斷（不是回預設值），
-                // 截斷後嘅 id 會變成另一條合法但錯誤嘅 id，反而更難查。
-                // 先取 Long，再明確檢查落在 Int 正數範圍才收。
-                val v = arr.optLong(i, -1L)
-                if (v > 0L && v <= Int.MAX_VALUE.toLong()) out.add(v.toInt())
+            val raw = prefs.getString(KEY_DISMISSED, null) ?: return out
+            val obj = JSONObject(raw)
+            val now = System.currentTimeMillis()
+            val it = obj.keys()
+            while (it.hasNext()) {
+                val k = it.next()
+                // key 係 preAlertId（正數 Int）。解析唔到就當壞條目跳過。
+                val id = k.toIntOrNull() ?: continue
+                // 用 optLong 而非 optInt，理由同 AlarmIdRegistry.readIds：
+                // optInt 會靜默截斷成另一個合法但錯誤嘅數值。
+                val v = obj.optLong(k, 0L)
+                if (v > now) out[id] = v
             }
         } catch (_: Exception) {
-            // 壞檔當空註冊表，唔 crash
+            // 壞檔當「冇人 dismiss 過」——最壞情況係通知多彈一次，
+            // 遠比「全部預告永久靜音」安全。
         }
         return out
     }
 
-    private fun writeIds(context: Context, ids: Set<Int>) {
+    private fun writeDismissed(context: Context, map: Map<Int, Long>) {
         try {
-            val arr = JSONArray()
-            for (id in ids.sorted()) arr.put(id)
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_IDS, arr.toString())
-                .apply()
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun rememberId(context: Context, preId: Int) {
-        try {
-            val ids = readIds(context).toMutableSet()
-            if (ids.add(preId)) writeIds(context, ids)
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun forgetId(context: Context, preId: Int) {
-        try {
-            val ids = readIds(context).toMutableSet()
-            if (ids.remove(preId)) writeIds(context, ids)
+            val obj = JSONObject()
+            // obj.put(String, Long) 係明確多載，唔會把 Long 誤當 Object 而
+            // 序列化成字串——dismissed 嘅值一定要係 JSON 數字，
+            // readDismissed 嘅 `optLong` 才讀得返。
+            for ((id, ts) in map) obj.put(id.toString(), ts)
+            context.getSharedPreferences(
+                PREFS_NAME, Context.MODE_PRIVATE
+            ).edit().putString(KEY_DISMISSED, obj.toString()).apply()
         } catch (_: Exception) {
         }
     }

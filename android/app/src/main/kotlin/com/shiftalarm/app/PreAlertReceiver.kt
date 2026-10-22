@@ -105,10 +105,21 @@ class PreAlertReceiver : BroadcastReceiver() {
 
         // 「知道了」：淨係取消呢隻通知，原鬧鐘照響
         if (intent.action == ACTION_DISMISS) {
+            // 版本號（＝鬧鐘觸發時刻）由派發時寫入 dismissPi，見下面
+            // dismissPi 嘅 `putExtra(EXTRA_TRIGGER_AT, …)`。讀唔到（0）就
+            // 唔寫記錄——寧願漏記一次，都唔可以寫錯版本號而令真正嘅
+            // 下一次預告被永久靜音。
+            val triggerAt = intent.getLongExtra(
+                PreAlertScheduler.EXTRA_TRIGGER_AT, 0L
+            )
             try {
                 nm.cancel(PreAlertScheduler.preAlertId(alarmId))
             } catch (_: Exception) {
             }
+            // v3.6.2：記住「呢一次」已經被 dismiss。
+            // 冇呢一句，任何一次 syncOnLaunch／onAssigned／重開機都會令
+            // 通知喺幾分鐘後自己復活——使用者明確表達咗唔想再見到。
+            PreAlertScheduler.markDismissed(context, alarmId, triggerAt)
             return
         }
 
@@ -131,6 +142,15 @@ class PreAlertReceiver : BroadcastReceiver() {
                 Intent(context, PreAlertReceiver::class.java).apply {
                     action = ACTION_DISMISS
                     putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
+                    // ⚠️ v3.6.2 必須帶埋版本號，否則 DISMISS 分支拿唔到
+                    // triggerAtMillis 去做「已 dismiss」記錄，只能退而用
+                    // alarmId 單獨做 key——咁就會變成永久靜音（今日㩒過
+                    // 「知道了」，明日同一 index 永遠唔再彈）。
+                    // FLAG_UPDATE_CURRENT 每次重派時會連 extras 一齊更新，
+                    // 所以同一 requestCode 唔會殘留舊嘅 triggerAt。
+                    putExtra(
+                        PreAlertScheduler.EXTRA_TRIGGER_AT, triggerAt
+                    )
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or
                     PendingIntent.FLAG_IMMUTABLE
@@ -158,6 +178,14 @@ class PreAlertReceiver : BroadcastReceiver() {
                 // 使用者原話「頂欄掛着」：划得走就等於功能失效
                 .setOngoing(true)
                 .setAutoCancel(false)
+                // 使用者掃走條通知（或者「全部清除」）都要當成 dismiss。
+                // v3.6.2：刻意**重用同一個 dismissPi**——行為同㩒「知道了」
+                // 完全一樣（都係 nm.cancel + markDismissed），冇必要多開一個
+                // requestCode 帶（多一個帶就多一個同未來 id 撞嘅機會）。
+                // 注意：`deleteIntent` 只會喺「使用者主動清除」時觸發，
+                // App 自己 `nm.cancel()`（例如真鬧鐘響嗰刻清走預告）唔會觸發，
+                // 所以唔會誤記「已 dismiss」。
+                .setDeleteIntent(dismissPi)
                 // 只提示一次：`PreAlertScheduler` 分支 2 每次 App 啟動都會用
                 // `set(now+1s)` 重新派發同一個 PendingIntent，即係同一條通知會被
                 // `notify()` 多次。同一 id 只會「更新」不會「新增」，加上頻道係
