@@ -69,17 +69,44 @@ object PreAlertScheduler {
     private const val LEAD_MILLIS = LEAD_MINUTES * 60_000L
 
     /**
+     * 分支 2（已進入預告窗口）嘅派發延遲。
+     *
+     * 唔可以喺 `schedule()` 內直接 `notify`：本 object 嘅職責邊界係「只碰
+     * AlarmManager 同 id 註冊表」，發通知一律經 [PreAlertReceiver]。所以用
+     * `AlarmManager.set` 排一個 1 秒後嘅廣播，等 receiver 自己砌通知。
+     *
+     * 1 秒係取捨：太短（0）等同同步 notify，等於繞過職責邊界；太長會令
+     * 「使用者開 App 後要等幾秒才見到倒計時」。
+     */
+    private const val IMMEDIATE_FIRE_DELAY_MILLIS = 1_000L
+
+    /**
      * 唯一轉換點：鬧鐘 id → 預告 id。
      * 同時用作 AlarmManager 嘅 broadcast PendingIntent requestCode 與通知 id。
      */
     fun preAlertId(alarmId: Int): Int = alarmId + PRE_ALERT_ID_OFFSET
 
     /**
-     * 排一條預告。
+     * 排一條預告。三分支（v3.6.1 修訂）：
+     *
+     * | 條件 | 行為 |
+     * |---|---|
+     * | `triggerAtMillis <= now` | 已響過／過期 → `cancelNotification` 後 return |
+     * | `leadAt <= now < triggerAtMillis` | **已進入 1 小時窗口** → `set(now + 1s)` 立刻派發倒計時 |
+     * | `leadAt > now` | 正常 → `setExactAndAllowWhileIdle(leadAt)` |
+     *
+     * ⚠️ 分支 2 係 v3.6.1 補嘅。舊版把「已進入窗口」同「已過期」混為一談，
+     * 一律 `cancelNotification` 後 return，造成兩個直接違反功能原意嘅缺陷：
+     *  - 09:00 響、08:00 lead，使用者 08:30 開 App → `syncOnLaunch` 會親手
+     *    殺掉**正在倒數 30 分鐘**嘅通知（畫面突然消失）。
+     *  - 08:30 才排 09:00 嘅更 → 預告**永遠唔會出現**。
+     *
+     * 分支 2 用 `AlarmManager.set`，**唔用** `setExactAndAllowWhileIdle` 亦
+     * **唔用** `setAlarmClock`：near-now 派發唔需要精確鬧鐘權限（避免
+     * Android 12+ 未授權時靜默失敗），亦唔應該污染系統「下一個鬧鐘」指示器。
      *
      * @param triggerAtMillis 鬧鐘**觸發**時刻（唔係預告時刻），由呼叫方計好。
-     * @param leadAt = triggerAtMillis − [LEAD_MINUTES] 分鐘；`leadAt <= now` 就唔排、唔補發，
-     *   只清走可能殘留嘅通知（ARCH D8）。
+     *   分支 2 傳落 [PreAlertReceiver] 嘅仍然係呢個原值，倒計時數值才正確。
      */
     fun schedule(
         context: Context,
@@ -92,13 +119,19 @@ object PreAlertScheduler {
         startTime: String = "",
         note: String = ""
     ) {
-        val leadAt = triggerAtMillis - LEAD_MILLIS
         val now = System.currentTimeMillis()
-        if (leadAt <= now) {
-            // 距響不足 1 小時（或已過）：唔排、唔補發，順手清走殘留通知
+        val leadAt = triggerAtMillis - LEAD_MILLIS
+
+        // ── 分支 1：已經響過／過期 ─────────────────────────────────────
+        if (triggerAtMillis <= now) {
+            // 真係過咗期：唔排、唔補發，順手清走殘留通知
             cancelNotification(context, alarmId)
             return
         }
+
+        // 分支 2 / 3 嘅判別：是否已踏入 1 小時窗口
+        val inWindow = leadAt <= now
+
         try {
             val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, PreAlertReceiver::class.java).apply {
@@ -123,15 +156,36 @@ object PreAlertScheduler {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, leadAt, pi)
+
+            if (inWindow) {
+                // ── 分支 2：已進入窗口 → 立刻派發，唔取消 ──────────────
+                // 用 set 而非 setExact*：near-now，唔需要精確鬧鐘權限，
+                // 亦唔會污染系統「下一個鬧鐘」。
+                am.set(
+                    AlarmManager.RTC_WAKEUP,
+                    now + IMMEDIATE_FIRE_DELAY_MILLIS,
+                    pi
+                )
             } else {
-                am.setExact(AlarmManager.RTC_WAKEUP, leadAt, pi)
+                // ── 分支 3：正常路徑，維持 v3.5 行為 ─────────────────
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP, leadAt, pi
+                    )
+                } else {
+                    am.setExact(AlarmManager.RTC_WAKEUP, leadAt, pi)
+                }
             }
+
             rememberId(context, preAlertId(alarmId))
             AlarmDebugLog.append(
                 context,
-                "[PRE_ALERT_SCHED] id=$alarmId leadAt=$leadAt"
+                if (inWindow) {
+                    "[PRE_ALERT_SCHED] id=$alarmId mode=immediate " +
+                        "triggerAt=$triggerAtMillis"
+                } else {
+                    "[PRE_ALERT_SCHED] id=$alarmId mode=exact leadAt=$leadAt"
+                }
             )
         } catch (_: Exception) {
             // Android 12+ 未授權精確鬧鐘會拋 SecurityException；任何異常嘅代價

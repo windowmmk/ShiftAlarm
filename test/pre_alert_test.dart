@@ -42,6 +42,32 @@ ShiftDef _def() => ShiftDef(
       ],
     );
 
+/// 造一個「距離現在約 [minutes] 分鐘後響」的班次：單一真鬧鐘 a1、offset 0。
+///
+/// 用相對時間而非寫死日期，因為「是否已踏入 1 小時預告窗口」正是本組測試的
+/// 自變量；寫死日期會令測試隨時間漂移。
+/// `triggerAtFor` 會把秒截成 0，所以實際觸發時刻會比 `now + minutes` 早 0–59 秒，
+/// 對本組測試（±30 分鐘級別）無影響。
+({String ymd, ShiftDef def}) _defFiringIn(int minutes) {
+  final t = DateTime.now().add(Duration(minutes: minutes));
+  final ymd = '${t.year}-${t.month.toString().padLeft(2, '0')}-'
+      '${t.day.toString().padLeft(2, '0')}';
+  final hhmm = '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
+  return (
+    ymd: ymd,
+    def: ShiftDef(
+      id: 'c9',
+      name: '即時',
+      startTime: hhmm,
+      endTime: hhmm,
+      alarms: [
+        ShiftAlarm(id: 'a1', label: '開工鬧鐘', offsetMinutes: 0, enabled: true),
+      ],
+    ),
+  );
+}
+
 /// 記錄三條通道呼叫的假橋。全部 override，避免落到真 MethodChannel
 /// 拋 `MissingPluginException`（同 `test/clockin_test.dart` 的 `_FakeBridge` 同手法）。
 class _FakeBridge extends AlarmBridge {
@@ -350,6 +376,91 @@ void main() {
       expect(fake.cancelledPreAlerts.length, ShiftAlarm.maxAlarmsPerShift,
           reason: 'onAssigned 開頭會 _cancelAllFor');
       expect(fake.preAlerts.length, 1);
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // 已進入預告窗口（leadAt <= now < triggerAt）
+  //
+  // 這組鎖的是 **Dart 側契約**：無論鬧鐘距離響鐘還有多久，Dart 都照送
+  // `PreAlertSchedule`，而且送出去的 `triggerAtMillis` 永遠是「原響鬧時間」。
+  // 「已進入窗口 → 立刻派發倒計時」這個決定 100% 在原生側
+  // （`PreAlertScheduler.schedule` 分支 2，用 `AlarmManager.set(now+1s)`）。
+  //
+  // ⚠️ 範圍說明：`AlarmManager.set` 有沒有被呼叫、`cancelNotification` 有沒有
+  // 被呼叫，是 Kotlin 內部行為，`flutter test` 觀察不到（本專案
+  // `android/app/src/test` 不存在，沒有任何 Kotlin 測試基建）。本組測試守住的是
+  // 「Dart 不會自作聰明把 triggerAtMillis 換成 now+1s」與「窗口內不會漏排」，
+  // 這兩點是分支 2 正確與否的必要條件。
+  // ───────────────────────────────────────────────────────────────────────
+  group('已進入預告窗口仍然要排（原生分支 2 的 Dart 側前提）', () {
+    test('30 分鐘後響：照送 schedule，triggerAtMillis 仍是原響鬧時間', () async {
+      final f = _defFiringIn(30);
+      final fake = _FakeBridge();
+      await AlarmService(fake).onAssigned(f.ymd, f.def);
+
+      expect(fake.preAlerts.length, 1,
+          reason: '已進入 1 小時窗口 ≠ 唔排；「即刻派發」係原生側分支 2 嘅事');
+
+      final expected =
+          AlarmService.triggerAtFor(f.ymd, f.def, f.def.alarms[0])!;
+      expect(fake.preAlerts.single.triggerAtMillis,
+          expected.millisecondsSinceEpoch);
+
+      // 明確否定「Dart 用 now + 1s 代替 triggerAt」：
+      // 窗口內仍然要傳原響鬧時間，差額必須遠大於 1 秒
+      expect(
+        fake.preAlerts.single.triggerAtMillis -
+            DateTime.now().millisecondsSinceEpoch,
+        greaterThan(20 * 60 * 1000),
+        reason: '倒計時終點必須係原響鬧時間，唔可以係 now+1s',
+      );
+    });
+
+    test('已過期（30 分鐘前響）：triggerAtFor 回 null → 零預告（分支 1 在 Dart 側前置攔住）',
+        () async {
+      final f = _defFiringIn(-30);
+      expect(AlarmService.triggerAtFor(f.ymd, f.def, f.def.alarms[0]), isNull,
+          reason: '過期的鬧鐘 Dart 根本唔會排，分支 1 只會被原生舊狀態觸發');
+
+      final fake = _FakeBridge();
+      await AlarmService(fake).onAssigned(f.ymd, f.def);
+
+      expect(fake.preAlerts, isEmpty);
+      expect(fake.full, isEmpty);
+      expect(fake.gentle, isEmpty);
+      // 取消仍然照跑（_cancelAllFor 不受窗口狀態影響）
+      expect(fake.cancelledPreAlerts.length, ShiftAlarm.maxAlarmsPerShift);
+    });
+
+    test('同一班次：一條在窗口外、一條在窗口內 → 兩條都要有預告', () async {
+      final t = DateTime.now().add(const Duration(minutes: 80));
+      final ymd = '${t.year}-${t.month.toString().padLeft(2, '0')}-'
+          '${t.day.toString().padLeft(2, '0')}';
+      final hhmm = '${t.hour.toString().padLeft(2, '0')}:'
+          '${t.minute.toString().padLeft(2, '0')}';
+      final def = ShiftDef(
+        id: 'c9',
+        name: '即時',
+        startTime: hhmm,
+        endTime: hhmm,
+        alarms: [
+          // a1：80 分鐘後響 → 窗口外（leadAt 仲有 20 分鐘才到）
+          ShiftAlarm(id: 'a1', label: '窗口外', offsetMinutes: 0, enabled: true),
+          // a2：50 分鐘後響 → 已進入 60 分鐘窗口
+          ShiftAlarm(id: 'a2', label: '窗口內', offsetMinutes: -30, enabled: true),
+        ],
+      );
+
+      final fake = _FakeBridge();
+      await AlarmService(fake).onAssigned(ymd, def);
+
+      expect(fake.preAlerts.length, 2,
+          reason: '窗口狀態唔影響「排不排」，Dart 兩條都要送落原生側');
+      expect(
+        fake.preAlerts.map((p) => p.alarmId).toSet(),
+        {AlarmService.alarmIdFor(ymd, 0), AlarmService.alarmIdFor(ymd, 1)},
+      );
     });
   });
 }
