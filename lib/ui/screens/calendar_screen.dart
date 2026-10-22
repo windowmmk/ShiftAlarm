@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -460,6 +461,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        titleSpacing: 8,
         title: InkWell(
           onTap: _showMonthPicker,
           borderRadius: BorderRadius.circular(8),
@@ -468,14 +470,30 @@ class _CalendarScreenState extends State<CalendarScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$_activeYear年$_activeMonth月'),
+                // ⚠️ 呢個 Text 一定要包 `Flexible` + 省略號，唔可以任由佢撐開。
+                // AppBar 的 middle slot 只會分到「總寬 − leading − actions − spacing」
+                // 的剩餘寬度（實測 320/360/390/412 分別只剩 55.8 / 95.8 / 125.8 / 147.8），
+                // 而標題（4 位數字＋年＋2 位數字＋月＋下拉箭頭）本身要 164px，
+                // 所以舊版**每一個寬度都爆邊**（320 爆 108、360 爆 68、390 爆 38、412 爆 16）。
+                // 包了 Flexible 之後，剩餘寬度有幾多就用幾多，永遠唔會再爆。
+                Flexible(
+                  child: AutoSizeText(
+                    '$_activeYear年$_activeMonth月',
+                    maxLines: 1,
+                    minFontSize: 11,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 const Icon(Icons.arrow_drop_down, size: 20),
               ],
             ),
           ),
         ),
         actions: [
-          FilledButton.tonalIcon(
+          // 導入由「圖示＋文字」的 tonal 按鈕改成純圖示：舊版呢個按鈕實佔 72.2px，
+          // 連同後面三個控制合共 220.2px，係標題被擠爆的主因。
+          // 圖示版只佔 48px（保住 48dp 最小觸控目標），文字提示改用 tooltip。
+          IconButton(
             onPressed: () => showUnifiedImportDialog(
               context: context,
               store: widget.store,
@@ -484,15 +502,9 @@ class _CalendarScreenState extends State<CalendarScreen>
                 _playSequentialImportAnimation(dates);
               },
             ),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: const Size(0, 36),
-            ),
-            icon: const Icon(Icons.file_download_outlined, size: 17),
-            label: const Text('導入',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
+            icon: const Icon(Icons.file_download_outlined, size: 20),
+            tooltip: '導入排班 / 配置',
           ),
-          const SizedBox(width: 4),
           OutlinedButton(
             onPressed: _goToToday,
             style: OutlinedButton.styleFrom(
@@ -606,14 +618,27 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   /// 一個月固定 6 週（42 格）標準網格：四周留白，破浪光潮推進時整個月曆容器如甲板般 3D 俯仰
   ///
-  /// [cellHeight] 由 [CalendarLayout] 實算（理想 75，空間唔夠先縮細），
-  /// 唔再寫死 75 —— 寫死會令三區固定佈局喺細機溢出。
+  /// **高度分配係自適應的**：頂部星期表頭用自然高度（會隨系統字體縮放變高），
+  /// 剩餘高度由 6 個星期列以 `Expanded` 平均吸收。
+  ///
+  /// v3.6.2 之前呢度係「表頭自然高度 + 6 × `SizedBox(height: cellHeight)`」，
+  /// 而 `CalendarLayout` 只預留 36px 給表頭與間距（實算：`gridHeight` − 8（上下 padding）
+  /// − 4（間距）= 24px 才是表頭可用高度）。1.0 倍字體時表頭 21px 剛好夠，
+  /// 但 1.15 倍就 24px 頂死、1.3 倍 26px 爆 2px、2.0 倍 38px 爆 14px ——
+  /// 即係**任何開了「大字體」無障礙設定的用戶，日曆都會出黃黑間條**。
+  /// 改用 `Expanded` 之後，表頭想幾高就幾高，格仔自動縮一點去讓位，
+  /// 結構上唔可能再溢出（`Expanded` 只會平分，唔會超出）。
+  ///
+  /// [cellHeight] 只作**理想上限**參考：`CalendarLayout` 用它算出 `gridHeight`，
+  /// 所以正常字體時每列分到的高度就係 `cellHeight` 本身。
   Widget _monthGrid(
     ShiftTokens t,
     int year,
     int month, {
     required double cellHeight,
   }) {
+    // 只作 debug 期守門：正常路徑由 CalendarLayout 保證為正數
+    assert(cellHeight > 0, '格高必須為正數（由 CalendarLayout 實算）');
     final firstDay = DateTime(year, month, 1);
     final firstWeekday = firstDay.weekday % 7; // 星期日為 0
     final firstSunday = DateTime(year, month, 1 - firstWeekday);
@@ -626,13 +651,14 @@ class _CalendarScreenState extends State<CalendarScreen>
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), // 四周邊距留白，透出靈動海面
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            // ⚠️ 一定要 `max`：下面 6 列用 `Expanded` 平分剩餘高度，
+            // 而 `Expanded` 要求 Column 有明確的高度上限（由外層 SizedBox 提供）。
+            mainAxisSize: MainAxisSize.max,
             children: [
               _weekHeader(t),
               const SizedBox(height: 4),
               for (int w = 0; w < weekCount; w++)
-                SizedBox(
-                  height: cellHeight,
+                Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 1.5),
                     child: Row(
