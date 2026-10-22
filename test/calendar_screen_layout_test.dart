@@ -16,10 +16,10 @@ import 'package:shiftalarm/ui/widgets/ocean_band.dart';
 /// `calendar_layout_test.dart` 只證明算式；呢度證明 `CalendarScreen` 真係用
 /// 呢組數字砌出嚟，而且 **冇 RenderFlex 溢出**（黃黑間條）。
 ///
-/// ⚠️ 已知既有問題（本次唔修，見 calendar_screen.dart 的 AppBar）：
-/// 360px 寬嘅 AppBar actions 會水平溢出 68px。所以下面嘅斷言只針對
-/// 三區本體（`LayoutBuilder` 底下嗰條 Column）嘅溢出 —— AppBar 嗰個唔會
-/// 被當成綠燈，亦唔會令測試紅。
+/// v3.6.2：AppBar 的水平溢出（320 爆 108 / 360 爆 68 / 390 爆 38 / 412 爆 16）
+/// 已經修好（`title` 加 `Flexible`、導入改圖示按鈕、`titleSpacing: 8`）。
+/// 所以呢個檔唔再需要「只挑三區本體溢出」的過濾器 —— 任何溢出都應該令測試紅。
+/// 全寬度 × 全字體縮放的掃描由 `responsive_overflow_test.dart` 負責。
 ///
 /// v3.6.1：期望值**一律由 widget 樹實測反推**（body 高度、真實底部 inset），
 /// 唔再靠「屏幕高 − 56 − 24」呢種假設 —— 測試環境冇狀態列 padding，
@@ -56,17 +56,14 @@ void main() {
     );
   }
 
-  /// 只抽「三區本體」嘅 layout 錯誤（AppBar 既有溢出維持為已知問題）
-  List<Object?> threeZoneOverflow(WidgetTester tester) {
+  /// 抽出所有 layout 錯誤（v3.6.2 起唔再過濾 —— AppBar 溢出已修，
+  /// 任何溢出都應該令測試紅）
+  List<Object?> layoutErrors(WidgetTester tester) {
     final hits = <Object?>[];
     for (;;) {
       final e = tester.takeException();
       if (e == null) break;
-      final msg = e.toString();
-      // 三區本體嘅 creator chain 一定包「Column ← LayoutBuilder」
-      if (msg.contains('overflowed') && msg.contains('LayoutBuilder')) {
-        hits.add(e);
-      }
+      hits.add(e);
     }
     return hits;
   }
@@ -93,8 +90,8 @@ void main() {
     ));
     await tester.pump();
 
-    expect(threeZoneOverflow(tester), isEmpty,
-        reason: '$w×$h 三區本體溢出');
+    expect(layoutErrors(tester), isEmpty,
+        reason: '$w×$h 有 layout 溢出');
   }
 
   testWidgets('360×800：三區都排到、高度對得上、冇溢出', (tester) async {
@@ -132,7 +129,7 @@ void main() {
 
     expect(find.byType(ShiftPickerPanel), findsOneWidget,
         reason: '排班編輯應該原地出現喺底部區');
-    expect(threeZoneOverflow(tester), isEmpty);
+    expect(layoutErrors(tester), isEmpty);
 
     // 原地切換 = 海洋帶高度完全冇變（呢個就係「唔用彈出彈入」嘅證據）
     final bandAfter = tester.widget<OceanBand>(find.byType(OceanBand)).height;
@@ -164,7 +161,7 @@ void main() {
     expect(layout.navHeight, isNot(CalendarLayout.navReserved),
         reason: '唔可以再係寫死嘅 72');
     expect(layout.totalHeight, closeTo(bodyHeightOf(tester), 1e-9));
-    expect(threeZoneOverflow(tester), isEmpty);
+    expect(layoutErrors(tester), isEmpty);
   });
 
   testWidgets('鍵盤彈起：天色欄壓到 0、nav 留白變 0、冇溢出', (tester) async {
@@ -176,6 +173,6 @@ void main() {
     expect(layout.navHeight, 0.0, reason: '鍵盤彈起時 Scaffold 已把 padding.bottom 歸零');
     expect(tester.getSize(find.byType(OceanBand)).height, closeTo(0.0, 1e-9));
     expect(layout.totalHeight, closeTo(bodyHeightOf(tester), 1e-9));
-    expect(threeZoneOverflow(tester), isEmpty);
+    expect(layoutErrors(tester), isEmpty);
   });
 }
