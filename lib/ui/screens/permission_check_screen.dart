@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../alarm/alarm_bridge.dart';
@@ -318,23 +319,49 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // 標題 + 兩個按鈕。
+            //
+            // 以前係一條 Row（標題／副標題／Spacer／重新排程／清除），實測
+            // 390px @1.0x 已經橫向溢出 4.7px —— 即係**連預設字體的中階機都爆**。
+            // 改用 `Wrap`：夠位就左右分開擺，唔夠位按鈕組自動換行去第二行，
+            // 按鈕唔會因為縮小而變難㩒。
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                Text('當機紀錄',
-                    style: TextStyle(
-                        fontSize: t.fontBody, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 8),
-                Text('原生＋Dart 未捕捉異常',
-                    style: TextStyle(
-                        fontSize: t.fontCaption, color: t.neutralFg2)),
-                const Spacer(),
-                TextButton(
-                  onPressed: _rescheduleAfterCrash,
-                  child: const Text('重新排程'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('當機紀錄',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: t.fontBody,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text('原生＋Dart 未捕捉異常',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: t.fontCaption, color: t.neutralFg2)),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: _clearCrashLogs,
-                  child: const Text('清除'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: _rescheduleAfterCrash,
+                      child: const Text('重新排程'),
+                    ),
+                    TextButton(
+                      onPressed: _clearCrashLogs,
+                      child: const Text('清除'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -403,37 +430,55 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
           children: [
             Icon(icon, color: iconColor, size: 28),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.title,
-                          style: TextStyle(
-                              fontSize: t.fontBody,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: item.check == null
-                              ? (item.manualOk
-                                  ? const Color(0xFFDCFCE7)
-                                  : const Color(0xFFEBF3FA))
-                              : (item.ok == true
-                                  ? const Color(0xFFDCFCE7)
-                                  : const Color(0xFFFFF9F5)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(status,
+                      // 權限名 + 狀態徽章。
+                      //
+                      // 呢一行以前係一條死板 Row：320×640 @1.3x 實測橫向溢出
+                      // 14px、@2.0x 溢出 143px（因為右邊「去應用詳情」按鈕在
+                      // 2.0x 已經食掉 172px，剩返 92px 畀成個 Column）。
+                      // 改用 `Wrap`：有位就一行過，冇位就徽章自動跌去第二行，
+                      // 永遠唔會爆邊，亦唔會把權限名截到睇唔出係邊一項。
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          // 用 AutoSizeText 而唔係 ellipsis：「鎖定螢幕通知顯示」
+                          // 截成「鎖定螢…」用戶就分唔清係邊一項，寧願字細一級。
+                          AutoSizeText(
+                            item.title,
+                            maxLines: 1,
+                            minFontSize: 10,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                fontSize: t.fontCaption,
-                                color: t.neutralFg2)),
+                                fontSize: t.fontBody,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: item.check == null
+                                  ? (item.manualOk
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFEBF3FA))
+                                  : (item.ok == true
+                                      ? const Color(0xFFDCFCE7)
+                                      : const Color(0xFFFFF9F5)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(status,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: t.fontCaption,
+                                    color: t.neutralFg2)),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                   const SizedBox(height: 4),
                   Text(item.desc,
                       style: TextStyle(

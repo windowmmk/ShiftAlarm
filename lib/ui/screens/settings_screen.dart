@@ -127,7 +127,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const Icon(Icons.qr_code_2, color: Color(0xFF2E7D32)),
                 const SizedBox(width: 8),
-                Text(title),
+                // 標題要可以縮：360×800 @2.0x 時圖示 + 標題實測橫向溢出 6px、
+                // 320 @2.0x 溢出 46px。圖示保持固定大細（縮圖示會令辨識度變差），
+                // 只讓文字讓位。
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             content: SizedBox(
@@ -531,107 +540,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ShiftAlarm 排班鬧鐘',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: t.neutralFg,
+            // App 名 + 版本號：320px @2.0x 時呢個 Column 實測橫向溢出 211px，
+            // 所以一定要 Flexible，否則連「ShiftAlarm」都會被切走。
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ShiftAlarm 排班鬧鐘',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: t.neutralFg,
+                    ),
                   ),
-                ),
-                Text(
-                  kAppVersionDisplay,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: t.neutralFg2,
-                    fontWeight: FontWeight.w500,
+                  Text(
+                    kAppVersionDisplay,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: t.neutralFg2,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F1FC),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFB6D3F9)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.shield_outlined, size: 16, color: t.brand),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '100% 純離線 · 零網絡權限 · 零追蹤',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: t.brand,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+        // 對話框內容**必須可滾動**，否則大字體用戶永遠睇唔到後半段。
+        //
+        // 內容有 16 個項目（保障標籤／簡介／開源代碼庫…），實測高度：
+        //   - 360×800 @1.3x 需要 658px，但可用只有 601px → 直向溢出 57px
+        //   - 360×800 @2.0x 需要 660px → 直向溢出 59px
+        //   - 320 @2.0x 更嚴重
+        // 之前用 `Column(mainAxisSize: min)` 直接塞入 content，高度一爆就直接
+        // 切走尾段（連「開源代碼庫」個網址都睇唔到）。改成
+        // `ConstrainedBox(maxHeight) + SingleChildScrollView`：高度有上限（唔會
+        // 撐爆整個畫面），但內容永遠滾得到。
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
+          ),
+          child: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F1FC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFB6D3F9)),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '專為輪班人士量身打造的極致隱私排班日曆與精確鬧鐘。瑞士精密工藝排版，原生底層鬧鐘喚醒，支援極簡二進制口令協議。',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: t.neutralFg,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: t.neutralBg2,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: t.neutralStroke),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.code, size: 15, color: t.neutralFg2),
+                        Icon(Icons.shield_outlined, size: 16, color: t.brand),
                         const SizedBox(width: 6),
-                        Text(
-                          '開源代碼庫 (GitHub)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: t.neutralFg,
+                        Expanded(
+                          child: Text(
+                            '100% 純離線 · 零網絡權限 · 零追蹤',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: t.brand,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    SelectableText(
-                      'https://github.com/windowmmk/ShiftAlarm',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: t.brand,
-                        fontFamily: 'monospace',
-                      ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '專為輪班人士量身打造的極致隱私排班日曆與精確鬧鐘。瑞士精密工藝排版，原生底層鬧鐘喚醒，支援極簡二進制口令協議。',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: t.neutralFg,
+                      height: 1.4,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: t.neutralBg2,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: t.neutralStroke),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.code, size: 15, color: t.neutralFg2),
+                            const SizedBox(width: 6),
+                            // 320px @2.0x 時呢一行實測橫向溢出 156px
+                            Flexible(
+                              child: Text(
+                                '開源代碼庫 (GitHub)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: t.neutralFg,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          'https://github.com/windowmmk/ShiftAlarm',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: t.brand,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         actions: [

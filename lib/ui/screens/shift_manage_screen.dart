@@ -672,54 +672,10 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
       child: Row(
         children: [
           // 1:1 日曆格預覽
-          Container(
-            width: 54,
-            height: 76,
-            decoration: BoxDecoration(
-              color: slot.bg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: slot.border, width: 1.5),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '15',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: slot.fg,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  abbrDisplay,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: slot.fg,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '地點',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: slot.fg,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+          _EditPreviewCell(
+            key: const Key('shift-edit-preview-cell'),
+            slot: slot,
+            abbr: abbrDisplay,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -738,12 +694,17 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      '月曆格即時預覽',
-                      style: TextStyle(
-                        fontSize: t.fontBody,
-                        fontWeight: FontWeight.w600,
-                        color: t.neutralFg,
+                    // 標題要可以縮：320px @2.0x 時呢一行實測橫向溢出 19.8px
+                    Flexible(
+                      child: Text(
+                        '月曆格即時預覽',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: t.fontBody,
+                          fontWeight: FontWeight.w600,
+                          color: t.neutralFg,
+                        ),
                       ),
                     ),
                   ],
@@ -920,6 +881,104 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
             child: Text(_saving ? '儲存緊…' : '儲存'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 班次編輯頁的 **1:1 日曆格預覽格**（54×76，同 `CalendarScreen` 的真實日曆格一樣大）。
+///
+/// 呢個格存在的唯一意義係「所見即所得」：用戶喺編輯頁睇到嘅比例，就係排完班之後
+/// 日曆上的比例。真實日曆格本身**唔會**跟系統文字縮放變大（`CalendarScreen` 用
+/// `AutoSizeText` 自己收放字級），所以預覽格都必須把文字縮放鎖死 1.0 ——
+/// 唔係嘅話兩邊比例就對唔上，預覽即刻講大話。
+///
+/// 實測（viewport 寬 × 系統字體縮放）：
+///   - 320×640 @2.0x：格內三行字（日期／縮寫／地點）需要 158px，但只有 65px
+///     → 直向溢出 **93px**；
+///   - 360×800 @2.0x：直向溢出 13px。
+///
+/// ⚠️ 唔可以改用 `FittedBox(BoxFit.scaleDown)` 硬縮：呢度個盒得 54×76，
+/// `scaleDown` 會把字縮到**剩返肉眼幾乎睇唔到**嘅比例，反而睇唔出縮寫長短。
+/// 鎖 `TextScaler.noScaling` 之後，三檔字體縮放下渲染完全一致。
+///
+/// ⚠️ 唔好再把「格內字級永遠等於真實日曆格」當理由——**呢句係錯嘅，已實測**：
+/// 真實日曆格三行各係 `Expanded` + `FittedBox(BoxFit.scaleDown)`，字級會跟系統
+/// 縮放放大到行高上限（`Text('15')` 自然尺寸 1.0x=17.0px、2.0x=34.0px，實際
+/// 繪製被壓到行高）。所以兩邊**機制唔同**，只係都唔會溢出：真實格靠縮到行高，
+/// 預覽格靠鎖死字級。
+class _EditPreviewCell extends StatelessWidget {
+  /// 該班次時段對應的四色 token（底／字／邊）
+  final SlotColors slot;
+
+  /// 已按 4 單位截斷的縮寫（截斷規則同真實日曆格一致）
+  final String abbr;
+
+  const _EditPreviewCell({super.key, required this.slot, required this.abbr});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 54,
+      height: 76,
+      decoration: BoxDecoration(
+        color: slot.bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: slot.border, width: 1.5),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      // 預覽格係固定 54×76 的「標準樣本」，格內字級必須鎖死喺設計值。
+      //
+      // 已實測（360px，1.0x vs 2.0x）：真實日曆格三行各係
+      // `Expanded` + `FittedBox(BoxFit.scaleDown)`，字級跟系統縮放但**永遠唔會
+      // 溢出**——撐唔落就縮到行高上限。所以縮寫喺真實格入面並冇「爆格」風險，
+      // 預覽嘅作用只係畀用戶睇「呢個縮寫喺格入面係咩樣」。
+      //
+      // 鎖死字級嘅理由：呢度係**固定細盒**，跟系統字體放大只會撐爆自己
+      // （320px @1.3x 起實測直向溢出 93px），而又縮唔出真實格嘅內容。
+      // 鎖死之後 1.0x / 1.3x / 2.0x 三檔渲染完全一致，用戶先有一個穩定參照。
+      child: MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.noScaling),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '15',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: slot.fg,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              abbr,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: slot.fg,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '地點',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: slot.fg,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
