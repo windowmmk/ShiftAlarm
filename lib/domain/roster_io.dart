@@ -10,6 +10,34 @@ import 'base58.dart';
 import 'config_io.dart' show computeCrc32;
 import 'csv_import.dart';
 import 'shift_store.dart';
+import 'stats.dart' show isValidYmd;
+
+/// 單一欄位長度上限：協議用 1 字節存長度，所以最多 255 字節。
+const int _kMaxFieldBytes = 255;
+
+/// 按 UTF-8 位元組上限安全截斷字串（預設 ≤255 字節）。
+///
+/// **為什麼唔可以直接 `bytes.sublist(0, 255)`：**
+/// UTF-8 一個中文字佔 3 字節、一個 emoji 佔 4 字節，第 255 個字節好可能
+/// 正好落在某個多位元組序列的中間（續接字節高位係 `0b10xxxxxx`）。
+/// 咁樣切出嚟嘅 bytes 唔係合法 UTF-8：寫入端會寫 255 字節但解碼端
+/// `utf8.decode` 會拋錯／回亂碼，而長度字段本身又同實際內容對唔上，
+/// 結果係**整份分享碼**（唔止備註）報「格式錯誤」，導入完全失敗。
+/// 所以截斷點必須回退到合法序列邊界（回退到該字元的起始字節之前）。
+///
+/// 截斷係有損（備註會少幾個字），但遠好過整份排班表報廢導入唔到。
+/// 呢個係協議限制（長度 1 字節）造成，唔係刻意設計。
+Uint8List _truncateUtf8(String s, [int maxBytes = _kMaxFieldBytes]) {
+  final bytes = utf8.encode(s);
+  if (bytes.length <= maxBytes) return Uint8List.fromList(bytes);
+  var end = maxBytes;
+  // bytes[end] 係「第一個唔要嘅字節」；若佢係續接字節，即代表切點落喺
+  // 某個多位元組字元中間，要一路往前退，直到切點前嘅字節係字元起始字節。
+  while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
+    end--;
+  }
+  return Uint8List.fromList(bytes.sublist(0, end));
+}
 
 /// 排班報文頭協議標識與快速檢查（用於剪貼簿自動辨識）
 class RosterPacketHeader {
@@ -57,18 +85,30 @@ Uint8List encodeCompactRoster(ShiftStore store, {DateTime? month}) {
     bb.addByte(d.clamp(1, 31));
 
     final def = store.defs[e.value.shiftId];
-    final code = def?.code ?? '';
-    final codeBytes = utf8.encode(code);
-    bb.addByte(codeBytes.length.clamp(0, 255));
+    // P1-8：班次 `code` 係選填欄位（見 shift_store.dart `ShiftDef.code`），
+    // 用戶可以完全唔填代號。舊版直接攞 code 做導入比對 key，多個空白 code
+    // 嘅班次就會撞成同一個 key（全部都係 ''），導入時班次對錯晒。
+    // 所以 code 為空時 fallback 用「startTime-endTime」做 key：班次時間係
+    // 必填欄位，導入端一樣可以重建同一個字串，唔會撞 key。
+    final rawCode = (def?.code ?? '').trim();
+    final shiftKey =
+        rawCode.isNotEmpty ? rawCode : (def != null ? _slotKeyOf(def) : '');
+    final codeBytes = _truncateUtf8(shiftKey);
+    bb.addByte(codeBytes.length);
     bb.add(codeBytes);
 
-    final venueBytes = utf8.encode(e.value.note);
-    bb.addByte(venueBytes.length.clamp(0, 255));
+    final venueBytes = _truncateUtf8(e.value.note);
+    bb.addByte(venueBytes.length);
     bb.add(venueBytes);
 
     final remark = store.remarks[e.key] ?? '';
-    final remarkBytes = utf8.encode(remark);
-    bb.addByte(remarkBytes.length.clamp(0, 255));
+    // P1-4：備註由 UI 限制 200 字，中文 200 字＝600 字節，遠超 1 字節長度
+    // 上限 255。舊版寫 `length.clamp(0,255)` 做長度但 `add(全部 bytes)`，
+    // 長度字段同實際內容一對唔上 → 解碼器讀到錯位 → CRC32 不符 →
+    // 用戶分享出去嘅**整份**排班表別人都導入唔到。
+    // 現在長度同內容都來自同一份截斷後 bytes，兩者永遠一致。
+    final remarkBytes = _truncateUtf8(remark);
+    bb.addByte(remarkBytes.length);
     bb.add(remarkBytes);
   }
 
@@ -154,6 +194,12 @@ class DecodedRosterResult {
   });
 }
 
+/// 班次時間 key：`startTime-endTime`（例如 `06:00-12:00`）。
+///
+/// 用於 P1-8：班次 `code` 為空時的 fallback 比對 key。編碼同解碼兩邊
+/// 都用同一個函數產生，保證字串格式完全一致（連 `HH:mm` 補零方式都一樣）。
+String _slotKeyOf(ShiftDef def) => '${def.startTime}-${def.endTime}';
+
 /// 解析緊湊排班數據體（v2）
 DecodedRosterResult _parseCompactRosterPayload({
   required Uint8List dataBytes,
@@ -179,9 +225,16 @@ DecodedRosterResult _parseCompactRosterPayload({
     final valid = <CsvImportRow>[];
     final errors = <String>[];
 
+    // 導入端的班次比對表（P1-8）：
+    // 1. codeMap：非空 code → shiftId（代號優先，唔分大細楷）
+    // 2. slotMap：`startTime-endTime` → shiftId（code 為空時的 fallback，
+    //    同編碼端 `_slotKeyOf` 用同一個字串格式）
     final codeMap = <String, String>{};
+    final slotMap = <String, String>{};
     for (final def in defs.values) {
-      if (def.code.isNotEmpty) codeMap[def.code.toUpperCase()] = def.id;
+      final c = def.code.trim();
+      if (c.isNotEmpty) codeMap[c.toUpperCase()] = def.id;
+      slotMap[_slotKeyOf(def)] = def.id;
     }
 
     for (int i = 0; i < count; i++) {
@@ -205,9 +258,24 @@ DecodedRosterResult _parseCompactRosterPayload({
       var remark = utf8.decode(dataBytes.sublist(offset, offset + remarkLen));
       offset += remarkLen;
 
+      // P1-5：日期驗證。y/m/d 係原始字節，理論上 CRC 已擋住篡改，但舊版
+      // 或第三方寫出嘅數據體可能含 `2026-02-30` 呢類「格式啱但日子唔存在」
+      // 嘅日期。舊版照收，之後統計就會把呢筆歸入錯區間（DateTime 會自動
+      // 進位成 3 月 2 日）。呢度跳過該筆並計入 errors，**唔會**令整份
+      // 分享碼導入失敗——其餘日子照樣入到。
+      // 注意：一定要讀完 code/venue/remark 之後才 continue，否則 offset 會錯位。
+      if (!isValidYmd(date)) {
+        errors.add('$date：日期唔存在，已跳過（其餘日子不受影響）');
+        continue;
+      }
+
       String? shiftId;
-      if (code.isNotEmpty) {
-        shiftId = codeMap[code.toUpperCase()];
+      final key = code.trim();
+      if (key.isNotEmpty) {
+        // 先按代號（唔分大細楷）
+        shiftId = codeMap[key.toUpperCase()];
+        // 再按「startTime-endTime」fallback（編碼端 code 為空時寫入嘅 key）
+        shiftId ??= slotMap[key];
       }
       if (shiftId == null) {
         for (final def in defs.values) {

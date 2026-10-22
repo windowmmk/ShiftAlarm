@@ -61,17 +61,30 @@ Map<String, dynamic> exportConfig(ShiftStore store) {
   };
 }
 
-/// 二進制緊湊預編碼（v2）：
+/// 二進制緊湊預編碼（v3）：
 /// 徹底捨棄 JSON 重複鍵名開銷，將時段、開關狀態、代號、場所等資料壓縮打包為二進制流，
 /// 讓導出的 Base58 口令長度直接從 2000+ 字元腰斬至 120-180 字元！
+///
+/// v3 相對 v2 唯一嘅分別：每個班次尾段多寫一段 `defId`（原 store 嘅班次 id）。
+/// 為什麼要帶原 id：v2 嘅 id 係解碼時即時推導（`'s' + code`），但
+/// `replaceAllDefs` 會清空重建班次清單，推導出嚟嘅 id 同原 store 唔一樣時，
+/// `assignments` 就會全部變成孤兒 → 導入之後所有日子顯示「未知班次」。
+/// 帶住原 id，導入端就可以砌返「舊 id → 新 id」對照表，把排班一齊搬過去。
+///
+/// 長度取捨：若 `def.id` 同 v2 推導規則（`code` 非空 → `'s'+code`，否則
+/// `'s'+索引`）算出嚟嘅值一樣，就寫 0 長度，解碼端照 v2 規則推導即可。
+/// 呢個「同值寫 0 字節」嘅做法同本格式處理 `name`／`abbr` 完全一致
+/// （見下面「若與 code 相同或為空，寫 0 字節」），所以係無損嘅，
+/// 只係唔重複寫一段本來就推導得到嘅資料。
 Uint8List encodeCompactConfig(ShiftStore store) {
   final bb = BytesBuilder();
-  bb.addByte(2); // protocol version 2
+  bb.addByte(3); // protocol version 3
 
   final defs = store.defs.values.toList();
   bb.addByte(defs.length.clamp(0, 255));
 
-  for (final def in defs) {
+  for (var i = 0; i < defs.length; i++) {
+    final def = defs[i];
     // 時間 00:00 -> h, m
     final sParts = def.startTime.split(':');
     final sh = int.tryParse(sParts.isNotEmpty ? sParts[0] : '') ?? 0;
@@ -143,6 +156,16 @@ Uint8List encodeCompactConfig(ShiftStore store) {
       bb.addByte(abbrBytes.length.clamp(0, 255));
       bb.add(abbrBytes);
     }
+
+    // v3：原班次 id（defId）。同 v2 推導規則一致時寫 0 字節，唔重複佔長度。
+    final derivedId = def.code.isNotEmpty ? 's${def.code}' : 's$i';
+    if (def.id.isEmpty || def.id == derivedId) {
+      bb.addByte(0);
+    } else {
+      final idBytes = utf8.encode(def.id);
+      bb.addByte(idBytes.length.clamp(0, 255));
+      bb.add(idBytes);
+    }
   }
 
   // 場所清單
@@ -157,12 +180,16 @@ Uint8List encodeCompactConfig(ShiftStore store) {
   return bb.toBytes();
 }
 
-/// 二進制緊湊預編碼解碼（v2）
+/// 二進制緊湊預編碼解碼（同時支援 v2 與 v3）。
+///
+/// v2 冇 `defId`（id 只能由 code 推導），v3 每個班次尾段多一段 `defId`。
+/// 兩個版本都要讀得，因為用戶手機裡面／截圖裡面仍然有舊 v2 口令碼，
+/// 一升版就讀唔到＝把「換機復原」呢個唯一嘅救援通道封死。
 Map<String, dynamic> decodeCompactConfig(Uint8List bytes) {
   var offset = 0;
   if (bytes.isEmpty) throw const ConfigImportException('數據為空');
   final version = bytes[offset++];
-  if (version != 2) {
+  if (version != 2 && version != 3) {
     throw ConfigImportException('不支援的緊湊協議版本: $version');
   }
 
@@ -250,9 +277,23 @@ Map<String, dynamic> decodeCompactConfig(Uint8List bytes) {
       abbr = truncateAbbr(name);
     }
 
-    final id = code.isNotEmpty ? 's$code' : 's$i';
+    // v3：原班次 id（defId）。0 長度＝同 v2 推導規則一致，唔使重複寫。
+    String? defId;
+    if (version >= 3) {
+      final idLen = bytes[offset++];
+      if (idLen > 0) {
+        defId = utf8.decode(bytes.sublist(offset, offset + idLen));
+        offset += idLen;
+      }
+    }
+
+    final id = (defId != null && defId.isNotEmpty)
+        ? defId
+        : (code.isNotEmpty ? 's$code' : 's$i');
     shifts.add({
       'id': id,
+      // 舊版（v2）冇原 id，呢個 key 留空，等 importConfig 用 code／name 反推
+      'defId': defId,
       'name': name,
       'abbr': abbr,
       'code': code,
@@ -273,10 +314,10 @@ Map<String, dynamic> decodeCompactConfig(Uint8List bytes) {
 
   return {
     'app': 'ShiftAlarm',
-    'version': 2,
+    'version': version,
     'header': {
       'magic': 'SHIFTALARM_CONFIG',
-      'version': 2,
+      'version': version,
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'shiftCount': shifts.length,
       'venueCount': venues.length,
@@ -414,26 +455,63 @@ void _validateConfigStructure(Map<String, dynamic> json) {
 }
 
 /// 從 Map 導入配置：清空現有班次／場所，寫入導入的。
+///
+/// 關鍵：換走班次定義之前，一定要先砌好「舊 id → 新 id」對照表，把
+/// `assignments` 內所有 `shiftId` 一齊搬過去。否則導入之後全部日子會變成
+/// 孤兒 → 日曆顯示「未知班次」，而用戶見到嘅係「導入完排班全冇了」。
+///
+/// 對照表嘅來源分兩種（必須保持向後兼容，舊 SA2 口令碼照樣要導入得）：
+/// - v3 報文自帶 `defId`（原 store 嘅 id）→ 直接對照。
+/// - v2 報文冇 `defId`，其 id 係解碼時即時由 `code` 推導出嚟
+///   （`'s' + code`），同原 store 完全無關 → 只能靠 `code` 反推，
+///   `code` 對唔上就退而用 `name` 對照。
+/// 仍然對唔上就當「無法對應」，原值保留唔刪 —— 寧可顯示未知班次，
+/// 都唔可以刪用戶資料。
 Future<void> importConfig(ShiftStore store, Map<String, dynamic> json) async {
   _validateConfigStructure(json);
   final shiftsRaw = json['shifts'] as List;
   final venuesRaw = json['venues'] as List;
 
+  // 導入前嘅班次定義：v2 要靠佢嘅 code／name 反推原 id
+  final oldDefs = Map<String, ShiftDef>.from(store.defs);
+
   // 解析班次
   final defs = <String, ShiftDef>{};
+  // 舊 id → 新 id
+  final idMap = <String, String>{};
+  // 冇 defId 嘅班次（v2），等解析完再用 code／name 反推
+  final pending = <({String newId, String code, String name})>[];
+
   for (final e in shiftsRaw) {
     if (e is! Map) continue;
     final m = Map<String, Object?>.from(e);
-    final id = m['id'] as String?;
+    final id = m['id']?.toString();
     if (id == null || id.isEmpty) continue;
+    final ShiftDef def;
     try {
-      final def = ShiftDef.fromJson(id, m);
+      def = ShiftDef.fromJson(id, m);
       def.normalizeClockAlarms();
-      defs[id] = def;
-    } catch (_) {}
+    } catch (_) {
+      continue; // 逐個班次獨立容錯，壞一個唔可以拖死整份配置
+    }
+    defs[id] = def;
+
+    final defId = m['defId']?.toString();
+    if (defId != null && defId.isNotEmpty) {
+      idMap[defId] = id;
+    } else {
+      pending.add((newId: id, code: def.code, name: def.name));
+    }
   }
   if (defs.isEmpty) {
     throw const ConfigImportException('配置檔冇有效班次');
+  }
+
+  // v2 兼容：靠 code 反推，再靠 name 兜底
+  for (final p in pending) {
+    final oldId = _findOldIdByCode(oldDefs, p.code) ??
+        _findOldIdByName(oldDefs, p.name);
+    if (oldId != null) idMap[oldId] = p.newId;
   }
 
   // 解析場所
@@ -444,9 +522,34 @@ Future<void> importConfig(ShiftStore store, Map<String, dynamic> json) async {
     }
   }
 
-  // 寫入（先清後寫）
+  // 次序好重要：先重寫 assignments 嘅 shiftId，再換 defs。
+  // 反過來就會有一瞬間「assignments 指向舊 id、defs 只有新 id」嘅孤兒狀態。
+  await store.remapAssignmentShiftIds(idMap);
   await store.replaceAllDefs(defs);
   await store.replaceAllVenues(venues);
+}
+
+/// 用代號反推舊班次 id（v2 口令碼兼容用）。空白代號唔可以用嚟對照，
+/// 否則所有冇填代號嘅班次都會互相誤配。
+String? _findOldIdByCode(Map<String, ShiftDef> oldDefs, String code) {
+  final c = code.trim();
+  if (c.isEmpty) return null;
+  final ids = oldDefs.keys.toList()..sort();
+  for (final id in ids) {
+    if (oldDefs[id]!.code.trim() == c) return id;
+  }
+  return null;
+}
+
+/// 用名稱反推舊班次 id（v2 口令碼兼容嘅最後一道對照）。
+String? _findOldIdByName(Map<String, ShiftDef> oldDefs, String name) {
+  final n = name.trim();
+  if (n.isEmpty) return null;
+  final ids = oldDefs.keys.toList()..sort();
+  for (final id in ids) {
+    if (oldDefs[id]!.name.trim() == n) return id;
+  }
+  return null;
 }
 
 /// 從任意文字（帶報文頭與 CRC32 校驗碼的 Base64 口令碼或 JSON 字符串）導入。

@@ -28,6 +28,48 @@ String truncateAbbr(String s, [int maxUnits = 4]) {
   return buf.toString();
 }
 
+/// 型別寬容讀取：任何值都轉成字串，null 保留 null。
+///
+/// 為什麼需要：舊版／別處寫入嘅 JSON 可能同今日嘅欄位型別唔一致（例如
+/// `startTime` 曾被寫成 int、`shiftId` 被寫成數字）。用 `as String?` 讀會
+/// 直接拋 `TypeError`，而外層 catch 會令**整份**清單歸零 —— 一個欄位嘅
+/// 型別錯就要用戶賠上全部排班。`toString()` 讀唔到都會照樣讀到，代價只是
+/// 值本身唔靚，唔會連累同一個容器嘅其他條目。
+String? _text(Object? v) {
+  if (v == null) return null;
+  return v is String ? v : v.toString();
+}
+
+/// 型別寬容讀取整數：接受 num 與數字字串，其餘回 null。
+int? _int(Object? v) {
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v.trim());
+  return null;
+}
+
+/// 型別寬容讀取布林：接受 bool、0/1、'true'/'false'。
+bool? _bool(Object? v) {
+  if (v is bool) return v;
+  if (v is num) return v != 0;
+  if (v is String) {
+    final s = v.trim().toLowerCase();
+    if (s == 'true' || s == '1') return true;
+    if (s == 'false' || s == '0') return false;
+  }
+  return null;
+}
+
+/// 寬容讀取 'HH:mm'：型別錯或者格式壞都退回 [fallback]。
+///
+/// 為什麼要驗格式：`_text(600)` 會變成 `'600'`，而 `'600'` 喺 [hmToMinutes]
+/// 解析失敗（時 600 越界）。留住呢個字串等於留一個「睇落似真」嘅鬼時間，
+/// 令收工打卡 offset 靜靜變 0 —— 比直接退回預設更難查。
+String _hhmmOr(Object? v, String fallback) {
+  final s = _text(v);
+  if (s == null) return fallback;
+  return hmToMinutes(s) == null ? fallback : s.trim();
+}
+
 /// 輸入過濾器：限制輸入內容不超過指定單位（全形＝2，半形＝1，預設 ≤4）
 class AbbrUnitLengthFormatter extends TextInputFormatter {
   final int maxUnits;
@@ -105,11 +147,11 @@ class ShiftAlarm {
       };
 
   static ShiftAlarm fromJson(Map<String, Object?> j) => ShiftAlarm(
-        id: j['id'] as String? ?? 'a1',
-        label: j['label'] as String? ?? '鬧鐘',
-        offsetMinutes: (j['offsetMinutes'] as num?)?.toInt() ?? -60,
-        notificationOnly: j['notificationOnly'] as bool? ?? false,
-        enabled: j['enabled'] as bool? ?? true,
+        id: _text(j['id']) ?? 'a1',
+        label: _text(j['label']) ?? '鬧鐘',
+        offsetMinutes: _int(j['offsetMinutes']) ?? -60,
+        notificationOnly: _bool(j['notificationOnly']) ?? false,
+        enabled: _bool(j['enabled']) ?? true,
       );
 
   ShiftAlarm copy() => ShiftAlarm(
@@ -155,20 +197,31 @@ class ShiftDef {
         'alarms': alarms.map((a) => a.toJson()).toList(),
       };
 
+  /// 由 JSON 還原班次定義。
+  ///
+  /// 所有欄位一律用型別寬容讀取（[`_text`]／[`_int`]／[`_bool`]），
+  /// **唔准**用 `as String?`：舊版或別處寫入嘅型別未必同今日一致，
+  /// 一次 `TypeError` 就會令呼叫方嘅整個 for-loop 中斷，變成
+  /// 「一個班次壞 → 全部班次消失」。
   static ShiftDef fromJson(String id, Map<String, Object?> j) {
-    final name = j['name'] as String? ?? id;
+    final name = _text(j['name']) ?? id;
     // 鬧鐘列表：新格式讀 alarms；舊格式由 advanceMinutes 遷移
     List<ShiftAlarm> alarms = [];
     final rawAlarms = j['alarms'];
     if (rawAlarms is List) {
       for (final e in rawAlarms) {
         if (e is Map) {
-          alarms.add(ShiftAlarm.fromJson(Map<String, Object?>.from(e)));
+          // 逐個鬧鐘獨立 try/catch：壞一個只掉一個，唔可以連累其他
+          try {
+            alarms.add(ShiftAlarm.fromJson(Map<String, Object?>.from(e)));
+          } catch (_) {
+            continue;
+          }
         }
       }
     }
     if (alarms.isEmpty) {
-      final adv = (j['advanceMinutes'] as num?)?.toInt() ?? 60;
+      final adv = _int(j['advanceMinutes']) ?? 60;
       alarms = [
         ShiftAlarm(
             id: 'a1',
@@ -181,11 +234,11 @@ class ShiftDef {
     return ShiftDef(
       id: id,
       name: name,
-      startTime: j['startTime'] as String? ?? '00:00',
-      endTime: j['endTime'] as String? ?? '00:00',
+      startTime: _hhmmOr(j['startTime'], '00:00'),
+      endTime: _hhmmOr(j['endTime'], '00:00'),
       alarms: alarms,
-      abbr: j['abbr'] as String? ?? truncateAbbr(name),
-      code: j['code'] as String? ?? '',
+      abbr: _text(j['abbr']) ?? truncateAbbr(name),
+      code: _text(j['code']) ?? '',
     );
   }
 
@@ -247,16 +300,33 @@ class ShiftAssignment {
 
   Map<String, Object?> toJson() => {'shiftId': shiftId, 'note': note};
 
-  static ShiftAssignment? fromJson(Object? v, Set<String> validIds) {
+  /// 由 JSON 還原單日指派。
+  ///
+  /// [validIds] 有值時，指向唔存在班次嘅條目會回 null（舊行為，供需要
+  /// 「只收有效指派」嘅呼叫方用）；傳 null 就完全唔做 id 校驗 ——
+  /// `load()` 用呢個模式，因為「班次定義唔見咗」同「條目本身壞掉」係兩件事：
+  /// 前者應該留住等人工救援，後者才應該略過。
+  ///
+  /// 為什麼 `shiftId` 一定要係字串，而 `note` 反而寬容：
+  /// - `shiftId` 型別錯（例如被寫成 `123`）＝**壞資料**，讀落去只會變成
+  ///   一個永遠對唔上任何班次嘅假 id，所以略過並計數。
+  /// - `shiftId` 係字串但對唔上班次＝**孤兒**，資料本身係好嘅（場所備註
+  ///   都仲喺），應該原樣保留。
+  static ShiftAssignment? fromJson(Object? v, [Set<String>? validIds]) {
     if (v is String) {
       // 舊格式：value 直接係 shiftId
-      return validIds.contains(v) ? ShiftAssignment(v, '') : null;
+      final sid = v.trim();
+      if (sid.isEmpty) return null;
+      if (validIds != null && !validIds.contains(sid)) return null;
+      return ShiftAssignment(sid, '');
     }
     if (v is Map) {
-      final m = Map<String, Object?>.from(v);
-      final sid = m['shiftId'] as String?;
-      if (sid == null || !validIds.contains(sid)) return null;
-      return ShiftAssignment(sid, m['note'] as String? ?? '');
+      final rawSid = v['shiftId'];
+      if (rawSid is! String) return null;
+      final sid = rawSid.trim();
+      if (sid.isEmpty) return null;
+      if (validIds != null && !validIds.contains(sid)) return null;
+      return ShiftAssignment(sid, _text(v['note']) ?? '');
     }
     return null;
   }
@@ -366,23 +436,127 @@ class ShiftStore extends ChangeNotifier {
   /// 場所清單（自動補全＋班次管理頁可管理；打過嘅新場所會自動加入）
   List<String> venues = [];
 
+  /// 最近一次 [load] 發現嘅資料損壞摘要；null＝一切正常。
+  ///
+  /// 為什麼要有：本檔最嚴重嘅故障模式係「用戶嘅排班靜靜蒸發，連一句提示
+  /// 都冇」—— 用戶只會以為係自己記錯，然後照樣用一個空咗嘅月曆。
+  /// UI 將來可以據此顯示「有 N 天資料損壞，已略過」，唔需要改動本檔邏輯。
+  String? lastLoadWarning;
+
+  /// 最近一次 [load] 因為條目本身壞掉（型別錯／缺必要欄位）而略過嘅條目數。
+  int lastDroppedEntries = 0;
+
+  /// 排班原始 JSON 完全無法解析時嘅隔離旗標。
+  /// 喺呢個狀態下唔准用空資料覆蓋原 key（見 [_saveAssignments]）。
+  bool _assignmentsQuarantined = false;
+
+  /// 損壞資料備份 key 嘅中綴：`<原 key>_corrupt_<毫秒時間戳>`
+  static const String _corruptInfix = '_corrupt_';
+
   ShiftStore(this.prefs);
 
-  Future<void> load() async {
-    final d = defaults();
+  /// 讀一個「本來應該係 JSON 字串」嘅 key，並回傳原始字串。
+  ///
+  /// 用 `prefs.get` 而唔係 `prefs.getString`：後者喺底層型別唔符時會直接
+  /// 拋 `TypeError`，一拋就會連累同一個 try 區塊內其他 key 嘅載入 ——
+  /// 呢個正是「一個 key 壞，全部 key 陪葬」嘅放大器。
+  String? _readRawJson(String key) {
+    final Object? v = prefs.get(key);
+    if (v == null) return null;
+    if (v is String) return v;
+    // 型別唔符（例如被人寫成 List）：盡量序列化返，等下游可以備份／診斷
     try {
-      final raw = prefs.getString(_kDefs);
-      if (raw != null) {
-        final j = jsonDecode(raw) as Map<String, dynamic>;
-        for (final e in j.entries) {
-          if (e.value is Map) {
-            final id = e.key;
+      return jsonEncode(v);
+    } catch (_) {
+      return v.toString();
+    }
+  }
+
+  /// `jsonDecode` 但唔拋：解析失敗回 null。
+  Object? _tryDecodeJson(String raw) {
+    try {
+      return jsonDecode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 把無法解析嘅原始資料另存到 `<原 key>_corrupt_<毫秒時間戳>`。
+  ///
+  /// 為什麼要備份：壞資料往往仍然救得返（例如某日 `shiftId` 型別錯咗，
+  /// 人手改一個字就得）。靜默清空係不可逆嘅 —— 用戶幾百天排班一夜蒸發，
+  /// 冇任何痕跡可以查。寧可留住壞資料等人工救援，都唔可以靜默清空。
+  Future<void> _quarantine(String sourceKey, String raw) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    try {
+      await prefs.setString('$sourceKey$_corruptInfix$stamp', raw);
+    } catch (_) {
+      // 備份失敗都唔可以拋：load 唔應該因為備份失敗而中斷，
+      // 真正嘅防線係 [_assignmentsQuarantined]（唔覆蓋原 key）。
+    }
+  }
+
+  /// 場所清單還原。
+  ///
+  /// 為什麼唔用 `prefs.getStringList`：舊版／別處可能寫成 JSON 字串
+  /// （例如 `'["A","B"]'`，底層型別係 `String`）甚至 `List<dynamic>`，
+  /// `getStringList` 一拋 `TypeError` 就會被外層 catch 吞掉，整個場所
+  /// 清單歸零。呢度自行判斷型別，唔靠 prefs 幫我轉型。
+  List<String> _parseVenues(Object? v) {
+    if (v == null) return defaultVenues(); // 從未儲存過 → 用預設
+    Object? decoded = v;
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return defaultVenues();
+      decoded = _tryDecodeJson(s);
+    }
+    if (decoded is! List) return defaultVenues();
+    final out = <String>[];
+    for (final e in decoded) {
+      final s = _text(e)?.trim() ?? '';
+      if (s.isEmpty || out.contains(s)) continue;
+      out.add(s);
+    }
+    return out;
+  }
+
+  Future<void> load() async {
+    final warnings = <String>[];
+    lastDroppedEntries = 0;
+    lastLoadWarning = null;
+
+    // ---------- 班次定義 ----------
+    final d = defaults();
+    final rawDefs = _readRawJson(_kDefs);
+    if (rawDefs != null) {
+      final decoded = _tryDecodeJson(rawDefs);
+      if (decoded is! Map) {
+        // 整份 defs 壞掉：備份原字串再用預設繼續，唔可以靜靜當冇事
+        await _quarantine(_kDefs, rawDefs);
+        warnings.add('班次定義 JSON 無法解析，已備份原資料');
+      } else {
+        var dropped = 0;
+        for (final e in decoded.entries) {
+          final id = e.key.toString();
+          if (e.value is! Map) {
+            dropped++;
+            continue;
+          }
+          // 逐個 def 獨立 try/catch：壞一個只掉一個，唔可以中斷整個清單
+          try {
             // 已有預設就合併覆蓋；自定義班次直接加入
-            d[id] = ShiftDef.fromJson(id, Map<String, Object?>.from(e.value as Map));
+            d[id] = ShiftDef.fromJson(
+                id, Map<String, Object?>.from(e.value as Map));
+          } catch (_) {
+            dropped++;
           }
         }
+        if (dropped > 0) {
+          lastDroppedEntries += dropped;
+          warnings.add('$dropped 個班次定義損壞已略過');
+        }
       }
-    } catch (_) {}
+    }
     defs = d;
     _invalidateDefsCache();
     // 舊數據可能冇打卡鬧鐘，load 時補上並修好 offset（唔即時寫回，
@@ -390,53 +564,107 @@ class ShiftStore extends ChangeNotifier {
     for (final def in defs.values) {
       def.normalizeClockAlarms();
     }
-    try {
-      final raw = prefs.getString(_kAssignments);
-      if (raw != null) {
-        final j = jsonDecode(raw) as Map<String, dynamic>;
-        final ids = d.keys.toSet();
-        final parsed = <String, ShiftAssignment>{};
-        for (final e in j.entries) {
-          final a = ShiftAssignment.fromJson(e.value, ids);
-          if (a != null) parsed[e.key] = a;
-        }
-        assignments = parsed;
-      }
-    } catch (_) {
+
+    // ---------- 排班指派 ----------
+    final rawAssignments = _readRawJson(_kAssignments);
+    _assignmentsQuarantined = false;
+    if (rawAssignments == null) {
       assignments = {};
-    }
-    try {
-      final raw = prefs.getString(_kRemarks);
-      if (raw != null) {
-        final j = jsonDecode(raw) as Map<String, dynamic>;
-        final parsed = <String, String>{};
-        for (final e in j.entries) {
-          if (e.value is String && (e.value as String).trim().isNotEmpty) {
-            parsed[e.key] = e.value as String;
+    } else {
+      final decoded = _tryDecodeJson(rawAssignments);
+      if (decoded is! Map) {
+        // 整份 JSON 解析唔到（例如被截斷成 "[{"）。備份 + 唔覆蓋原 key。
+        await _quarantine(_kAssignments, rawAssignments);
+        _assignmentsQuarantined = true;
+        warnings.add('排班資料 JSON 無法解析，已備份原資料（未清空）');
+        assignments = {};
+      } else {
+        final parsed = <String, ShiftAssignment>{};
+        var dropped = 0;
+        var orphan = 0;
+        for (final e in decoded.entries) {
+          final ymd = e.key.toString();
+          // 逐條獨立解析：一條壞只掉一條。之前係整個 for-loop 包一個
+          // try/catch，任何一天型別錯就令 assignments 變成 {}，
+          // 然後照樣寫回 prefs → 幾百天排班永久消失。
+          try {
+            // 唔傳 validIds：班次定義唔見咗係「孤兒」而唔係「壞資料」，
+            // 唔應該連用戶嘅場所備註一齊靜靜刪走（寧可顯示未知班次）。
+            final a = ShiftAssignment.fromJson(e.value);
+            if (a == null) {
+              dropped++;
+              continue;
+            }
+            if (!defs.containsKey(a.shiftId)) orphan++;
+            parsed[ymd] = a;
+          } catch (_) {
+            dropped++;
           }
+        }
+        if (decoded.isEmpty) {
+          assignments = parsed; // 合法嘅「冇排班」，唔算損壞
+        } else if (parsed.isEmpty) {
+          // 有內容但一條都解析唔到 → 當整份壞：備份 + 唔覆蓋原 key
+          await _quarantine(_kAssignments, rawAssignments);
+          _assignmentsQuarantined = true;
+          lastDroppedEntries += dropped;
+          warnings.add('排班資料 $dropped 條全部無法解析，已備份原資料（未清空）');
+          assignments = {};
+        } else {
+          assignments = parsed;
+          if (dropped > 0) {
+            lastDroppedEntries += dropped;
+            warnings.add('$dropped 天排班損壞已略過');
+          }
+          if (orphan > 0) {
+            warnings.add('$orphan 天排班指向唔存在嘅班次（已保留原資料）');
+          }
+        }
+      }
+    }
+
+    // ---------- 每日備註 ----------
+    final rawRemarks = _readRawJson(_kRemarks);
+    if (rawRemarks != null) {
+      final decoded = _tryDecodeJson(rawRemarks);
+      if (decoded is! Map) {
+        await _quarantine(_kRemarks, rawRemarks);
+        warnings.add('每日備註 JSON 無法解析，已備份原資料');
+      } else {
+        final parsed = <String, String>{};
+        for (final e in decoded.entries) {
+          // 型別寬容：舊版可能有 null／數字備註，唔可以因此放棄整份
+          final text = _text(e.value);
+          if (text == null || text.trim().isEmpty) continue;
+          parsed[e.key.toString()] = text;
         }
         remarks = parsed;
       }
-    } catch (_) {
-      remarks = {};
     }
-    try {
-      final rawList = prefs.getStringList(_kVenues);
-      // 只有從未儲存過（null）先用預設；用戶主動刪到空＝佢嘅選擇，唔好重置
-      venues = rawList == null
-          ? defaultVenues()
-          : rawList.where((v) => v.trim().isNotEmpty).toList();
-    } catch (_) {
-      venues = defaultVenues();
-    }
+
+    // ---------- 場所清單 ----------
+    venues = _parseVenues(prefs.get(_kVenues));
+
+    lastLoadWarning = warnings.isEmpty ? null : warnings.join('；');
     notifyListeners();
   }
 
   Future<void> _saveDefs() =>
       prefs.setString(_kDefs, jsonEncode(defs.map((k, v) => MapEntry(k, v.toJson()))));
 
-  Future<void> _saveAssignments() =>
-      prefs.setString(_kAssignments, jsonEncode(assignments.map((k, v) => MapEntry(k, v.toJson()))));
+  Future<void> _saveAssignments() async {
+    // 隔離期間（原始 JSON 完全解析唔到）手上嘅 assignments 係「載入失敗
+    // 之後嘅空集合」，寫返去就等於用空資料覆蓋用戶嘅原始排班。
+    // 寧可暫時唔寫：原 key 留住壞資料，等人工救援。
+    // 一旦有真實資料寫入（assignments 非空），就解除隔離正常保存 ——
+    // 因為壞資料本身已經備份喺 `_corrupt_*` key。
+    if (_assignmentsQuarantined) {
+      if (assignments.isEmpty) return;
+      _assignmentsQuarantined = false;
+    }
+    await prefs.setString(
+        _kAssignments, jsonEncode(assignments.map((k, v) => MapEntry(k, v.toJson()))));
+  }
 
   List<ShiftDef>? _cachedSortedDefs;
 
@@ -498,12 +726,32 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 刪除班次（呼叫方負責先取消相關鬧鐘＋清指派）
-  Future<void> removeDef(String id) async {
+  /// 刪除班次，並同步清走引用佢嘅排班指派。
+  ///
+  /// 為什麼要一齊清：只刪 `shiftDefs` 唔刪 `assignments`，會留下一堆
+  /// 指向唔存在班次嘅記錄 —— 日曆格變成空白／「未知班次」，統計頁靜靜
+  /// 少算，而用戶見到嘅係「嗰日明明排過更但冇咗」。呢個係資料完整性問題，
+  /// 唔應該推畀每個呼叫端自己記得處理。
+  ///
+  /// 回傳被清掉嘅日期清單（已排序），等呼叫端可以順手取消／重排鬧鐘。
+  Future<List<String>> removeDef(String id) async {
     defs.remove(id);
     _invalidateDefsCache();
     await _saveDefs();
+
+    final affected = <String>[
+      for (final e in assignments.entries)
+        if (e.value.shiftId == id) e.key,
+    ]..sort();
+    if (affected.isNotEmpty) {
+      for (final ymd in affected) {
+        assignments.remove(ymd);
+      }
+      await _saveAssignments();
+    }
+
     notifyListeners();
+    return affected;
   }
 
   Future<void> assign(String ymd, String shiftId, {String note = ''}) async {
@@ -606,8 +854,38 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 配置導入用：按 [idMap]（舊 id → 新 id）重寫所有排班嘅 shiftId。
+  ///
+  /// 為什麼需要：導入配置會整批換走班次定義，新定義嘅 id 未必等於舊嘅
+  /// （舊版 SA2 口令碼嘅 id 係即時由 code 推導，唔係由原 store 帶過嚟）。
+  /// 唔重寫 `assignments` 就會全部變成孤兒 → 日曆顯示「未知班次」。
+  ///
+  /// 原子性：先砌好一個全新 map，全部成功先一次過賦值。中途出錯就原封
+  /// 不動 —— 唔會出現「一半日子指新 id、一半指舊 id」嘅撕裂狀態（撕裂
+  /// 之後就算再導入一次都補唔返，因為已經分唔清邊個係原本嘅值）。
+  Future<void> remapAssignmentShiftIds(Map<String, String> idMap) async {
+    if (idMap.isEmpty) return;
+    final next = <String, ShiftAssignment>{};
+    var changed = false;
+    for (final e in assignments.entries) {
+      final target = idMap[e.value.shiftId];
+      if (target == null || target == e.value.shiftId) {
+        next[e.key] = e.value;
+      } else {
+        next[e.key] = ShiftAssignment(target, e.value.note);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    assignments = next;
+    await _saveAssignments();
+    notifyListeners();
+  }
+
   /// 配置導入用：整批替換班次定義（清空後寫入）。
-  /// 注意：唔清排班指派；指派到已刪班次嘅日子會喺下次 load 時自動過濾。
+  /// 注意：唔清排班指派 —— 呼叫方（`importConfig`）必須先經
+  /// [remapAssignmentShiftIds] 把舊 id 對應到新 id。對應唔上嘅條目會
+  /// 原樣保留（寧可顯示未知班次，都唔可以刪用戶資料）。
   Future<void> replaceAllDefs(Map<String, ShiftDef> newDefs) async {
     defs = Map<String, ShiftDef>.from(newDefs);
     _invalidateDefsCache();
