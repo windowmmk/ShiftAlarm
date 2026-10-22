@@ -245,168 +245,187 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        // v3.6：高度改由外層底部區（`CalendarLayout.detailHeight`）決定，
-        // 唔再寫死 126 —— 寫死會喺三鍵導航機（SafeArea 墊高）被裁掉完成掣。
-        child: SizedBox.expand(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 8, left: 10, right: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // 第一行：日期標籤、充裕地點展示/設置按鈕、完成按鈕（固定 42px）
-                SizedBox(
-                  height: 42,
-                  child: Row(
-                    children: [
-                      Text(
-                        _dateLabel,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: t.neutralFg,
-                        ),
+      // v3.6.1：**唔可以**再加底部安全區包裝層，亦唔可以自己再扣
+      // `MediaQuery.padding.bottom`。外層第三區（`CalendarLayout.detailHeight`）
+      // 已經用**真實** `padding.bottom` 預留咗導航欄高度，呢度再食一次就係
+      // 「食兩次」，正是面板溢出的元兇：
+      //   手勢導航（inset 88.8）：Column 只剩 36.2 而內容要 100 → 溢出 63.8px
+      //   三鍵導航（inset 112.8）：Column 只剩 12.2 → 溢出 87.8px
+      // 高度由外層決定，呢度只需鋪滿（`SizedBox.expand`）＋內距。
+      child: SizedBox.expand(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 8, left: 10, right: 10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 第一行：日期標籤、充裕地點展示/設置按鈕、完成按鈕（固定 42px）
+              SizedBox(
+                height: 42,
+                child: Row(
+                  children: [
+                    Text(
+                      _dateLabel,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: t.neutralFg,
                       ),
-                      const SizedBox(width: 10),
-                      // 地點輸入欄（原頁面文本框輸入，無彈窗，與入備註方式完全一致）
-                      Expanded(
-                        child: SizedBox(
-                          height: 36,
-                          child: _editingVenue
-                              ? TextField(
-                                  controller: _noteCtrl,
-                                  focusNode: _venueFocus,
-                                  maxLines: 1,
-                                  maxLength: 4,
-                                  inputFormatters: const [
-                                    AbbrUnitLengthFormatter(4)
-                                  ],
-                                  style: const TextStyle(fontSize: 13),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: t.neutralBg2,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                          color: t.brand, width: 1.5),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 6),
-                                    counterText: '',
-                                    isDense: true,
-                                    hintText: '輸入地點（如總部）',
-                                    prefixIcon: Icon(Icons.location_on,
-                                        size: 16, color: t.brand),
-                                    suffixIcon: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.check, size: 18),
-                                      onPressed: _saveInlineVenue,
-                                    ),
+                    ),
+                    const SizedBox(width: 10),
+                    // 地點輸入欄（原頁面文本框輸入，無彈窗，與入備註方式完全一致）
+                    Expanded(
+                      child: SizedBox(
+                        height: 36,
+                        child: _editingVenue
+                            ? TextField(
+                                controller: _noteCtrl,
+                                focusNode: _venueFocus,
+                                maxLines: 1,
+                                maxLength: 4,
+                                inputFormatters: const [
+                                  AbbrUnitLengthFormatter(4)
+                                ],
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: t.neutralBg2,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                        color: t.brand, width: 1.5),
                                   ),
-                                  onEditingComplete: _saveInlineVenue,
-                                )
-                              : GestureDetector(
-                                  onTap: () {
-                                    setState(() => _editingVenue = true);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      if (mounted) _venueFocus.requestFocus();
-                                    });
-                                  },
-                                  behavior: HitTestBehavior.opaque,
-                                  child: Container(
-                                    height: 36,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10),
-                                    decoration: BoxDecoration(
-                                      color: note.isNotEmpty
-                                          ? t.brand.withValues(alpha: 0.12)
-                                          : t.neutralBg2,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: note.isNotEmpty
-                                            ? t.brand.withValues(alpha: 0.35)
-                                            : t.neutralStroke,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.location_on,
-                                          size: 15,
-                                          color: note.isNotEmpty
-                                              ? t.brand
-                                              : t.neutralFg2,
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Expanded(
-                                          child: Text(
-                                            note.isNotEmpty
-                                                ? note
-                                                : '新增地點…',
-                                            style: TextStyle(
-                                              fontSize: 12.5,
-                                              fontWeight: note.isNotEmpty
-                                                  ? FontWeight.w500
-                                                  : FontWeight.normal,
-                                              color: note.isNotEmpty
-                                                  ? t.brand
-                                                  : t.neutralFg2,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Icon(
-                                          note.isNotEmpty
-                                              ? Icons.edit
-                                              : Icons.add,
-                                          size: 13,
-                                          color: note.isNotEmpty
-                                              ? t.brand.withValues(alpha: 0.7)
-                                              : t.neutralFg2,
-                                        ),
-                                      ],
-                                    ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 6),
+                                  counterText: '',
+                                  isDense: true,
+                                  hintText: '輸入地點（如總部）',
+                                  prefixIcon: Icon(Icons.location_on,
+                                      size: 16, color: t.brand),
+                                  suffixIcon: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.check, size: 18),
+                                    onPressed: _saveInlineVenue,
                                   ),
                                 ),
+                                onEditingComplete: _saveInlineVenue,
+                              )
+                            : GestureDetector(
+                                onTap: () {
+                                  setState(() => _editingVenue = true);
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (mounted) _venueFocus.requestFocus();
+                                  });
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  height: 36,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: note.isNotEmpty
+                                        ? t.brand.withValues(alpha: 0.12)
+                                        : t.neutralBg2,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: note.isNotEmpty
+                                          ? t.brand.withValues(alpha: 0.35)
+                                          : t.neutralStroke,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        size: 15,
+                                        color: note.isNotEmpty
+                                            ? t.brand
+                                            : t.neutralFg2,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Expanded(
+                                        child: Text(
+                                          note.isNotEmpty
+                                              ? note
+                                              : '新增地點…',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: note.isNotEmpty
+                                                ? FontWeight.w500
+                                                : FontWeight.normal,
+                                            color: note.isNotEmpty
+                                                ? t.brand
+                                                : t.neutralFg2,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Icon(
+                                        note.isNotEmpty
+                                            ? Icons.edit
+                                            : Icons.add,
+                                        size: 13,
+                                        color: note.isNotEmpty
+                                            ? t.brand.withValues(alpha: 0.7)
+                                            : t.neutralFg2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // 完成退出按鈕
+                    FilledButton(
+                      onPressed: () {
+                        if (_editingVenue) {
+                          _saveInlineVenue();
+                        }
+                        widget.onClose();
+                      },
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 0),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      // 完成退出按鈕
-                      FilledButton(
-                        onPressed: () {
-                          if (_editingVenue) {
-                            _saveInlineVenue();
-                          }
-                          widget.onClose();
-                        },
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 0),
-                          minimumSize: const Size(0, 36),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('完成',
-                            style:
-                                TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                      ),
-                    ],
-                  ),
+                      child: const Text('完成',
+                          style:
+                              TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    ),
+                  ],
                 ),
-                // 第二行：橫向排班卡片（點更即排，自動保存，高度固定 58px）
-                SizedBox(
-                  height: 58,
-                  child: defs.length <= 4
-                      ? Row(
+              ),
+              // 第二行：橫向排班卡片（點更即排，自動保存，高度固定 58px）
+              SizedBox(
+                height: 58,
+                child: defs.length <= 4
+                    ? Row(
+                        children: [
+                          for (int i = 0; i < defs.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 6),
+                            Expanded(
+                              child: _compactShiftButton(
+                                  t, defs[i], defs[i].id == currentId),
+                            ),
+                          ],
+                          const SizedBox(width: 6),
+                          _clearButton(t, currentId),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
                           children: [
                             for (int i = 0; i < defs.length; i++) ...[
                               if (i > 0) const SizedBox(width: 6),
-                              Expanded(
+                              SizedBox(
+                                width: 88,
                                 child: _compactShiftButton(
                                     t, defs[i], defs[i].id == currentId),
                               ),
@@ -414,27 +433,10 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                             const SizedBox(width: 6),
                             _clearButton(t, currentId),
                           ],
-                        )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (int i = 0; i < defs.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 6),
-                                SizedBox(
-                                  width: 88,
-                                  child: _compactShiftButton(
-                                      t, defs[i], defs[i].id == currentId),
-                                ),
-                              ],
-                              const SizedBox(width: 6),
-                              _clearButton(t, currentId),
-                            ],
-                          ),
                         ),
-                ),
-              ],
-            ),
+                      ),
+              ),
+            ],
           ),
         ),
       ),

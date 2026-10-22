@@ -129,8 +129,52 @@ class OceanBandState extends State<OceanBand> {
     }
     _reportRenderer('shader');
     setState(() => _shader = shader);
+    _startFrameTimer();
+  }
+
+  /// 是否應該燒 30fps：帶有實際高度、而且未被收合。
+  ///
+  /// v3.6.1：鍵盤彈起時 `bandHeight` 直接歸 0（天色欄完全壓縮），
+  /// 呢個時候**一定要停錶**，唔可以「繼續 30fps 跑、只係畫個空框」——
+  /// 用戶打字嗰陣冇理由為一條 0px 的帶燒 CPU／電。
+  bool get _shouldAnimate => widget.visible && widget.height > 0.0;
+
+  /// 起 30fps 幀節流（重複呼叫無害；shader 未就緒時唔會起）。
+  void _startFrameTimer() {
+    if (_frameTimer != null || _shader == null || !_shouldAnimate) return;
     _frameTimer = Timer.periodic(_frameInterval, (_) => _onFrame());
   }
+
+  /// 停 30fps 幀節流並釋放 Timer。
+  ///
+  /// `_clock` 刻意**唔停**：`elapsed` 用單調遞增的真實時間，
+  /// 復活時相位無縫接上，唔會跳格（見 `_BandFrame.elapsed` 的說明）。
+  void _stopFrameTimer() {
+    _frameTimer?.cancel();
+    _frameTimer = null;
+  }
+
+  /// 按當前可見性同步 Timer 狀態（可見 → 起，不可見 → 停）。
+  void _syncFrameTimer() {
+    if (_shouldAnimate) {
+      _startFrameTimer();
+    } else {
+      _stopFrameTimer();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant OceanBand oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visible != widget.visible ||
+        oldWidget.height != widget.height) {
+      _syncFrameTimer();
+    }
+  }
+
+  /// 測試用：30fps Timer 而家有冇真係喺度跑（永久防線，見 ocean_band_idle_test）。
+  @visibleForTesting
+  bool get debugFrameTimerRunning => _frameTimer?.isActive ?? false;
 
   /// 印出唯一的 renderer 標記（重複呼叫只會生效一次）。
   void _reportRenderer(String value) {
@@ -197,7 +241,7 @@ class OceanBandState extends State<OceanBand> {
 
   @override
   void dispose() {
-    _frameTimer?.cancel();
+    _stopFrameTimer();
     _moodTimer?.cancel();
     _watchdog?.cancel();
     _clock.stop();

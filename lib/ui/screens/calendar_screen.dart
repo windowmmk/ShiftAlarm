@@ -518,15 +518,39 @@ class _CalendarScreenState extends State<CalendarScreen>
       // 高度全部由 CalendarLayout 一次算定，切換排班編輯只係原地換內容，無彈出彈入。
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final layout = CalendarLayout.compute(constraints.maxHeight);
+          // v3.6.1：底部留白改用**真實**導航欄高度，唔再靠寫死嘅 72。
+          // `HomeScreen` 用 `extendBody: true`，Scaffold 會把導航欄高度注入 body 的
+          // `padding.bottom`（實測手勢導航 88.8 / 三鍵導航 112.8）；鍵盤彈起時
+          // Scaffold 已將佢歸零，所以 navHeight 自動變 0，唔會再空出 72px 死白。
+          final mq = MediaQuery.of(context);
+          // ⚠️ 鍵盤唔可以讀 `mq.viewInsets.bottom`：Scaffold（`resizeToAvoidBottomInset`
+          // 預設 true）在 body 之前已經把底部 viewInsets 食掉，body 內永遠讀到 0
+          // （實測：view 有 300，body 內 viewInsets.bottom = 0）。所以讀未經消費的
+          // `View.of(context).viewInsets`（實體像素，只用作 > 0 判斷，dpr 無影響）。
+          final keyboardOpen =
+              View.of(context).viewInsets.bottom > 0 || mq.viewInsets.bottom > 0;
+          final layout = CalendarLayout.compute(
+            constraints.maxHeight,
+            bottomInset: mq.padding.bottom,
+            // 輸入文字（鍵盤彈起）時天色欄完全壓縮為 0，讓位俾日曆同底部區
+            keyboardOpen: keyboardOpen,
+          );
 
           return Column(
             children: [
               // ① 頂部海洋線
-              OceanBand(
-                key: _oceanKey,
-                visible: layout.bandHeight >= 48.0,
+              //
+              // ⚠️ 外面一定要用 `SizedBox` 夾死高度：`OceanBand` 內部有 260ms 的
+              // 高度過渡。若佢直接做 Column 的 child，鍵盤彈起收合嗰 260ms 內
+              // 佢仍然報舊高度 96，而日曆區已經按 band=0 長大 → Column 短暫超高
+              // 96px，會閃一下黃黑間條。夾死之後「讓位」係即時的，動畫只係內部視覺。
+              SizedBox(
                 height: layout.bandHeight,
+                child: OceanBand(
+                  key: _oceanKey,
+                  visible: layout.bandHeight >= 48.0,
+                  height: layout.bandHeight,
+                ),
               ),
               // ② 中間日曆：高度寫死，格高由佈局算式實算（理想 75，唔夠位先縮）
               SizedBox(
