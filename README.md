@@ -1,97 +1,86 @@
 # ShiftAlarm 排班鬧鐘 ⏰
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web%20(PWA)-3DDC84?logo=android&logoColor=white)](https://windowmmk.github.io/ShiftAlarm/)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-success)](https://github.com/windowmmk/ShiftAlarm)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-v3.5.0-orange)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![Latest Release](https://img.shields.io/github/v/release/windowmmk/ShiftAlarm?label=Release)](https://github.com/windowmmk/ShiftAlarm/releases)
+[![CI](https://github.com/windowmmk/ShiftAlarm/actions/workflows/deploy-web.yml/badge.svg?branch=main)](https://github.com/windowmmk/ShiftAlarm/actions/workflows/deploy-web.yml)
 
-專為輪班與排班人士量身打造的**極致隱私、純離線、全功能**排班日曆與精確鬧鐘應用程式（Flutter / Android 原生整合 / Web PWA）。
+專為輪班與排班人士打造的**極致隱私、純離線**排班日曆與精確鬧鐘（Flutter / Android 原生整合 / Web PWA）。
 
 🌐 **線上體驗 Web 版**：[https://windowmmk.github.io/ShiftAlarm/](https://windowmmk.github.io/ShiftAlarm/)
 
 ---
 
-## 🌊 v3.5 重大里程碑：海平線帶、跨端共用著色器與響前預告
+## 🔒 核心承諾：極致隱私與純離線
 
-- **海洋由覆蓋整個畫面改為螢幕上緣 96px 的「海平線帶」**：舊版海洋用 `Positioned.fill` 覆蓋整個 Scaffold，但月曆每格 84% 是白色，海只從格子之間約 3px 的縫隙漏出來，使用者體感是「好似冇做過」；而且海洋、AppBar、月曆、底部面板全部疊在同一層，整體觀感雜亂。v3.5 把海收成頂端一條 96px 的點綴帶——海依然在，但唔再同月曆爭位。可用高度不足（帶高 < 48px）時自動隱藏。
-- **著色器仍然是真光影，只是畫在帶上**：9 層傅立葉物理波高、次表面翡翠散射、各向異性太陽碎鑽光斑與星夜藍眼淚全部保留，僅渲染區域收窄至那條帶。
-- **Android 與 Web 共用同一套 fragment shader**：兩端統一走 `shaders/ocean.frag`，視覺一致。舊版只有 Web 有 WebGL 版（`web/ocean_shader.js`），Android 走 CustomPainter 簡化版，兩邊觀感有落差。
-- **鬧鐘響前 1 小時的頂欄預告通知**：以 `setExactAndAllowWhileIdle` 精確排程，**刻意不用 `setAlarmClock`**——後者會令系統時鐘 App 的「下一個鬧鐘」顯示成預告時間，污染系統指示器。代價是裝置處於 Doze 深度休眠時，這類鬧鐘雖可喚醒但受系統頻率上限約束，可能延後數分鐘；真鬧鐘本身仍走 `setAlarmClock`，不受影響。響鬧當下自動撤下預告，重開機由 `BootReceiver` 自動重建。
-- **統計頁總工時改按實際班次長度計算**：支援跨午夜班次，顯示「X 小時 Y 分」。舊版硬編碼每更 6 小時。
-- **四時天空精確對應（100% 純時間判定，杜絕任何文字衝突）**：🌅 05:00 ～ 10:59 晨曦破曉、☀️ 11:00 ～ 16:29 豔陽碧海、🌇 16:30 ～ 21:29 金暉落日、🌌 21:30 ～ 04:59 星夜深邃（浪尖藍眼淚螢光）；未選中日期時，自動按目前實際時鐘時辰展現真實海天。
-- **月曆自然大小屏幕置中、每格 75px**：未選中日期時，日曆不佔滿全屏，而是在屏幕中心以原創自然尺寸舒適置中；星期列（日〜六）融入月曆甲板一體隨動並精準對齊日曆欄位，每格高度 75px，點選體驗極佳。
-- **42 格對角線 3D 破浪浮力轉場**：批量導入與跨月換頁時，依照波浪相位由下而上推進 3D 透視拋起、旋轉、浮力落位與浪尖高光閃邊。
-- **全新緊湊排班卡片（支援下划隱去）**：自適應緊湊包裹（總高約 88px），零多餘空白；選取日期時自底部平滑彈出，支援向下劃動（Swipe down）或點擊下箭頭隨時收起。
-
----
-
-## 🔒 核心承諾：極致隱私與純離線架構
-
-- **100% 離線運行**：本應用程式在 Android 作業系統層級**完全未申請 `INTERNET` 網路存取權限**，在物理層面徹底杜絕聯網可能。
-- **無帳號、無雲端**：所有班次、排程與備註資料全數存放於本機儲存空間，永不離開您的裝置。
+- **100% 離線**：Android 層級**完全未申請 `INTERNET` 權限**，在物理層面杜絕聯網可能。
+- **無帳號、無雲端**：班次、排程與備註全數存放本機，永不離開裝置。
 - **零追蹤、零廣告**：無 Firebase、無 Crashlytics、無任何第三方追蹤分析或廣告 SDK。
-- **透明可審計**：全開源架構，代碼乾淨透明，隨時接受社群審查。
+- **開源可審計**：全開源，程式碼乾淨透明，隨時接受社群審查。
 
 ---
 
-## ✨ 主要功能亮點
+## ✨ 功能一覽
 
-### 🚀 全新 SA2 / SR2 極簡二進制協議（Base58）
-- **體積壓縮 90%+**：捨棄冗長 JSON 欄位名，採用工業級自定義二進制緊湊預編碼：
-  - **配置口令 (`SA2:<Base58>`)**：班次定義＋地點清單壓縮至 **90 ~ 115 字元**（原需 2000+ 字元）。
-  - **排班口令 (`SR2:<Base58>`)**：整月排班＋地點＋備註壓縮至 **150 ~ 230 字元**。
-- **IEEE 802.3 CRC32 防偽校驗**：CRC32 校驗碼與 UNIX 時間戳直接內嵌於二進制前導區，防止傳輸截斷與惡意竄改。
-- **雙模相容純 CSV 文字**：同時支援傳統 Excel / 記事本純文字匯入匯出（格式：`YYYY-MM-DD,班次代號,地點`）。
-- **多維零負擔分享體驗**：
-  - **剪貼簿即時探針**：打開彈窗自動辨識有效口令，免去手動貼上步驟。
-  - **網址一鍵導入**：分享連結支援 `?c=SA2:...` 與 `?r=SR2:...`（微信友善無 `#`，杜絕話題標籤誤判；亦向下相容 `#c=` 與 `#r=`），點開即跳出預覽確認並 1 秒套用。
-  - **二維碼（QR Code）面對面快傳**：支援在現場一鍵生成 QR Code，支援網址與純短碼切換，面對面掃碼秒級同步。
+### 🖥️ 三區固定版面（v3.6 起）
 
-### 📅 固定 6 週流暢月曆
-- **標準 42 格固定網格**：每月固定 6 行排版，消除了跨月切換時的高度撕裂與震顫。
-- **Web 60fps 滿幀渲染**：引入 `RepaintBoundary` 重繪邊界隔離與文字佈局快取，滑動體驗行雲流水。
-- **年月快速跳轉**：點擊頂部標題即可展開年月快速切換面板，一鍵跨年跨月跳轉。
-- **手勢與震動反饋**：
-  - 日曆格點選支援輕微觸覺震動（Haptic Feedback），提供扎實手感。
-  - 底部排班面板支援左右水平滑動手勢，連續排班切換日期得心應手。
-- **獨立每日便利貼**：每日常駐便簽功能，排班與備註互不干擾。
-- **澳門公眾假期標註**：內建法定公眾假期表，假期日期醒目標記，排班休假一目了然。
+頂部天色帶／中間月曆／底部排班詳情，**三區高度比例固定，不再彈出彈入**；可用高度不足時天色帶讓位（96px → 下限 56px），輸入文字（場名／備註）鍵盤彈起時**完全壓縮為 0**，把空間全讓給日曆。
 
-### ⏰ 精準輪班鬧鐘系統（Android 原生）
-- **多鬧鐘調度**：每個班次可配置多組鬧鐘（提前開工提醒、打卡通知等）。
-- **全屏鬧鐘喚醒**：原生 Android `AlarmManager` 精確調度，支援鎖屏全屏彈窗喚醒與自訂鈴聲。
-- **溫和通知模式**：支援「僅通知」輕量震動提示，滿足開工或收工打卡等多樣化需求。
-- **開機自動重排**：裝置重開機後，原生 `BootReceiver` 自動自本地還原並重新排程所有未來鬧鐘，絕不漏響。
-- **權限自檢儀表板**：內建精確鬧鐘、全屏通知、電池最佳化白名單自檢引導。
+### 🌊 天色帶與四時天空
 
-### 🎨 班次與地點管理
-- **所見即所得預覽**：班次編輯器內建即時日曆格縮圖，即時計算全形／半形單位字寬，超長自動防截斷警示。
-- **地點自動補全**：輸入地點時自動比對歷史記錄，高亮標籤一鍵選填。
+- Android 與 Web **共用同一套 fragment shader**（`shaders/ocean.frag`），真光影：9 層傅立葉物理波高、次表面散射、太陽碎鑽光斑、星夜藍眼淚。
+- 依時辰自動切換四時天色：🌅 晨曦破曉（05:00–10:59）、☀️ 豔陽碧海（11:00–16:29）、🌇 金暉落日（16:30–21:29）、🌌 星夜深邃（21:30–04:59）。未選日期時按目前實際時鐘呈現。
+- v3.6.3 起天色帶與月曆卡**共用同一底色、描邊、圓角與內縮**，闊屏（> 480px）亦不會錯位。
 
-### 📊 工時與出勤統計總覽
-- **多維度區間統計**：支援「本月」、「最近 7 天」、「近 30 天」、「近 90 天」、「今年至今」及自訂區間。
-- **視覺化分佈圖表**：班次比例長條圖、地點分佈次數排行、總出勤天數與累計工時即時精算。
-- **總工時按實際班次長度累計**：逐筆依班次的開工／收工時間計算，支援跨午夜班次，以「X 小時 Y 分」呈現。
+### 📅 月曆
+
+- **標準 42 格固定網格**（每月 6 行），消除跨月高度撕裂；日曆格理想高度 75px。
+- 點選震動回饋、年月快速跳轉面板、**澳門公眾假期標註**、每日常駐便利貼。
+- Web 端 60fps：`RepaintBoundary` 隔離重繪與文字佈局快取。
+
+### ⏰ 精準輪班鬧鐘（Android 原生）
+
+- 每班次最多 10 組鬧鐘；原生 `AlarmManager` 精確調度，鎖屏全屏喚醒（前台服務＋系統鬧鐘鈴聲）。
+- **響前 1 小時倒計時預告**：以狀態欄倒計時呈現（非推播），**只限真鬧鐘**——純通知類（打卡）不發預告；響鬧即撤下，重開機由 `BootReceiver` 重建。
+- 溫和通知模式（僅通知、輕震動）；開機自動重排所有未來鬧鐘。
+- 內建精確鬧鐘、全屏通知、電池最佳化白名單**權限自檢儀表板**。
+
+### 🔗 分享與導入（SA2 / SR2 極簡二進制協議）
+
+- **體積壓縮 90%+**：配置口令 `SA2:<Base58>` 壓至 90–115 字元，整月排班 `SR2:<Base58>` 壓至 150–230 字元。
+- **CRC32 防偽校驗**：IEEE 802.3 CRC32 與 UNIX 時間戳內嵌於二進制前導區，防截斷與竄改。
+- 網址一鍵導入（`?c=SA2:...`／`?r=SR2:...`，微信友善無 `#`）、剪貼簿即時探針、面對面 QR Code 快傳。
+- 雙模相容純 CSV 文字（`YYYY-MM-DD,班次代號,地點`），Excel／記事本可直接編輯。
+
+### 📊 統計與班次管理
+
+- 多維區間統計（本月／近 7／30／90 天／今年至今／自訂）、班次比例與地點分佈圖表。
+- **總工時按實際班次長度**逐筆計算，支援跨午夜班次，顯示「X 小時 Y 分」。
+- 班次編輯器內建**日曆格即時預覽**（所見即所得，字級已鎖定、唔受系統字體縮放影響）；地點輸入自動補全歷史記錄。
 
 ---
 
-## 📂 專案結構簡介
+## 📂 專案結構
 
 ```text
 ShiftAlarm/
-├── android/               # Android 原生模組（AlarmReceiver, BootReceiver, 權限自檢）
+├── android/               # Android 原生模組（AlarmScheduler/Receiver、BootReceiver、
+│                          #   AlarmActivity 全屏喚醒、PreAlert 響前預告、AlarmIdRegistry）
 ├── lib/
-│   ├── alarm/             # 原生鬧鐘與廣播 MethodChannel 橋接層
-│   ├── domain/            # 領域模型（SA2/SR2 二進制編解碼、Base58、CSV、假期、統計）
-│   ├── theme/             # 設計規範與色彩 Token
+│   ├── alarm/             # MethodChannel 橋接層（shift_alarm/alarm）
+│   ├── domain/            # 純 Dart 領域層：SA2/SR2 編解碼、Base58、CSV、假期、
+│   │                      #   統計、班次時長、日曆三區佈局（calendar_layout.dart）
+│   ├── theme/             # 設計 Token 與色彩規範
 │   ├── ui/
-│   │   ├── screens/       # 畫面（日曆、排班面板、班次管理、統計圖表、權限設定）
-│   │   └── widgets/       # 共用元件（徽章、縮圖、二維碼彈窗）
-│   ├── config.dart        # 平台相容性開關
-│   └── main.dart          # App 啟動入口與全域錯誤防護
-├── shaders/               # Android 與 Web 共用的 fragment shader（ocean.frag）
-└── test/                  # 單元測試集（協議編解碼、校驗碼、CSV、統計算法）
+│   │   ├── screens/       # 日曆、班次管理、統計、設定、權限自檢、排班面板
+│   │   ├── widgets/       # 天色帶（ocean_band）、大氣海洋、導入轉場、徽章
+│   │   └── dialogs/       # 導入／QR Code 等對話框
+│   ├── config.dart        # 版本常數（與 pubspec.yaml 同步）
+│   └── main.dart          # App 入口與全域錯誤防護
+├── shaders/               # Android 與 Web 共用的 ocean.frag
+└── test/                  # 測試集（見下方「測試與防線」）
 ```
 
 ---
@@ -99,91 +88,72 @@ ShiftAlarm/
 ## 🛠️ 開發與建置
 
 ### 環境需求
-- **Flutter SDK**：3.13+ 以上
-- **Android SDK**：API 34 ~ 36
+
+- **Flutter SDK**：3.47+（Dart `^3.13.5`，以 `pubspec.yaml` 的 `environment` 為準）
 - **JDK**：OpenJDK 17
+- **Android**：`compileSdk`／`targetSdk` 沿用 Flutter Gradle Plugin 預設值；`minSdk` 由 `flutter.minSdkVersion` 帶入（現值 **24**）
 
 ### 快速開始
 
 ```bash
-# 1. 取得專案源碼
 git clone https://github.com/windowmmk/ShiftAlarm.git
 cd ShiftAlarm
-
-# 2. 安裝 Flutter 依賴
 flutter pub get
-
-# 3. 執行單元測試
-flutter test
-
-# 4. 打包 Android Release APK
-flutter build apk --release --target-platform android-arm64
-
-# 5. 打包 Web PWA 版本
-flutter build web --release
+flutter test                    # 跑全部測試
+flutter build apk --release     # Android Release APK
+flutter build web --release     # Web PWA
 ```
 
----
+### CI / 發版
 
-## 📜 版本演進歷程
+| Workflow | 觸發 | 產物 |
+|---|---|---|
+| `deploy-web.yml` | push `main` | GitHub Pages 線上版 |
+| `build-apk.yml` | 打 `v*` tag（或手動） | GitHub Release APK |
 
-### 🌟 v3.5.0（現行版本）
-- **海平線帶**：海洋渲染區域由整個畫面收窄為頂端 96px 帶狀點綴，帶高不足 48px 時自動隱藏（背景與理由見上方 v3.5 里程碑）。
-- **跨端共用著色器**：Android 與 Web 統一使用 `shaders/ocean.frag`。
-- **響前 1 小時預告通知**：`setExactAndAllowWhileIdle` 排程，響鬧即撤下，重開機自動重建。
-- **總工時按實際班次長度計算**：支援跨午夜班次，顯示「X 小時 Y 分」。
-
----
-
-### 🌟 v3.4.1 / v3.4.0（重大版本）
-- **真 3D 物理著色器海洋**：GPU 光線步進（Ray Marching）渲染 9 層傅立葉物理波高、次表面翡翠散射、各向異性太陽碎鑽光斑與星夜螢光「藍眼淚」。（著色器本體沿用至 v3.5，僅渲染區域收窄為頂端 96px 海平線帶）
-- **四時天空精確對應（自然時辰）**：
-  - 🌅 **06:00 早班**：晨曦破曉（旭日初升、低仰角粉金朝霞、微藍清晨）
-  - ☀️ **12:00 午班**：豔陽碧海（高空 $55^\circ$ 烈陽晴空、極通透蔚藍天空、耀眼碎鑽波光，天特別亮！）
-  - 🌇 **18:00 晚班**：金暉落日（海平線緋紅夕陽暮光、熔金夕陽波濤）
-  - 🌌 **00:00 夜班**：星夜深邃（黑曜石暗夜天幕、暗海靜謐、浪尖 $3.2\times$ 藍眼淚螢光，天特別暗！）
-- **真實時間即時感應**：未選擇日期時，自動依目前設備真實時鐘呈現海天；
-- **屏幕置中原創比例月曆**：未選中日期時，日曆不佔滿畫面，而是在屏幕中心以原創自然尺寸舒適置中。（v3.5 起海洋讓位給月曆，只在頂端保留 96px 海平線帶）
-- **42 格對角線 3D 破浪浮力轉場**：排更導入與切月時，依浪潮相位推進 3D 透視拋起、旋轉、浮力落位與浪尖光潮閃爍。
-- **全新緊湊自適應排班詳情卡片**：高度緊湊（約 88px），零多餘空白；選取日期自底部平滑彈出，支援手勢下划或點擊下箭頭隨時收起。
+> ⚠️ **出 APK 一定要打 `v*` tag**，只 push main 只會觸發 Deploy Web。
+> Release notes 寫在 `build-apk.yml` 的 `body:`，**打 tag 前要先改**，否則會沿用上一版文案。
 
 ---
 
-### 📦 v3.3 系列歷史更新匯總（v3.3.0 ~ v3.3.21）
+## 🧪 測試與防線
 
-#### 1. 口令協議與分享革命（SA2 / SR2 Base58 協議）
-- **極致壓縮 90%+**：推出自定義緊湊二進制編碼，配置口令（`SA2:`）壓縮至 90~115 字元，整月排班（`SR2:`）壓縮至 150~230 字元。
-- **CRC32 防偽校驗**：內嵌 IEEE 802.3 CRC32 校驗碼與 UNIX 時間戳，杜絕網路傳輸截斷與惡意竄改。
-- **零門檻全維度導入**：
-  - 微信友好 `?c=` 與 `?r=` 網址直連導入（免手動貼上，點開即跳出預覽確認並 1 秒套用）；
-  - 剪貼簿即時探針自動辨識有效口令；
-  - 面對面 QR Code 快速傳輸（支援網址與純二進制碼切換）；
-  - 雙模相容傳統 Excel / CSV 純文字格式。
+CI 每次 push `main` 都會跑 `flutter test`（見上方 CI 徽章）。v3.6.3 時為 **499 項全綠**，
+`flutter analyze` 維持 **28 項**（既有，改動不得新增）。幾條重點防線：
 
-#### 2. 精密藍幾何體系與月曆佈局重構
-- **標準 42 格固定佈局**：確立每月固定 6 行（42 格）標準分頁，消除跨月高度撕裂與抖動。
-- **觸覺與微交互**：日曆格點選 120ms 堅實觸感震動（Haptic Feedback）、頂部微交互通知條（Top Notification）。
-- **字重平衡與行內編輯**：排班地點與每日便利貼直接在行內輸入，移除額外彈窗干擾。
-- **節假日標籤**：法定公眾假期智能醒目標記，排班休假一目了然。
+| 防線 | 內容 |
+|---|---|
+| `layout_overflow_sweep_test.dart` | 7 個介面 × 4 個寬度 × 3 個字體 = **84 組**，掃每粒 `RenderFlex` 的「子節點總長 vs 自身長度」，零溢出 |
+| `responsive_overflow_test.dart` | 日曆頁 21 組尺寸掃描 |
+| `band_card_alignment_test.dart` | 4 個寬度（含闊屏 900px）量天色帶與月曆卡左右對齊，並斷言底色對比度 |
+| `calendar_layout_measure_test.dart` | 三區高度實算與預留對帳 |
 
-#### 3. 部署與自動化體系固化
-- **CI/CD 自動化建置**：打通 GitHub Actions 自動化 Web PWA（GitHub Pages）與 Android APK 雙端建置。
-- **持久化 Release Keystore 簽名**：在 CI 端固化發布金鑰，確保後續跨版本升級 100% 無簽名衝突。
-
-#### 4. 動態海天與視覺探索過渡
-- 全界面通透海天連動背景（貫通頂部 AppBar 與底部導航欄）。
-- 批量排班跨月自動換頁與專屬更次色彩光浪推進動效。
-- 關於彈窗常數集中統一由 config 驅動，確保版本號與構建號全局一致。
+> ⚠️ 本機跑測試前必須 `export NO_PROXY="localhost,127.0.0.1,::1"` 並清掉 `HTTP(S)_PROXY`，
+> 否則 `flutter_tester` 的 localhost WebSocket 連不上。
 
 ---
-- **v3.2.1**：
-  - 實現比特幣同款 Base58 編解碼器，解決 Base64 符號雙擊選取問題。
-  - Web 端引入 `RepaintBoundary` 與文字排版快取，幀率提升至穩定的 60fps。
-- **v3.2.0**：
-  - 重構月曆為標準固定 6 週（42 格）分頁網格，修復跨年溢出 Bug。
-  - 升級 Gradle 8.14，打通 GitHub Actions 自動化 Web / Android CI 建置。
-- **v3.1.0**：
-  - 初始開源版本，具備 100% 離線排班與 Android 原生輪班鬧鐘。
+
+## 📜 版本演進
+
+### 現行版本：v3.6.x
+
+| 版本 | 重點 |
+|---|---|
+| **v3.6.3** | 天色帶與月曆卡「成套」：修闊屏每邊錯開 8px 的嵌套順序根因，共用底色／描邊／圓角；格線對比度 15 → 23/255 |
+| **v3.6.2** | 版面窄屏＋大字體零溢出（9 處，含 AppBar 四寬度全爆邊）、啟動不再白屏、排班 JSON 損壞唔會成份清空、分享統計邊界修正、Android 幽靈鬧鐘對帳 |
+| **v3.6.1** | 響前預告只限真鬧鐘並改為狀態欄倒計時；輸入文字時天色帶壓縮為 0；第三欄高度用盡 |
+| **v3.6.0** | 三區固定版面（頂部天色帶／中間月曆／底部排班詳情），唔再彈出彈入 |
+
+<details>
+<summary><b>舊版本紀錄（v3.5 及以前）</b></summary>
+
+- **v3.5.0**：海洋由覆蓋全畫面收窄為頂端 96px 海平線帶；Android 與 Web 統一走 `shaders/ocean.frag`；響前 1 小時預告通知；總工時改按實際班次長度計算。
+- **v3.4.x**：真 3D 物理著色器海洋（Ray Marching）、四時天空對應、42 格對角線 3D 破浪轉場、緊湊排班詳情卡片。
+- **v3.3.x**：SA2／SR2 Base58 協議與 CRC32 校驗、標準 42 格固定佈局、觸覺回饋、GitHub Actions 雙端建置與持久化 Release Keystore。
+- **v3.2.x**：Base58 編解碼器、Web 端 `RepaintBoundary` 提速至 60fps、Gradle 8.14。
+- **v3.1.0**：初始開源版本，100% 離線排班與 Android 原生輪班鬧鐘。
+
+</details>
 
 ---
 
