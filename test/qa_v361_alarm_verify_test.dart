@@ -225,8 +225,14 @@ void main() {
       expect(actual, isNot(expected.subtract(const Duration(minutes: 60))
           .millisecondsSinceEpoch),
           reason: '不可以傳 leadAt（07:30），否則倒數會提早一小時歸零');
+      // ⚠️ 呢條**唔可以**寫成「距現在 > 12 小時」：`expected` 係**明日** 08:30，
+      //    當下只要過咗 20:30，距離就唔夠 12 小時 —— 斷言會喺每日
+      //    20:30–08:30 之間必紅（掛鐘依賴，同程式行為完全無關）。
+      //    呢度真正要排嘅只係「now + 1s」，用 1 分鐘門檻就夠，
+      //    而且任何時刻都成立。上面第 223 行已經逐毫秒鎖死等於明日 08:30，
+      //    所以「傳 now+1s」本身一定會被抓到，唔需要靠呢個寬鬆斷言。
       expect(actual - DateTime.now().millisecondsSinceEpoch,
-          greaterThan(const Duration(hours: 12).inMilliseconds),
+          greaterThan(const Duration(minutes: 1).inMilliseconds),
           reason: '不可以傳 now + 1s（分支 2 的派發時刻），否則倒計時永遠顯示 00:00:01');
     });
 
