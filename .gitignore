@@ -48,3 +48,6 @@ local.properties
 
 # Widget Preview related
 .widget_preview/
+
+# 截圖腳本執行時的進度標記（只用於除錯，唔應該入版本庫）
+tool/_progress.txt
