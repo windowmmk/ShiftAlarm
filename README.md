@@ -11,6 +11,20 @@
 
 🌐 **線上體驗 Web 版**：[https://windowmmk.github.io/ShiftAlarm/](https://windowmmk.github.io/ShiftAlarm/)
 
+<p align="center">
+  <img src="docs/screenshots/01-home.png" width="240" alt="日曆主畫面：天色帶、月曆與底部排班詳情">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/02-stats.png" width="240" alt="工時統計：班次與地點分佈">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/03-shifts.png" width="240" alt="班次管理">
+</p>
+
+<p align="center">
+  <sub>日曆主畫面（天色帶／月曆／排班詳情）　·　工時統計　·　班次管理</sub>
+</p>
+
+> 以上為**真實 UI 截圖**，由 `tool/gen_screenshots_test.dart` 經 Flutter 渲染管線直接輸出，非設計稿或合成圖。
+
 ---
 
 ## 🔒 核心承諾：極致隱私與純離線
@@ -80,6 +94,8 @@ ShiftAlarm/
 │   ├── config.dart        # 版本常數（與 pubspec.yaml 同步）
 │   └── main.dart          # App 入口與全域錯誤防護
 ├── shaders/               # Android 與 Web 共用的 ocean.frag
+├── tool/                  # 開發輔助腳本（README 截圖產生器，不在 test/ 下所以不進 CI）
+├── docs/screenshots/      # README 用的真實 UI 截圖
 └── test/                  # 測試集（見下方「測試與防線」）
 ```
 
@@ -130,6 +146,21 @@ CI 每次 push `main` 都會跑 `flutter test`（見上方 CI 徽章）。v3.6.3
 
 > ⚠️ 本機跑測試前必須 `export NO_PROXY="localhost,127.0.0.1,::1"` 並清掉 `HTTP(S)_PROXY`，
 > 否則 `flutter_tester` 的 localhost WebSocket 連不上。
+
+### 重新產生 README 截圖
+
+```bash
+export NO_PROXY="localhost,127.0.0.1,::1"
+flutter test tool/gen_screenshots_test.dart --plain-name home
+flutter test tool/gen_screenshots_test.dart --plain-name stats
+flutter test tool/gen_screenshots_test.dart --plain-name shifts
+```
+
+- **一張圖一個進程**：天色帶的 30fps `Timer.periodic` 會令 `flutter_test` 收尾等不到靜止，
+  所以腳本拍完即 `exit(0)`；同一進程連拍第二張會 hang 住（實測 5 分鐘以上不返回）。
+- 字型：測試環境預設是 Ahem（全方塊），腳本會載入 Flutter SDK 的 Roboto + MaterialIcons，
+  以及 Windows 的「等線」（`Deng.ttf` / `Dengb.ttf`）作中文 fallback。**非 Windows 環境要改路徑**。
+- `tool/` 不在 `test/` 目錄下，所以全量 `flutter test` 不會跑到它，也不影響 CI。
 
 ---
 
