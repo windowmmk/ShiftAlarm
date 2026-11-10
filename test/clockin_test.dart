@@ -123,25 +123,25 @@ void main() {
   });
 
   group('打卡實際觸發時間', () {
-    test('開工打卡＝班次 startTime（s00 跨午夜：2026-11-02 00:00）', () {
+    test('開工打卡＝班次 startTime（s00 跨午夜：2099-11-02 00:00）', () {
       final def = _defs()['s00']!;
       final t = AlarmService.triggerAtFor(
-          '2026-11-02', def, _byId(def, ShiftAlarm.clockInId));
-      expect(t, DateTime(2026, 11, 2, 0, 0));
+          '2099-11-02', def, _byId(def, ShiftAlarm.clockInId));
+      expect(t, DateTime(2099, 11, 2, 0, 0));
     });
 
     test('收工打卡＝班次 endTime（s00 → 同日 06:00）', () {
       final def = _defs()['s00']!;
       final t = AlarmService.triggerAtFor(
-          '2026-11-02', def, _byId(def, ShiftAlarm.clockOutId));
-      expect(t, DateTime(2026, 11, 2, 6, 0));
+          '2099-11-02', def, _byId(def, ShiftAlarm.clockOutId));
+      expect(t, DateTime(2099, 11, 2, 6, 0));
     });
 
     test('收工打卡跨日（s18 18:00–00:00 → 翌日 00:00）', () {
       final def = _defs()['s18']!;
       final t = AlarmService.triggerAtFor(
-          '2026-11-02', def, _byId(def, ShiftAlarm.clockOutId));
-      expect(t, DateTime(2026, 11, 3, 0, 0));
+          '2099-11-02', def, _byId(def, ShiftAlarm.clockOutId));
+      expect(t, DateTime(2099, 11, 3, 0, 0));
     });
 
     test('自訂 8 小時班次：收工打卡 offset 480，觸發 17:00', () {
@@ -154,12 +154,12 @@ void main() {
       );
       final out = _byId(def, ShiftAlarm.clockOutId);
       expect(out.offsetMinutes, 480);
-      expect(AlarmService.triggerAtFor('2026-11-02', def, out),
-          DateTime(2026, 11, 2, 17, 0));
+      expect(AlarmService.triggerAtFor('2099-11-02', def, out),
+          DateTime(2099, 11, 2, 17, 0));
       expect(
           AlarmService.triggerAtFor(
-              '2026-11-02', def, _byId(def, ShiftAlarm.clockInId)),
-          DateTime(2026, 11, 2, 9, 0));
+              '2099-11-02', def, _byId(def, ShiftAlarm.clockInId)),
+          DateTime(2099, 11, 2, 9, 0));
     });
   });
 
@@ -230,13 +230,13 @@ void main() {
       final def = store.defs['s06']!;
       expect(_byId(def, ShiftAlarm.clockOutId).offsetMinutes, 360);
       expect(
-          AlarmService.triggerAtFor('2026-11-02', def,
+          AlarmService.triggerAtFor('2099-11-02', def,
               _byId(def, ShiftAlarm.clockInId)),
-          DateTime(2026, 11, 2, 7, 0));
+          DateTime(2099, 11, 2, 7, 0));
       expect(
-          AlarmService.triggerAtFor('2026-11-02', def,
+          AlarmService.triggerAtFor('2099-11-02', def,
               _byId(def, ShiftAlarm.clockOutId)),
-          DateTime(2026, 11, 2, 13, 0));
+          DateTime(2099, 11, 2, 13, 0));
     });
 
     test('改時長 → 收工打卡 offset 動態重算', () async {
@@ -250,9 +250,9 @@ void main() {
       final def = store.defs['s12']!;
       expect(_byId(def, ShiftAlarm.clockOutId).offsetMinutes, 480);
       expect(
-          AlarmService.triggerAtFor('2026-11-02', def,
+          AlarmService.triggerAtFor('2099-11-02', def,
               _byId(def, ShiftAlarm.clockOutId)),
-          DateTime(2026, 11, 2, 20, 0));
+          DateTime(2099, 11, 2, 20, 0));
     });
   });
 
@@ -311,7 +311,7 @@ void main() {
           alarms: alarms);
       final ids = <int>{};
       for (var i = 0; i < def.alarms.length && i < 10; i++) {
-        ids.add(AlarmService.alarmIdFor('2026-11-02', i));
+        ids.add(AlarmService.alarmIdFor('2099-11-02', i));
       }
       expect(ids.length, 10);
       // UI 新增掣 disable 條件：_alarms.length >= 10
@@ -337,7 +337,7 @@ void main() {
           endTime: '12:00',
           alarms: alarms);
       final fake = _FakeBridge();
-      await AlarmService(fake).onAssigned('2026-11-02', def);
+      await AlarmService(fake).onAssigned('2099-11-02', def);
       expect(fake.full.length + fake.gentle.length, 10);
     });
   });
@@ -357,21 +357,21 @@ void main() {
           alarms: alarms);
 
       final fake = _FakeBridge();
-      await AlarmService(fake).onAssigned('2026-11-02', live);
+      await AlarmService(fake).onAssigned('2099-11-02', live);
 
       // a1 全鬧鐘走 schedule
       expect(fake.full.length, 1);
       expect(fake.full.single.triggerAtMillis,
-          DateTime(2026, 11, 2, 5, 0).millisecondsSinceEpoch);
+          DateTime(2099, 11, 2, 5, 0).millisecondsSinceEpoch);
       // 兩個打卡走 scheduleGentle，時間＝開工／收工整點
       expect(fake.gentle.length, 2);
       final byTitle = {for (final g in fake.gentle) g.title: g};
       expect(
           byTitle['早更 開工打卡']!.triggerAtMillis,
-          DateTime(2026, 11, 2, 6, 0).millisecondsSinceEpoch);
+          DateTime(2099, 11, 2, 6, 0).millisecondsSinceEpoch);
       expect(
           byTitle['早更 收工打卡']!.triggerAtMillis,
-          DateTime(2026, 11, 2, 12, 0).millisecondsSinceEpoch);
+          DateTime(2099, 11, 2, 12, 0).millisecondsSinceEpoch);
     });
   });
 
@@ -384,16 +384,16 @@ void main() {
 
       await store.assignBatch([
         (ymd: '2026-11-01', shiftId: 's06', note: 'SITE_A', remark: '備註1'),
-        (ymd: '2026-11-02', shiftId: 's12', note: 'SITE_B', remark: ''),
+        (ymd: '2099-11-02', shiftId: 's12', note: 'SITE_B', remark: ''),
       ]);
 
       expect(store.assignments['2026-11-01']?.shiftId, 's06');
       expect(store.assignments['2026-11-01']?.note, 'SITE_A');
       expect(store.remarks['2026-11-01'], '備註1');
 
-      expect(store.assignments['2026-11-02']?.shiftId, 's12');
-      expect(store.assignments['2026-11-02']?.note, 'SITE_B');
-      expect(store.remarks.containsKey('2026-11-02'), isFalse);
+      expect(store.assignments['2099-11-02']?.shiftId, 's12');
+      expect(store.assignments['2099-11-02']?.note, 'SITE_B');
+      expect(store.remarks.containsKey('2099-11-02'), isFalse);
     });
   });
 }
