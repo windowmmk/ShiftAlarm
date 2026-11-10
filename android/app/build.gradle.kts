@@ -34,9 +34,9 @@ android {
             val keystoreFile = file("shiftalarm-release.jks")
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "shiftalarm2026"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
                 keyAlias = System.getenv("KEY_ALIAS") ?: "shiftalarm"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "shiftalarm2026"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
             }
         }
     }

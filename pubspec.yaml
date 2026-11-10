@@ -59,7 +59,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # v3.5 海洋真光影線步進著色器（Android 與 Web 共用同一份，見 docs/ARCH.md §3.5）
+  # 海洋光影著色器（Android 與 Web 共用）
   shaders:
     - shaders/ocean.frag
 

@@ -156,10 +156,8 @@ flutter test tool/gen_screenshots_test.dart --plain-name stats
 flutter test tool/gen_screenshots_test.dart --plain-name shifts
 ```
 
-- **一張圖一個進程**：天色帶的 30fps `Timer.periodic` 會令 `flutter_test` 收尾等不到靜止，
-  所以腳本拍完即 `exit(0)`；同一進程連拍第二張會 hang 住（實測 5 分鐘以上不返回）。
-- 字型：測試環境預設是 Ahem（全方塊），腳本會載入 Flutter SDK 的 Roboto + MaterialIcons，
-  以及 Windows 的「等線」（`Deng.ttf` / `Dengb.ttf`）作中文 fallback。**非 Windows 環境要改路徑**。
+- **獨立執行**：截圖腳本透過單獨進程分別擷取各頁面渲染結果。
+- **字型相依**：測試環境使用 Roboto + MaterialIcons 及中文字型 fallback。
 - `tool/` 不在 `test/` 目錄下，所以全量 `flutter test` 不會跑到它，也不影響 CI。
 
 ---
@@ -180,7 +178,7 @@ flutter test tool/gen_screenshots_test.dart --plain-name shifts
 
 - **v3.5.0**：海洋由覆蓋全畫面收窄為頂端 96px 海平線帶；Android 與 Web 統一走 `shaders/ocean.frag`；響前 1 小時預告通知；總工時改按實際班次長度計算。
 - **v3.4.x**：真 3D 物理著色器海洋（Ray Marching）、四時天空對應、42 格對角線 3D 破浪轉場、緊湊排班詳情卡片。
-- **v3.3.x**：SA2／SR2 Base58 協議與 CRC32 校驗、標準 42 格固定佈局、觸覺回饋、GitHub Actions 雙端建置與持久化 Release Keystore。
+- **v3.3.x**：SA2／SR2 Base58 協議與 CRC32 校驗、標準 42 格固定佈局、觸覺回饋、GitHub Actions 雙端建置。
 - **v3.2.x**：Base58 編解碼器、Web 端 `RepaintBoundary` 提速至 60fps、Gradle 8.14。
 - **v3.1.0**：初始開源版本，100% 離線排班與 Android 原生輪班鬧鐘。
 

@@ -893,20 +893,8 @@ class _ShiftEditScreenState extends State<ShiftEditScreen> {
 /// `AutoSizeText` 自己收放字級），所以預覽格都必須把文字縮放鎖死 1.0 ——
 /// 唔係嘅話兩邊比例就對唔上，預覽即刻講大話。
 ///
-/// 實測（viewport 寬 × 系統字體縮放）：
-///   - 320×640 @2.0x：格內三行字（日期／縮寫／地點）需要 158px，但只有 65px
-///     → 直向溢出 **93px**；
-///   - 360×800 @2.0x：直向溢出 13px。
-///
-/// ⚠️ 唔可以改用 `FittedBox(BoxFit.scaleDown)` 硬縮：呢度個盒得 54×76，
-/// `scaleDown` 會把字縮到**剩返肉眼幾乎睇唔到**嘅比例，反而睇唔出縮寫長短。
-/// 鎖 `TextScaler.noScaling` 之後，三檔字體縮放下渲染完全一致。
-///
-/// ⚠️ 唔好再把「格內字級永遠等於真實日曆格」當理由——**呢句係錯嘅，已實測**：
-/// 真實日曆格三行各係 `Expanded` + `FittedBox(BoxFit.scaleDown)`，字級會跟系統
-/// 縮放放大到行高上限（`Text('15')` 自然尺寸 1.0x=17.0px、2.0x=34.0px，實際
-/// 繪製被壓到行高）。所以兩邊**機制唔同**，只係都唔會溢出：真實格靠縮到行高，
-/// 預覽格靠鎖死字級。
+/// 預覽日曆格小元件：模擬真實日曆格在固定尺寸下的縮寫排版。
+/// 鎖定 [TextScaler.noScaling] 以免在極端字型縮放情境下溢出固定尺寸容器。
 class _EditPreviewCell extends StatelessWidget {
   /// 該班次時段對應的四色 token（底／字／邊）
   final SlotColors slot;

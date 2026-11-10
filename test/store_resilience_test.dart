@@ -69,7 +69,7 @@ void main() {
     return 'SA2:${base58Encode(out.toBytes())}';
   }
 
-  group('P0-1 排班一天壞資料唔可以拖死整本', () {
+  group('排班單日異常資料容錯', () {
     test('一天 shiftId 型別錯 → 其他天仍然載入，壞嘅被略過並計數', () async {
       final store = await freshStore({
         'shift_defs': jsonEncode({
@@ -160,7 +160,7 @@ void main() {
     });
   });
 
-  group('P0-2 一個班次定義壞唔可以拖死整個班次清單', () {
+  group('單一班次定義異常容錯', () {
     test('某個 def 的 startTime 係數字 → 其他 def 仍然載入得到', () async {
       final store = await freshStore({
         'shift_defs': jsonEncode({
@@ -202,7 +202,7 @@ void main() {
     });
   });
 
-  group('P1-6 場所清單型別唔符唔可以令清單歸零', () {
+  group('場所清單型別相容', () {
     test('venues 存成 JSON 字串 → 仍然還原成兩個場所', () async {
       final store = await freshStore({'venues': '["A","B"]'});
       expect(store.venues, ['A', 'B']);
@@ -216,7 +216,7 @@ void main() {
     });
   });
 
-  group('P1-7 刪班次唔可以留低孤兒排班', () {
+  group('刪除班次級聯處理', () {
     test('removeDef 清走引用佢嘅排班，並回傳被清掉嘅日期', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
@@ -260,7 +260,7 @@ void main() {
     });
   });
 
-  group('P0-3 導入配置後排班唔可以變成「未知班次」', () {
+  group('配置導入班次對照映射', () {
     test('v3 端到端：export → 清空 → import，排班仍然指向正確班次', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();

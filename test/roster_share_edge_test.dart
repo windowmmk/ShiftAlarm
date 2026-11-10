@@ -8,13 +8,12 @@ import 'package:shiftalarm/domain/config_io.dart' show computeCrc32;
 import 'package:shiftalarm/domain/roster_io.dart';
 import 'package:shiftalarm/domain/shift_store.dart';
 
-/// 排班分享協議（SR2）邊界測試——永久防線。
+/// 排班分享協議（SR2）邊界測試。
 ///
-/// 每一條測試都對應一個**真實現過嘅缺陷**，而且刻意寫成「舊版一定會紅」：
-/// - P1-4：備註長度欄位只寫 1 字節，但實際寫入全部 bytes → 整份分享碼報廢。
-/// - P1-8：班次 code 為空時多個班次撞成同一個 key → 導入時班次對錯。
-/// - P1-5：報文內含唔存在嘅日期（如 2026-02-30）要跳過該筆，唔可以令
-///   整份碼導入失敗，亦唔可以讓 DateTime 自動進位把該筆算成另一日。
+/// 包含：
+/// - 備註超長截斷防護
+/// - 班次代號為空時的時間段比對相容
+/// - 解碼端非合法日期過濾與防護
 
 /// 建立測試用 store（預設用內建樣本班次）
 Future<ShiftStore> _store({Map<String, ShiftDef>? defs}) async {
@@ -26,7 +25,7 @@ Future<ShiftStore> _store({Map<String, ShiftDef>? defs}) async {
   return store;
 }
 
-/// 一個班次（時間不同、code 皆為空）——P1-8 用
+/// 一個班次（時間不同、code 皆為空）
 ShiftDef _def(String id, String name, String start, String end) => ShiftDef(
       id: id,
       name: name,
@@ -74,7 +73,7 @@ String _buildPacket(
 }
 
 void main() {
-  group('P1-4 備註超長（1 字節長度欄位）', () {
+  group('備註超長（1 字節長度欄位）', () {
     test('200 個中文字（600 字節）→ 分享碼仍然導入得，其餘日子完全正確', () async {
       final store = await _store();
       await store.assignBatch([
@@ -164,7 +163,7 @@ void main() {
     });
   });
 
-  group('P1-8 班次 code 為空', () {
+  group('班次代號為空相容', () {
     test('兩個班次 code 都係空、時間唔同 → 導入後仍然對得上正確班次', () async {
       final defs = <String, ShiftDef>{
         'sa': _def('sa', '早更', '06:00', '14:00'),
@@ -211,7 +210,7 @@ void main() {
     });
   });
 
-  group('P1-5 解碼端日期防禦', () {
+  group('解碼端日期防禦', () {
     test('報文含 2026-02-30 → 跳過該筆並報錯，其餘日子照入（offset 唔會錯位）', () async {
       final store = await _store();
       final packet = _buildPacket([

@@ -161,7 +161,7 @@ void main() {
       expect(bridge.full.length, 1, reason: '只有一個真鬧鐘');
       // 預告：只有真鬧鐘
       expect(bridge.preAlerts.length, 1,
-          reason: '打卡與自建只通知鬧鐘都不應該排預告（用戶原話：提前通知只限鬧鐘）');
+          reason: '打卡與自建只通知鬧鐘都不應該排預告（提前通知只限真鬧鐘）');
 
       final base = AlarmService.alarmBaseId(ymd);
       expect(bridge.preAlerts.single.alarmId, base * 10 + 0,

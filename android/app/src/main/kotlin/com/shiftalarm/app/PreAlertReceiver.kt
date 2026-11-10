@@ -10,33 +10,12 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 /**
- * 響鬧預告通知：鬧鐘真正響之前 1 小時，喺狀態欄掛一條 ongoing 通知，
- * 並以**倒計時**形式實時顯示仲有幾耐響（使用者原話「會提前有一個通知頂欄掛着」，
- * v3.6.1 起由靜態文案改為狀態欄倒計時）。
+ * 響鬧預告通知：鬧鐘響前 1 小時在狀態欄常駐 ongoing 通知，
+ * 並以倒計時形式即時顯示距離響鬧剩餘時間。
  *
- * ⚠️ **本檔依賴 `minSdkVersion >= 24`。**
- * 倒計時用 `setChronometerCountDown(true)`，佢係 API 24（Android 7.0）引入；
- * 喺 API < 24 上 `NotificationCompat` 會靜默忽略呢個 flag，通知會由「倒數」
- * 靜默退化為「正計時」（顯示 00:00 起往上加），唔會 crash 但語意完全錯。
- * 目前 `minSdk` 由 Flutter Gradle Plugin 提供（`flutter.minSdkVersion`，現值 24）。
- * 若日後有人調低 minSdk，**必須**喺下面加 `Build.VERSION.SDK_INT >= N` 守衛
- * 或者改用其他方案，唔可以若無其事咁照跑。
+ * 依賴 minSdkVersion >= 24（Chronometer 倒計時支援）。
  *
- * 職責邊界：本 receiver **只碰 NotificationManager**，唔碰 AlarmManager。
- * 排程／取消由 [PreAlertScheduler] 負責，兩邊共用 [PreAlertScheduler.preAlertId] 公式。
- *
- * 生命週期：
- *  - 建立：[PreAlertScheduler.schedule] 到時 → [onReceive] → `notify(id + 900000)`
- *  - ①「知道了」：[ACTION_DISMISS] → 只 `nm.cancel`，**唔動 AlarmManager**
- *    （原鬧鐘照響，使用者只係唔想再見到提示）
- *  - ②鬧鐘真正響：由 [AlarmReceiver] / [GentleAlarmReceiver] 呼叫
- *    [PreAlertScheduler.cancelNotification]
- *  - ③App 內取消／轉更：Dart `AlarmService._cancelAllFor` → `cancelPreAlert`
- *
- * 本 receiver **只讀四個 extra**（`alarm_id` / `title` / `body` / `pre_alert_trigger_at`）。
- * Intent 內另有 `pre_alert_date` / `shift_name` / `start_time` / `note` 四個 extra，
- * 係 P2-2「點擊通知跳該日」嘅預留欄位，現階段刻意只寫不讀——寫入點在
- * [PreAlertScheduler.schedule]，原因寫喺嗰度，唔好當死碼刪。
+ * 職責邊界：本 receiver 只操作 NotificationManager，排程由 [PreAlertScheduler] 負責。
  */
 class PreAlertReceiver : BroadcastReceiver() {
     companion object {
@@ -175,7 +154,7 @@ class PreAlertReceiver : BroadcastReceiver() {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setContentIntent(contentPi)
-                // 使用者原話「頂欄掛着」：划得走就等於功能失效
+                // 保持 ongoing 狀態，確保預告通知持續可見
                 .setOngoing(true)
                 .setAutoCancel(false)
                 // 使用者掃走條通知（或者「全部清除」）都要當成 dismiss。

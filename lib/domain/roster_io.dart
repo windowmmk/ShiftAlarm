@@ -85,11 +85,7 @@ Uint8List encodeCompactRoster(ShiftStore store, {DateTime? month}) {
     bb.addByte(d.clamp(1, 31));
 
     final def = store.defs[e.value.shiftId];
-    // P1-8：班次 `code` 係選填欄位（見 shift_store.dart `ShiftDef.code`），
-    // 用戶可以完全唔填代號。舊版直接攞 code 做導入比對 key，多個空白 code
-    // 嘅班次就會撞成同一個 key（全部都係 ''），導入時班次對錯晒。
-    // 所以 code 為空時 fallback 用「startTime-endTime」做 key：班次時間係
-    // 必填欄位，導入端一樣可以重建同一個字串，唔會撞 key。
+    // 班次代號比對：代號為空時 fallback 使用「startTime-endTime」作為比對鍵值
     final rawCode = (def?.code ?? '').trim();
     final shiftKey =
         rawCode.isNotEmpty ? rawCode : (def != null ? _slotKeyOf(def) : '');
@@ -102,11 +98,7 @@ Uint8List encodeCompactRoster(ShiftStore store, {DateTime? month}) {
     bb.add(venueBytes);
 
     final remark = store.remarks[e.key] ?? '';
-    // P1-4：備註由 UI 限制 200 字，中文 200 字＝600 字節，遠超 1 字節長度
-    // 上限 255。舊版寫 `length.clamp(0,255)` 做長度但 `add(全部 bytes)`，
-    // 長度字段同實際內容一對唔上 → 解碼器讀到錯位 → CRC32 不符 →
-    // 用戶分享出去嘅**整份**排班表別人都導入唔到。
-    // 現在長度同內容都來自同一份截斷後 bytes，兩者永遠一致。
+    // 備註位元組安全截斷，確保長度欄位與實際寫入位元組完全一致
     final remarkBytes = _truncateUtf8(remark);
     bb.addByte(remarkBytes.length);
     bb.add(remarkBytes);
@@ -196,8 +188,7 @@ class DecodedRosterResult {
 
 /// 班次時間 key：`startTime-endTime`（例如 `06:00-12:00`）。
 ///
-/// 用於 P1-8：班次 `code` 為空時的 fallback 比對 key。編碼同解碼兩邊
-/// 都用同一個函數產生，保證字串格式完全一致（連 `HH:mm` 補零方式都一樣）。
+/// 供班次 `code` 為空時的 fallback 比對鍵值。
 String _slotKeyOf(ShiftDef def) => '${def.startTime}-${def.endTime}';
 
 /// 解析緊湊排班數據體（v2）
@@ -225,10 +216,7 @@ DecodedRosterResult _parseCompactRosterPayload({
     final valid = <CsvImportRow>[];
     final errors = <String>[];
 
-    // 導入端的班次比對表（P1-8）：
-    // 1. codeMap：非空 code → shiftId（代號優先，唔分大細楷）
-    // 2. slotMap：`startTime-endTime` → shiftId（code 為空時的 fallback，
-    //    同編碼端 `_slotKeyOf` 用同一個字串格式）
+    // 導入端的班次比對表：代號優先，為空時以時間區間比對
     final codeMap = <String, String>{};
     final slotMap = <String, String>{};
     for (final def in defs.values) {
@@ -258,12 +246,7 @@ DecodedRosterResult _parseCompactRosterPayload({
       var remark = utf8.decode(dataBytes.sublist(offset, offset + remarkLen));
       offset += remarkLen;
 
-      // P1-5：日期驗證。y/m/d 係原始字節，理論上 CRC 已擋住篡改，但舊版
-      // 或第三方寫出嘅數據體可能含 `2026-02-30` 呢類「格式啱但日子唔存在」
-      // 嘅日期。舊版照收，之後統計就會把呢筆歸入錯區間（DateTime 會自動
-      // 進位成 3 月 2 日）。呢度跳過該筆並計入 errors，**唔會**令整份
-      // 分享碼導入失敗——其餘日子照樣入到。
-      // 注意：一定要讀完 code/venue/remark 之後才 continue，否則 offset 會錯位。
+      // 日期合法性驗證：若格式不合法則跳過該條目，避免影響整批排班導入
       if (!isValidYmd(date)) {
         errors.add('$date：日期唔存在，已跳過（其餘日子不受影響）');
         continue;

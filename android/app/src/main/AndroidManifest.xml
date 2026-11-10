@@ -9,15 +9,10 @@
       USE_EXACT_ALARM 係專為「核心功能就係鬧鐘／計時器／日曆」嘅 App 而設，
       **安裝即授予、用戶不可撤銷**，正好補上上面嗰個缺口。
 
-      ⚠️ 呢個權限救嘅係**兩條通道**，唔止預告。`setAlarmClock` **冇**豁免
-      精確鬧鐘權限——兩個權限都冇嘅話，真鬧鐘（AlarmScheduler.schedule 同
-      scheduleGentle 都係用 setAlarmClock）同響鬧預告
-      （setExactAndAllowWhileIdle）一樣會拋 SecurityException。結果係
-      「新用戶裝完之後連真鬧鐘都唔響，而且 App 內零提示、crash.log 零記錄」。
-      以前有人以為 setAlarmClock 有豁免，所以低估咗嚴重性——唔好再寫錯。
+      此權限適用於真鬧鐘調度（AlarmScheduler）與響鬧預告（PreAlertScheduler），
+      確保 Android 14+ 下精確排程正常運作。
 
-      兩者並存係合法嘅：USE_EXACT_ALARM 生效時 canScheduleExactAlarms()
-      一樣會回 true，所以 Dart 側現有嘅權限自檢邏輯唔需要改。
+      兩者並存以確保在不同 Android 版本與安裝情境下精確鬧鐘功能皆可獲得授權。
     -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

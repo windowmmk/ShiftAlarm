@@ -64,7 +64,7 @@ void main() {
             // ③ 鍵盤彈起 → 天色欄完全壓縮為 0
             if (kb) {
               expect(l.bandHeight, 0.0,
-                  reason: '$label：鍵盤彈起時天色欄必須為 0（用戶原話「完全壓縮為0」）');
+                  reason: '$label：鍵盤彈起時天色欄必須為 0');
             } else if (entry.value >= 300) {
               // 空間足夠的機型才要求天色欄食滿；極細視窗會按比例讓步（設計如此）
               expect(
@@ -317,7 +317,7 @@ void main() {
           expect(gap, lessThanOrEqualTo(7.0),
               reason: '$scene：底部區留白過多（gap=$gap）');
 
-          // ⑤ 白卡內部餘量：用戶原話「第三欄…尚有余量在底下空白位置，應該用盡」
+          // ⑤ 白卡內部餘量驗證
           final slack = innerSlackOf(tester);
           expect(slack, greaterThanOrEqualTo(-0.5),
               reason: '$scene：白卡內容溢出可視區（slack=$slack）');

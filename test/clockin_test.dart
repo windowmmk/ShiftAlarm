@@ -239,7 +239,7 @@ void main() {
           DateTime(2026, 11, 2, 13, 0));
     });
 
-    test('改時長 → 收工打卡 offset 動態重算（6 小時改 8 小時）', () async {
+    test('改時長 → 收工打卡 offset 動態重算', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final store = ShiftStore(prefs);

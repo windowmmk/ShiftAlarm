@@ -20,7 +20,7 @@
 //
 // 覆蓋矩陣：7 個介面 × 寬度 320/360/390/412 × 字體 1.0/1.3/2.0 = 84 個組合。
 //
-// ⚠️ 技術注意（踩過的坑，唔好改返）：
+// 技術注意事項：
 //   - 任何用 `context.tokens` 的頁面必須 `theme: buildAppTheme()`，
 //     否則 `_TypeError: Null check operator used on a null value`。
 //   - 海洋帶有 30fps 常駐 `Timer.periodic`，`pumpAndSettle()` 會永遠 timeout

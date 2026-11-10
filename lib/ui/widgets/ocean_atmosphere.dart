@@ -147,8 +147,7 @@ class OceanAtmosphereWidget extends StatefulWidget {
 
   /// `true` = 96px 海平線帶模式（用 [_Compact96] 那組幾何常數逐像素硬畫）。
   ///
-  /// 注意：呢個 flag **只影響 fallback 的 2D 繪製**。shader 版係解析度無關嘅，
-  /// 唔需要「96px 參數」（見 docs/ARCH.md §6.4.1）。
+  /// 注意：呢個 flag 只影響 fallback 的 2D 繪製。shader 版係解析度無關嘅。
   final bool compact96;
 
   const OceanAtmosphereWidget({
@@ -582,8 +581,8 @@ class _OceanPainter extends CustomPainter {
 
   // ───────────────────────────────────────────────────────────────────────
   // 96px 海平線帶模式（fallback 專用）
-  // 幾何常數全部來自 [_Compact96]（見 docs/ARCH.md §6.4.2）。
-  // 注意：帶模式**唔畫衝擊環** —— 2D 橫線喺 30px 水面裡會被讀成進度條（§7.1）。
+  // 幾何常數來自 [_Compact96]。
+  // 注意：帶模式唔畫衝擊環 —— 2D 橫線在 30px 水面裡會被誤讀為進度條。
   // ───────────────────────────────────────────────────────────────────────
 
   /// 96px 帶的整體繪製順序：天空 → 日月 → 水面 → 透光層。
@@ -816,10 +815,9 @@ class _WaveSpec {
   });
 }
 
-/// 96px 海平線帶的幾何常數（**fallback 專用**，見 docs/ARCH.md §6.4.2）。
+/// 96px 海平線帶的幾何常數（fallback 專用）。
 ///
-/// 呢組係「逐像素硬畫」嘅尺寸，與帶高綁死；shader 版係解析度無關嘅，唔會用到。
-/// 由 56px 版本等比放大後再逐項微調（唔係單純 ×1.714）。
+/// 此組為 2D 繪製專用尺寸；shader 版為解析度無關，不使用本常數集。
 class _Compact96 {
   _Compact96._();
 

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiftalarm/domain/stats.dart';
 
-/// 統計日期邊界防線（P1-5）。
+/// 統計日期邊界防線。
 ///
 /// **重現舊 bug 的關鍵**：舊版 `_inRange` 有做 `\d{2}` 格式檢查，所以
 /// 「缺前導零」其實已經被擋住；真正嘅漏洞係**冇驗證日子真偽**——
@@ -61,7 +61,7 @@ void main() {
     });
   });
 
-  group('P1-5 computeStats 唔會把非法日期計入任何區間', () {
+  group('computeStats 唔會把非法日期計入任何區間', () {
     test('2026-02-30 唔會被計入 3 月（舊版會當成 3 月 2 日）', () {
       final r = computeStats(march(), [rec('2026-02-30')]);
       expect(r.workDays, 0, reason: '舊版這裡係 1（進位成 3 月 2 日）');

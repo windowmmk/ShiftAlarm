@@ -14,7 +14,7 @@
 // 即係**注釋話一致、代碼實際唔一致**。呢個測試就係用真 widget 量兩條邊，
 // 令呢句話冇得再講大話。
 //
-// ⚠️ 技術注意（踩過嘅坑，唔好改返）：
+// 技術注意事項：
 //   - 任何用 `context.tokens` 嘅頁面必須 `theme: buildAppTheme()`，
 //     否則 `_TypeError: Null check operator used on a null value`。
 //   - 海洋帶有 30fps 常駐 `Timer.periodic`，`pumpAndSettle()` 會永遠 timeout

@@ -43,13 +43,9 @@ bool _hasHalfWidthCommaOutsideQuotes(String line) {
   return false;
 }
 
-/// 最小可用嘅 RFC4180 風格欄位切分（P2-10）。
+/// RFC4180 風格欄位切分。
 ///
-/// **為什麼唔可以 `line.split(',')`：**
-/// 1. 備註／場所欄用引號包住時可以內含半角逗號（`"早班, 有津貼"`），
-///    直接 split 會把一個欄位切成兩個，令後面所有欄位錯位。
-/// 2. 用戶由微信／中文版 Excel 貼上時，分隔符可能係**全角逗號 `，`**
-///    （U+FF0C）。舊版只認半角逗號，整行會變成一欄 → 解析失敗。
+/// 支援包含引號轉義與全角逗號的分隔符處理：
 ///
 /// 規則（刻意保持最小，唔做多行引號等 RFC 全功能）：
 /// - `"..."` 包住嘅欄位：內含逗號／全角逗號都唔切，`""` 代表一個字面 `"`。
@@ -127,7 +123,7 @@ CsvImportResult parseRosterCsv(String text, Map<String, ShiftDef> defs) {
       errors.add('行 ${li + 1}：太長（超過 $_kMaxLineLength 字，已跳過）');
       continue;
     }
-    // P2-10：用支援引號與全角逗號嘅切分器，唔再用 `line.split(',')`
+    // 使用支援引號與全角逗號的切分器
     final parts = splitCsvLine(line);
     if (parts.length < 2) {
       errors.add('行 ${li + 1}：格式唔啱（要 YYYY-MM-DD,代號,場所）');

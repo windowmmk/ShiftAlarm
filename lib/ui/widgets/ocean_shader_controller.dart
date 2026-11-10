@@ -46,14 +46,12 @@ const String kOceanFailUnsupported = 'unsupported';
 const String kOceanFailCompileError = 'compile-error';
 const String kOceanFailTimeout = 'timeout';
 
-/// 海洋著色器控制器：全域單例載入 `FragmentProgram`、建立 `FragmentShader`、餵 uniform。
+/// 海洋著色器控制器：全域單例載入 `FragmentProgram`、建立 `FragmentShader`、傳遞 uniform。
 ///
-/// 設計約束（見 docs/ARCH.md §3.5.6 / §4.4 / §7.9）：
-/// 1. `FragmentProgram.fromAsset` **全域只做一次**並快取（static），
-///    絕對唔可以在 `build()` / `paint()` 內呼叫 —— 否則每幀都會重新編譯，直接掉幀。
-/// 2. `load()` **永不 rethrow**：載入失敗只記錄 [loadError] 並令 [isAvailable] 保持 false，
-///    由 `OceanBand` 自動退回 2D `_OceanPainter`，唔可以白屏、唔可以 crash。
-/// 3. `FragmentProgram` 跟 App 生命週期共用，唔釋放；`FragmentShader` 由呼叫方 dispose。
+/// 設計約束：
+/// 1. `FragmentProgram.fromAsset` 全域只做一次並快取（static），避免在每幀重新編譯造成掉幀。
+/// 2. `load()` 載入失敗時記錄 [loadError] 並保持 [isAvailable] 為 false，由 `OceanBand` 自動降級至 2D 繪製。
+/// 3. `FragmentProgram` 於 App 生命週期內共用，`FragmentShader` 則由各呼叫方獨立 dispose。
 class OceanShaderController {
   OceanShaderController._();
 

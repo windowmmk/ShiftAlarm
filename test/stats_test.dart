@@ -268,7 +268,7 @@ void main() {
       expect(r.workHours, 19); // 向下取整
     });
 
-    test('8 小時 + 12 小時 → 「20 小時」，證明沒有殘留固定 6 小時', () {
+    test('8 小時 + 12 小時 → 「20 小時」，各班次時長精確累計', () {
       final r = computeStats(threeDays(), [
         const ShiftRecord(
             ymd: '2026-10-05',

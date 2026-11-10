@@ -87,9 +87,7 @@ class ShiftRecord {
 
   /// 該更實際時長（分鐘）。由呼叫端用 [shiftDurationMinutes] 算好傳入。
   ///
-  /// 刻意設為 **required** 而非給預設值：讓每個呼叫端在編譯期被迫交代真實時長。
-  /// 若給預設 360，日後新增呼叫端忘記傳就會靜默退回「每更 6 小時」的舊 bug，
-  /// 而那種 bug 在測試裡看不出來（因為測試也會忘記傳）。
+  /// 設為 required：確保每個呼叫端明確傳入真實班次時長，避免預設值帶來計算偏差。
   final int durationMinutes;
 
   const ShiftRecord({
@@ -171,10 +169,7 @@ bool isValidYmd(String ymd) {
 }
 
 bool _inRange(String ymd, DateTime start, DateTime end) {
-  // P1-5：舊版直接 `ymd.compareTo(...)` 用字串比較日期。非法日期
-  // （`2026-2-30`）或格式唔規範（`2026-2-1`）嘅字串排序結果同真實
-  // 時間次序無關，會令該筆被歸入錯誤區間 → 工時統計數字靜默出錯。
-  // 現在先做嚴格驗證，非法就回 false（跳過該筆），再用 DateTime 比較。
+  // 日期合法性驗證與精確區間判定
   if (!isValidYmd(ymd)) return false;
   final m = _ymdRe.firstMatch(ymd.trim())!;
   final d = DateTime(

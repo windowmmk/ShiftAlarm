@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiftalarm/domain/csv_import.dart';
 import 'package:shiftalarm/domain/shift_store.dart';
 
-/// CSV 引號／全角逗號解析（P2-10）永久防線。
+/// CSV 引號與全角逗號解析防護測試。
 ///
 /// 舊版 `line.split(',')` 的兩個後果：
 /// 1. 備註欄用引號包住但內含半角逗號 → 被切開，後面欄位全部錯位。

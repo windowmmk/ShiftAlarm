@@ -334,11 +334,10 @@ ThemeData buildAppTheme() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// v3.5 海平線帶（Ocean Band）常數 —— 唯一來源，UI 與測試都用呢組
-// 見 docs/ARCH.md §6.4 / §6.8
+// 海平線帶（Ocean Band）常數 —— 唯一來源，UI 與測試共用
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// 帶高（logical px）。使用者裁示 96（56 → 96）。
+/// 帶高（logical px）。
 const double kOceanBandHeight = 96.0;
 
 /// 左右內縮，令圓角唔會貼住螢幕邊。
@@ -358,7 +357,7 @@ const int kOceanMoodPollSeconds = 60;
 
 /// shader 資產路徑。
 ///
-/// ⚠️ 必須與 `pubspec.yaml` 的 `flutter.shaders` 條目係同一個字串，改名要兩邊一齊改。
+/// 必須與 `pubspec.yaml` 的 `flutter.shaders` 條目為同一個字串。
 const String kOceanShaderAsset = 'shaders/ocean.frag';
 
 /// 固定水平半角 tan（≈46°，與 16:9 原版等價：1.778 × 0.58 ≈ 1.03）。
@@ -375,11 +374,9 @@ const int kOceanSurgeDurationMs = 2200;
 /// 預設集逐參數插值速度（每秒收斂係數）：`lerpSpeed = min(1.0, dt * 3.8)`。
 const double kOceanPresetLerp = 3.8;
 
-/// 頁面靜態底色（P0-2）。**已裁示用此值，勿改回 PRD 原值 #F8FAFC。**
+/// 頁面靜態底色。
 ///
-/// 理由：空白格是 `Colors.white.withValues(alpha: 0.84)`，疊在 #F8FAFC 上混合後
-/// 每通道只差約 5/255，格線肉眼看不見、月曆會變一塊白板（違反 G1）。
-/// #EDF2F7 下差約 14/255，格線清楚而底色仍極淺。詳見 ARCH §6.5 / §8-Q1。
+/// 空白格是 `Colors.white.withValues(alpha: 0.84)`，在 #EDF2F7 下格線清楚而底色仍極淺。
 const Color kCalendarPageBg = Color(0xFFEDF2F7);
 
 // ─────────────────────────────────────────────────────────────────────────────

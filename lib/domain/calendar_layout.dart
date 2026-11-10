@@ -56,11 +56,7 @@ class CalendarLayout {
   /// 所以：103 + 30.4 = 133.4（普通態）／109 + 30.4 = 139.4（編輯態）→
   /// **140 就係「啱啱好」**：普通態內層餘 6.6px、編輯態餘 0.6px。
   ///
-  /// 舊版 158/142 會令大屏白白多 18px 空白（用戶原話：「第三欄的高度，
-  /// 現在尚有余量在底下空白位置，應該用盡」），所以兩者一齊收窄到 140。
-  ///
-  /// 排班編輯係原地切換入呢一格，裁切咗會睇唔到完成掣，所以呢個值唔可以再壓。
-  /// 實測依據：`test/calendar_layout_measure_test.dart` 會用真 widget 泵出嚟驗。
+  /// 卡片收窄至 140，消除大螢幕底部多餘空白並兼顧編輯態完成按鈕顯示。
   static const double detailMax = 140.0;
   static const double detailMin = 140.0;
 
@@ -102,8 +98,7 @@ class CalendarLayout {
   /// `padding.bottom`，所以直接讀佢就係「導航欄真正遮住幾多」；
   /// 鍵盤彈起時 Scaffold 會將佢歸零 → [navHeight] 自動變 0，唔會再空出 72。
   ///
-  /// [keyboardOpen] 為 `true` 時海洋帶直接壓到 0，讓出嚟的高度全部俾日曆
-  /// （用戶原話：「點開排班開始輸入文字後…請可把頂部的天色欄完全壓縮為0」）。
+  /// [keyboardOpen] 為 `true` 時海洋帶壓縮至 0，讓出的高度全部留給日曆與輸入介面。
   factory CalendarLayout.compute(
     double bodyHeight, {
     double bottomInset = navReserved,

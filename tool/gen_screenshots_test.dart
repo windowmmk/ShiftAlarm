@@ -1,23 +1,11 @@
-// 產生 README 用的 demo 截圖 —— **真實 UI 渲染**，唔係示意圖。
+// 產生 README 用的 demo 截圖（真實 UI 渲染）。
 //
 // 用法（由專案根目錄執行）：
-//   export NO_PROXY="localhost,127.0.0.1,::1"   # 否則 flutter_tester 連唔上
+//   export NO_PROXY="localhost,127.0.0.1,::1"
 //   flutter test tool/gen_screenshots_test.dart
 // 產物：docs/screenshots/*.png
 //
-// ⚠️ 點解放喺 `tool/` 而唔係 `test/`：
-//    全量 `flutter test` 只跑 `test/` 目錄，所以呢個檔唔會入 CI、唔會產生
-//    golden 比對，亦唔會因為換咗 Flutter 版本嘅字型渲染差異而令 CI 變紅。
-//
-// ⚠️ 兩個踩過嘅坑（改壞咗截圖會變方格 / 空白）：
-//    1. 測試環境預設字型係 **Ahem**（每個字都渲染成實心方格），
-//       必須手動 `FontLoader` 載入真字型，否則中文全部變方格。
-//       拉丁用 Flutter SDK 自帶嘅 Roboto，中文 fallback 到 Windows 嘅「等線」
-//       （`Deng.ttf`）—— 揀佢而唔係 `msyh.ttc`，因為 FontLoader 食唔到 .ttc。
-//    2. 天色帶有 30fps 常駐 `Timer.periodic`，`pumpAndSettle()` 會永遠 timeout，
-//       一律只 `pump()` 兩次。
-// ⚠️ 呢個檔本質上就係一個 test（要 `flutter test` 嘅渲染環境先截到圖），
-//    所以用 `@visibleForTesting` 嘅 API 係正當嘅，唔應該當成違規。
+// 注意：本檔案置於 tool/ 目錄下，不參與常規單元測試與 CI 流水線。
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 library;
 
@@ -59,18 +47,7 @@ const double _pixelRatio = 2.0;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // ⚠️ test 名用**英文**：Git Bash 傳中文參數畀 `flutter.bat` 會觸發 MSYS
-  //    路徑轉換，搞到 `'C:\workspace' is not recognized`，
-  //    咁就冇得用 `--plain-name` 單跑某一張。
-  //
-  // ⚠️ **一張圖一個 test、每次一個進程**，唔可以三個 test 連著跑：
-  //    實測第二次 `pumpWidget`（把首頁連同天色帶嘅 30fps `Timer.periodic`
-  //    一齊換走）會**永久 hang** —— 舊 tree 未 dispose 完，新 frame 等唔到。
-  //    所以每個 test 拍完自己嗰張就直接 `exit(0)`，用 `--plain-name` 分三次跑。
-  //
-  // ⚠️ `exit(0)` 唔係偷懶：天色帶常駐 periodic timer 令 `flutter_test` 收尾嘅
-  //    fake-async 靜止檢查永遠唔會完成，進程唔會自己退出。截圖喺 exit 之前
-  //    已經 `writeAsBytesSync` 落咗磁碟，唔會有半張圖。
+  // 截圖測試單獨執行，拍完立即退出以釋放資源並確保畫面乾淨
   testWidgets('home', (tester) async {
     await _ensureFonts(tester);
     final store = await _makeStore();
@@ -268,15 +245,7 @@ Future<ShiftStore> _makeStore() async {
   return store;
 }
 
-/// 把中文字型 fallback 灌入**所有** `RenderParagraph`。
-///
-/// 為咩要喺 render 層做，而唔係改 theme：
-/// `RichText` 嘅 `TextSpan` 一旦自帶 `TextStyle`（例如統計頁「返工／總工時／
-/// 休息」三張卡嘅數字），就**唔會**繼承 `DefaultTextStyle`；`fontFamily` 為
-/// null 時會落到測試環境嘅默認字體 Ahem（實心方格）。
-/// 呢個 style 係 widget 內硬寫嘅，改 `ThemeData` 改唔到；
-/// 試過 `FontLoader('Ahem')` 灌真字型都**冇效**（框架內建 Ahem 優先）。
-/// 所以喺 render 層統一補 fallback —— 純截圖層補丁，唔使為咗出圖去改產品代碼。
+/// 為 RenderParagraph 注入中文字型 fallback，確保測試環境截圖字體正常渲染。
 void _applyFontFallback(WidgetTester tester) {
   const fallback = ['Deng'];
   final paragraphs = <RenderParagraph>[];

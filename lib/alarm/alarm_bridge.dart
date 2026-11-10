@@ -87,7 +87,7 @@ class PreAlertSchedule {
   final String title;
   final String body;
 
-  /// 以下四個只為 P2-2（點擊跳日期）預留，現階段原生側只寫入 log 不消費。
+  /// 預留欄位（供通知跳轉日期擴充使用）。
   final String date;
   final String shiftName;
   final String startTime;

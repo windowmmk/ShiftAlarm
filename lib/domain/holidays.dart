@@ -1,12 +1,6 @@
-/// 澳門公眾假期靜態表（離線兜底）：key = `YYYY-MM-DD`，value = 假期名。
+/// 澳門公眾假期靜態對照表（離線兜底）：key = `YYYY-MM-DD`，value = 假期名。
 ///
-/// 口徑與工作小工具一致：
-/// - 來源：澳門政府公眾假期 iCal（https://www.gov.mo/zh-hant/public-holidays/ical/），
-///   載入失敗時工作小工具用此內建表；App 離線所以直接綁定內建表；
-/// - 2026 年數據另經 SAFP 年曆 PDF 交叉核對（行政公職局，2025-10-13 發布）：
-///   https://app.safp.gov.mo/static/2025/10/13/e323e5e8-abd6-42ed-bcec-69480502cadd.pdf
-/// - 「XXX 的補假」計入（補假日視同假期）；
-/// - 「XXX（下午豁免）」計入（下午豁免上班，工作小工具亦視為非工作天）。
+/// 包含法定公眾假期、補假及豁免安排。
 /// 覆蓋 2026–2027 年；僅供參考，實際以官方公佈為準。
 const Map<String, String> macauHolidays = {
   '2026-01-01': '元旦',

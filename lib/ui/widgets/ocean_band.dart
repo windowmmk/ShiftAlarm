@@ -34,11 +34,10 @@ class _BandFrame {
   OceanShaderPreset preset = OceanShaderPreset.midday;
 }
 
-/// v3.5 海平線帶：96px 高、圓角 16px 的裝飾性海洋（真光影線步進）。
+/// 海平線帶：96px 高、圓角 16px 的裝飾性海洋（真光影線步進）。
 ///
-/// 主路徑：`shaders/ocean.frag`（Android 與 Web 共用同一份著色器）。
-/// Fallback：`shaders/ocean.frag` 載入唔到時，自動退回 [OceanAtmosphereWidget] 的 2D 版，
-/// 全程 try/catch，唔會 crash、唔會白屏（見 docs/ARCH.md §7.9）。
+/// 主路徑：`shaders/ocean.frag`（Android 與 Web 共用著色器）。
+/// Fallback：著色器載入失敗時，自動降級為 [OceanAtmosphereWidget] 的 2D 繪製，避免異常或白屏。
 ///
 /// 呢個 widget **不可點擊**（純裝飾），亦唔會搶走月曆的觸控。
 class OceanBand extends StatefulWidget {

@@ -9,27 +9,12 @@ import android.os.Build
 import org.json.JSONObject
 
 /**
- * 響鬧預告排程器（第三條通知通道）。
+ * 響鬧預告排程器。
  *
- * 使用者原話：「我想在每次鬧鐘響之前1小時, 像本地鬧鐘一樣, 會提前有一個通知頂欄掛着,
- * 讓用戶知道即將要響。」→ 每個 enabled **而且係真正鬧鐘**（`notificationOnly == false`）
- * 嘅鬧鐘，喺真正觸發時刻之前 60 分鐘排一條預告廣播，由 [PreAlertReceiver] 發
- * ongoing 通知並以狀態欄倒計時顯示剩餘時間。
+ * 針對啟用且非純通知類型的鬧鐘，在預定觸發時刻前 60 分鐘排定預告廣播，
+ * 由 [PreAlertReceiver] 發布 ongoing 通知並顯示倒計時。
  *
- * ⚠️ 純通知類鬧鐘（打卡開工／收工、使用者自建嘅「只通知」）**唔排預告**（v3.6.1 裁示）。
- * 過濾喺三個呼叫點各自做：Dart `AlarmService.onAssigned`、Dart
- * `AlarmService.syncOnLaunch`、原生 `BootReceiver.scheduleAll`。本 object 唔再重複判斷
- * ——入得嚟就照排，保持「呼叫方決定排邊啲」嘅單一職責。
- *
- * 職責邊界：本 object **只碰 AlarmManager 同 id 註冊表**（例外係 [cancelNotification]，
- * 佢淨係清通知）。發通知嘅嘢全部喺 [PreAlertReceiver]。
- *
- * ⚠️ 排程 API 用 `setExactAndAllowWhileIdle`，**唔用 `setAlarmClock`**（已裁示，見 ARCH §7.5）。
- * 理由：`setAlarmClock` 會令系統時鐘 App 嘅「下一個鬧鐘」顯示預告時間（例如 08:00），
- * 而真鬧鐘係 09:00，等於每日向使用者謊報響鬧時間。系統鬧鐘指示器係使用者判斷
- * 「我幾點會被叫醒」嘅唯一權威來源，唔可以俾一個提示性通知污染。
- * 代價（Doze 下最多遲約 15 分鐘）已接受；真鬧鐘本身仍然走 `setAlarmClock`，不受影響。
- * 因為唔用 `setAlarmClock`，所以**冇** AlarmClockInfo、**冇** showIntent。
+ * 排程採用 `setExactAndAllowWhileIdle`，避免影響系統全局鬧鐘圖示指示。
  */
 object PreAlertScheduler {
     /** 預告 id 命名空間偏移。必須同 Dart `AlarmService.preAlertIdOffset` 一致。 */
@@ -39,13 +24,7 @@ object PreAlertScheduler {
     const val LEAD_MINUTES = 60
 
     /**
-     * 預留欄位（P2-2「點擊通知跳該日」用），現階段**只寫入 extra 不消費**。
-     *
-     * 刻意**不**共用 [AlarmScheduler.EXTRA_DATE]（值 `"alarm_date"`）：
-     * 兩者語意唔同（一個係預告要跳嘅日期、一個係真鬧鐘嘅日期），
-     * 若日後有人把預告 Intent 誤交 [AlarmActivity]（例如共用一個 helper），
-     * 共用 key 會令 AlarmActivity 讀到預告嘅日期而顯示錯誤嘅班次。
-     * 呢個「刻意唔共用」寫喺度，免得下次「統一命名」嘅善意重構把它改掉。
+     * 預留欄位（供點擊通知跳轉目標日期使用）。
      */
     const val EXTRA_PRE_ALERT_DATE = "pre_alert_date"
 
@@ -197,13 +176,9 @@ object PreAlertScheduler {
                 putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
                 putExtra(AlarmScheduler.EXTRA_TITLE, title)
                 putExtra(AlarmScheduler.EXTRA_BODY, body)
-                // 倒計時終點：真鬧鐘觸發時刻（見 EXTRA_TRIGGER_AT KDoc）
+                // 倒計時終點：真鬧鐘觸發時刻
                 putExtra(EXTRA_TRIGGER_AT, triggerAtMillis)
-                // 以下四個 extra 現階段**只寫不讀**（PreAlertReceiver 唔會讀），
-                // 係 P2-2「點擊通知跳該日」嘅預留欄位——到時 PreAlertReceiver
-                // 會用佢哋砌一條帶日期嘅 Intent 交 MainActivity。
-                // ⚠️ 唔係死碼，唔好見到「寫咗但冇人讀」就刪：刪咗之後 P2-2
-                // 要由 Dart 層重新打通整條解析鏈路（bridge → channel → intent）。
+                // 預留欄位（供後續點擊通知跳轉目標日期使用）
                 putExtra(EXTRA_PRE_ALERT_DATE, date)
                 putExtra(AlarmScheduler.EXTRA_SHIFT_NAME, shiftName)
                 putExtra(AlarmScheduler.EXTRA_START_TIME, startTime)

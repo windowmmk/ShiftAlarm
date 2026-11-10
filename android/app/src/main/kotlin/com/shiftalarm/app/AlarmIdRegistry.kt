@@ -18,8 +18,7 @@ import org.json.JSONArray
  *
  * 儲存格式：同一個 prefs 檔（沿用預告用開嘅 `shiftalarm_prealerts`），每個
  * 通道一個 key，value 係 JSON int 陣列（例如 `[202610150,202610151]`）。
- * 用 JSON 而唔用 `putStringSet`：預告嗰份由 v3.5 起已經係呢個格式，改格式
- * 要寫遷移程式碼，而呢個 object 嘅唯一目的係「唔好再各自為政」。
+ * 用 JSON 而唔用 `putStringSet`：保持與既有儲存格式向後相容。
  *
  * ⚠️ [KEY_PRE_ALERT] 嘅值**必須維持 `"ids"`**。呢個 key 由 v3.5 起已經喺
  * 用戶機上寫住現存預告 id。搬 key 等於開一張空註冊表，而下一次 `prune` 會
