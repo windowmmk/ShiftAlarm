@@ -46,14 +46,12 @@ void main() {
       '01-home',
       HomeScreen(store: store, alarms: AlarmService(AlarmBridge())),
     );
-    exit(0);
   });
 
   testWidgets('stats', (tester) async {
     await _ensureFonts(tester);
     final store = await _makeStore();
     await _shot(tester, '02-stats', StatsScreen(store: store));
-    exit(0);
   });
 
   testWidgets('shifts', (tester) async {
@@ -64,7 +62,6 @@ void main() {
       '03-shifts',
       ShiftManageScreen(store: store, alarms: AlarmService(AlarmBridge())),
     );
-    exit(0);
   });
 
   testWidgets('settings', (tester) async {
@@ -75,7 +72,6 @@ void main() {
       '04-settings',
       SettingsScreen(store: store, alarms: AlarmService(AlarmBridge())),
     );
-    exit(0);
   });
 }
 
@@ -293,20 +289,28 @@ Future<void> _shot(WidgetTester tester, String name, Widget child) async {
 
   final boundary =
       boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-  final image = await boundary.toImage(pixelRatio: _pixelRatio);
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
-  final bytes =
-      data!.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  final bytes = await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: _pixelRatio);
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data!.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    } finally {
+      image.dispose();
+    }
+  });
 
   final out = File('$_outDir/$name.png');
   if (!out.parent.existsSync()) {
     out.parent.createSync(recursive: true);
   }
-  out.writeAsBytesSync(bytes);
+  out.writeAsBytesSync(bytes!);
+
+  // 卸載 widget 樹釋放 OceanBand 等定時器，讓測試乾淨收尾（不需硬叫 exit(0)）
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
+  tester.view.resetPhysicalSize();
+  tester.view.resetDevicePixelRatio();
 
   // ignore: avoid_print
-  print(
-    '[SHOT] ${out.path} ${bytes.lengthInBytes} bytes '
-    '${image.width}x${image.height}',
-  );
+  print('[SHOT] ${out.path} ${bytes.lengthInBytes} bytes');
 }

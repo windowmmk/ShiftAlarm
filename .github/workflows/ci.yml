@@ -71,11 +71,7 @@ jobs:
           sudo apt-get install -y -qq fonts-noto-cjk
 
       - name: Render UI Screenshots
-        run: |
-          flutter test tool/gen_screenshots_test.dart --plain-name home
-          flutter test tool/gen_screenshots_test.dart --plain-name stats
-          flutter test tool/gen_screenshots_test.dart --plain-name shifts
-          flutter test tool/gen_screenshots_test.dart --plain-name settings
+        run: flutter test tool/gen_screenshots_test.dart
 
       - name: Upload UI Screenshots Artifact
         uses: actions/upload-artifact@v4
