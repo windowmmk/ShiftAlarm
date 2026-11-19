@@ -65,12 +65,18 @@ jobs:
       - name: Build Android APK (Debug Verify)
         run: flutter build apk --debug
 
-      - name: Install CJK Fonts for Screenshot Verification
+      - name: Download Standalone Noto Sans TC OTF Fonts for Screenshot Verification
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-noto-cjk
+          mkdir -p /tmp/cjk-fonts
+          BASE_URL="https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/TraditionalChinese"
+          curl -fsSL "$BASE_URL/NotoSansCJKtc-Regular.otf" -o /tmp/cjk-fonts/NotoSansCJKtc-Regular.otf
+          curl -fsSL "$BASE_URL/NotoSansCJKtc-Medium.otf"  -o /tmp/cjk-fonts/NotoSansCJKtc-Medium.otf
+          curl -fsSL "$BASE_URL/NotoSansCJKtc-Bold.otf"    -o /tmp/cjk-fonts/NotoSansCJKtc-Bold.otf
+          ls -lh /tmp/cjk-fonts
 
       - name: Render UI Screenshots
+        env:
+          SHIFTALARM_CJK_FONT_DIR: /tmp/cjk-fonts
         run: flutter test tool/gen_screenshots_test.dart
 
       - name: Upload UI Screenshots Artifact

@@ -75,32 +75,77 @@ void main() {
   });
 }
 
-String _materialFont(String name) {
+String _findMaterialFont(String filename) {
   final root = Platform.environment['FLUTTER_ROOT'];
   if (root == null || root.isEmpty) {
     throw StateError('讀不到 FLUTTER_ROOT 環境變數，請經由 `flutter test` 執行。');
   }
-  return '$root/bin/cache/artifacts/material_fonts/$name';
+  final dir = Directory('$root/bin/cache/artifacts/material_fonts');
+  if (!dir.existsSync()) {
+    throw StateError('找不到 material_fonts 目錄：${dir.path}');
+  }
+  final target = filename.toLowerCase();
+  for (final entity in dir.listSync()) {
+    if (entity is File) {
+      final base = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+      if (base == target) return entity.path;
+    }
+  }
+  final found = dir
+      .listSync()
+      .whereType<File>()
+      .map((f) => f.path.split(Platform.pathSeparator).last)
+      .toList()
+    ..sort();
+  throw StateError(
+    '在 ${dir.path} 找不到 $filename，實際檔案：${found.join(', ')}',
+  );
 }
 
-/// 跨平台尋找系統繁體中文字型（支援 Linux / macOS / Windows）。
+/// 跨平台尋找獨立 `.otf` / `.ttf` 繁體中文字型（FontLoader 不支援 `.ttc` 合集）。
 List<String> _findCjkFontPaths() {
+  // 1. 優先讀取 CI 或手動指定的字型目錄 / 檔案環境變數
+  final envDir = Platform.environment['SHIFTALARM_CJK_FONT_DIR'];
+  if (envDir != null && envDir.isNotEmpty) {
+    final dir = Directory(envDir);
+    if (dir.existsSync()) {
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) {
+            final lower = f.path.toLowerCase();
+            return lower.endsWith('.otf') || lower.endsWith('.ttf');
+          })
+          .map((f) => f.path)
+          .toList()
+        ..sort();
+      if (files.isNotEmpty) return files;
+    }
+  }
+
+  final envFile = Platform.environment['SHIFTALARM_CJK_FONT'];
+  if (envFile != null && envFile.isNotEmpty) {
+    final paths = envFile
+        .split(RegExp(r'[,;]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty && File(s).existsSync())
+        .toList();
+    if (paths.isNotEmpty) return paths;
+  }
+
+  // 2. 常見系統獨立 `.otf` / `.ttf` 中文字型（避免 `.ttc`）
   final candidates = <List<String>>[
-    // Linux Noto Sans CJK (Ubuntu fonts-noto-cjk)
     [
-      '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-      '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+      '/usr/share/fonts/opentype/noto/NotoSansCJKtc-Regular.otf',
+      '/usr/share/fonts/opentype/noto/NotoSansCJKtc-Medium.otf',
+      '/usr/share/fonts/opentype/noto/NotoSansCJKtc-Bold.otf',
     ],
     [
-      '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
-      '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc',
+      '/usr/share/fonts/truetype/noto/NotoSansTC-Regular.ttf',
+      '/usr/share/fonts/truetype/noto/NotoSansTC-Bold.ttf',
     ],
-    ['/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'],
-    ['/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'],
     // Windows 等線
     ['C:/Windows/Fonts/Deng.ttf', 'C:/Windows/Fonts/Dengb.ttf'],
-    // macOS PingFang
-    ['/System/Library/Fonts/PingFang.ttc'],
   ];
 
   for (final group in candidates) {
@@ -108,31 +153,41 @@ List<String> _findCjkFontPaths() {
     if (existing.isNotEmpty) return existing;
   }
 
-  // 環境變數覆寫（供 CI 自訂字型路徑）
-  final envPath = Platform.environment['SHIFTALARM_CJK_FONT'];
-  if (envPath != null && envPath.isNotEmpty && File(envPath).existsSync()) {
-    return [envPath];
-  }
-
-  throw StateError('找不到系統中文字型，請安裝 fonts-noto-cjk 或設定 SHIFTALARM_CJK_FONT。');
+  throw StateError(
+    '找不到獨立 .otf/.ttf 繁體中文字型，請設定 SHIFTALARM_CJK_FONT_DIR 或 SHIFTALARM_CJK_FONT。',
+  );
 }
 
 bool _fontsLoaded = false;
 
 Future<void> _ensureFonts(WidgetTester tester) async {
   if (_fontsLoaded) return;
-  await tester.runAsync(() async {
-    await _loadFontFamily('Roboto', [
-      _materialFont('roboto-regular.ttf'),
-      _materialFont('roboto-medium.ttf'),
-      _materialFont('roboto-bold.ttf'),
-    ]);
-    await _loadFontFamily(
-      'MaterialIcons',
-      [_materialFont('MaterialIcons-Regular.otf')],
-    );
-    await _loadFontFamily(_cjkFamily, _findCjkFontPaths());
+  final robotoPaths = [
+    _findMaterialFont('roboto-regular.ttf'),
+    _findMaterialFont('roboto-medium.ttf'),
+    _findMaterialFont('roboto-bold.ttf'),
+  ];
+  final iconPaths = [_findMaterialFont('MaterialIcons-Regular.otf')];
+  final cjkPaths = _findCjkFontPaths();
+
+  final ok = await tester.runAsync<bool>(() async {
+    await _loadFontFamily('Roboto', robotoPaths);
+    await _loadFontFamily('MaterialIcons', iconPaths);
+    await _loadFontFamily(_cjkFamily, cjkPaths);
+    return true;
   });
+
+  if (ok != true) {
+    final err = tester.takeException();
+    fail('字型載入失敗（不可靜默退回 Ahem）：$err');
+  }
+
+  // ignore: avoid_print
+  print(
+    '[FONTS] Roboto=${robotoPaths.length} '
+    'MaterialIcons=${iconPaths.length} '
+    '$_cjkFamily=${cjkPaths.map((p) => p.split(Platform.pathSeparator).last).join('+')}',
+  );
   _fontsLoaded = true;
 }
 
@@ -255,9 +310,11 @@ void _applyFontFallback(WidgetTester tester) {
 InlineSpan _withFallback(InlineSpan span, List<String> fallback) {
   if (span is! TextSpan) return span;
   final base = span.style ?? const TextStyle();
-  final style = base.fontFamily == null
-      ? base.copyWith(fontFamily: 'Roboto', fontFamilyFallback: fallback)
-      : base.copyWith(fontFamilyFallback: fallback);
+  final style = base.fontFamily == 'MaterialIcons'
+      ? base
+      : base.fontFamily == null
+          ? base.copyWith(fontFamily: 'Roboto', fontFamilyFallback: fallback)
+          : base.copyWith(fontFamilyFallback: fallback);
   return TextSpan(
     text: span.text,
     style: style,
@@ -282,7 +339,11 @@ Future<void> _shot(WidgetTester tester, String name, Widget child) async {
   );
   await tester.pump();
   await tester.pump();
-  tester.takeException();
+  final exc = tester.takeException();
+  if (exc != null) {
+    // ignore: avoid_print
+    print('[WARN] $name exception: $exc');
+  }
 
   _applyFontFallback(tester);
   await tester.pump();
