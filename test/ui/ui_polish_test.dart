@@ -118,7 +118,6 @@ void main() {
         testWidgets('StatsScreen ${w.toInt()}px × ${ts}x 零溢出', (tester) async {
           final errors = <FlutterErrorDetails>[];
           final orig = FlutterError.onError;
-          FlutterError.onError = errors.add;
           addTearDown(() {
             FlutterError.onError = orig;
             tester.view.resetPhysicalSize();
@@ -129,20 +128,25 @@ void main() {
           tester.view.devicePixelRatio = 1.0;
 
           final store = await makePopulatedStore();
-          await tester.pumpWidget(
-            MediaQuery(
-              data: MediaQueryData(
-                size: Size(w, 800),
-                textScaler: TextScaler.linear(ts),
+          FlutterError.onError = errors.add;
+          try {
+            await tester.pumpWidget(
+              MediaQuery(
+                data: MediaQueryData(
+                  size: Size(w, 800),
+                  textScaler: TextScaler.linear(ts),
+                ),
+                child: MaterialApp(
+                  theme: buildAppTheme(),
+                  home: StatsScreen(store: store),
+                ),
               ),
-              child: MaterialApp(
-                theme: buildAppTheme(),
-                home: StatsScreen(store: store),
-              ),
-            ),
-          );
-          await tester.pump();
-          await tester.pump();
+            );
+            await tester.pump();
+            await tester.pump();
+          } finally {
+            FlutterError.onError = orig;
+          }
 
           final overflows = errors
               .where((e) => e.exceptionAsString().contains('overflowed'))
@@ -156,7 +160,6 @@ void main() {
             (tester) async {
           final errors = <FlutterErrorDetails>[];
           final orig = FlutterError.onError;
-          FlutterError.onError = errors.add;
           addTearDown(() {
             FlutterError.onError = orig;
             tester.view.resetPhysicalSize();
@@ -167,23 +170,28 @@ void main() {
           tester.view.devicePixelRatio = 1.0;
 
           final store = await makePopulatedStore();
-          await tester.pumpWidget(
-            MediaQuery(
-              data: MediaQueryData(
-                size: Size(w, 800),
-                textScaler: TextScaler.linear(ts),
-              ),
-              child: MaterialApp(
-                theme: buildAppTheme(),
-                home: ShiftManageScreen(
-                  store: store,
-                  alarms: AlarmService(AlarmBridge()),
+          FlutterError.onError = errors.add;
+          try {
+            await tester.pumpWidget(
+              MediaQuery(
+                data: MediaQueryData(
+                  size: Size(w, 800),
+                  textScaler: TextScaler.linear(ts),
+                ),
+                child: MaterialApp(
+                  theme: buildAppTheme(),
+                  home: ShiftManageScreen(
+                    store: store,
+                    alarms: AlarmService(AlarmBridge()),
+                  ),
                 ),
               ),
-            ),
-          );
-          await tester.pump();
-          await tester.pump();
+            );
+            await tester.pump();
+            await tester.pump();
+          } finally {
+            FlutterError.onError = orig;
+          }
 
           final overflows = errors
               .where((e) => e.exceptionAsString().contains('overflowed'))

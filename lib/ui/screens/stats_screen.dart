@@ -317,33 +317,30 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 2,
                       children: [
-                        Expanded(
-                          child: Text(
-                            slotDisplayLabels[i],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: t.fontBody,
-                              fontWeight: FontWeight.w600,
-                              color: fgs[i],
-                            ),
+                        Text(
+                          slotDisplayLabels[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: t.fontBody,
+                            fontWeight: FontWeight.w600,
+                            color: fgs[i],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          flex: 0,
-                          child: Text(
-                            '${r.slotDays[i]}日 · ${r.slotPercent(i).toStringAsFixed(1)}%',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: t.fontCaption,
-                              color: t.neutralFg2,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        Text(
+                          '${r.slotDays[i]}日 · ${r.slotPercent(i).toStringAsFixed(1)}%',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: t.fontCaption,
+                            color: t.neutralFg2,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],

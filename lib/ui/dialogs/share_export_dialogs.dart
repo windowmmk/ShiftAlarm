@@ -133,10 +133,8 @@ Future<void> showExportRosterDialog({
   final messenger = ScaffoldMessenger.of(context);
 
   final initialCode = exportRosterCode(store, month: selectedMonth);
-  try {
-    await Clipboard.setData(ClipboardData(text: initialCode));
-  } catch (_) {}
-  if (!context.mounted) return;
+  // 背景自動複製，不阻塞彈窗開啟（亦避免測試環境平台通道卡住）。
+  Clipboard.setData(ClipboardData(text: initialCode)).catchError((Object _) {});
 
   await showDialog<void>(
     context: context,
@@ -161,7 +159,8 @@ Future<void> showExportRosterDialog({
             store,
             month: all ? null : selectedMonth,
           );
-          Clipboard.setData(ClipboardData(text: updated));
+          Clipboard.setData(ClipboardData(text: updated))
+              .catchError((Object _) {});
         }
 
         return AlertDialog(
@@ -315,10 +314,7 @@ Future<void> showExportConfigDialog({
 }) async {
   final messenger = ScaffoldMessenger.of(context);
   final code = exportConfigCode(store);
-  try {
-    await Clipboard.setData(ClipboardData(text: code));
-  } catch (_) {}
-  if (!context.mounted) return;
+  Clipboard.setData(ClipboardData(text: code)).catchError((Object _) {});
 
   await showDialog<void>(
     context: context,

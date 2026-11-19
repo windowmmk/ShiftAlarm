@@ -223,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-/// 設定頁分組圓角卡片（白底＋霧灰描邊＋組內分隔線）。
+/// 設定頁分組圓角卡片（白底 Material＋霧灰描邊＋組內分隔線，確保 ListTile 水波紋正常顯示）。
 class _SettingsGroupCard extends StatelessWidget {
   final List<Widget> children;
 
@@ -231,11 +231,11 @@ class _SettingsGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kCardStroke),
+        side: const BorderSide(color: kCardStroke),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
