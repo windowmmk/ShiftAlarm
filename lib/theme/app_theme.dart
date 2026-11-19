@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
 /// 是否支援原生 Android 鬧鐘與系統權限（iOS / Web 平台不支援，隱藏相關介面）

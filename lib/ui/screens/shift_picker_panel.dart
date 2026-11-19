@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -228,8 +229,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     final t = context.tokens;
     final assignment = widget.store.assignments[_key];
     final currentId = assignment?.shiftId;
-    final currentDef = currentId != null ? widget.store.defs[currentId] : null;
-    final slot = currentDef != null ? t.slotForTime(currentDef.startTime) : null;
     final defs = widget.store.sortedDefs();
     final note = _noteCtrl.text.trim();
 

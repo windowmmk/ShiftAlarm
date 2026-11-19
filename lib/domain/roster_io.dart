@@ -1,5 +1,5 @@
 /// 排班表導出與導入模組：支援最新極簡 SR2 Base58 報文協議與純 CSV 雙模相容
-/// - 外部協議報文頭：SR2:<Base58>（CRC32 與時間戳內嵌二進制，長度約 150-250 字元）
+/// - 外部協議報文頭：`SR2:<Base58>`（CRC32 與時間戳內嵌二進制，長度約 150-250 字元）
 /// - 雙模支援：貼上 SR2 口令或純 CSV 文字均可無縫解析
 library;
 
@@ -139,13 +139,13 @@ Map<String, dynamic> exportRoster(ShiftStore store, {DateTime? month}) {
       'version': 1,
       'timestamp': nowTs,
       'daysCount': items.length,
-      if (prefix != null) 'month': prefix,
+      'month': ?prefix,
     },
     'items': items,
   };
 }
 
-/// 導出為帶有極簡協議報文頭（SR2:<Base58>）的極速緊湊 Base58 排班口令碼：
+/// 導出為帶有極簡協議報文頭（`SR2:<Base58>`）的極速緊湊 Base58 排班口令碼：
 /// 報文頭內化打包：CRC32（4 字節）與時間戳（4 字節）直接嵌入二進制數據體，
 /// 外部前綴僅 4 字元（SR2:），整月排班長度由 3500+ 字元壓縮至 200~240 字元！
 String exportRosterCode(ShiftStore store, {DateTime? month}) {

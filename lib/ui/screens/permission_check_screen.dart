@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:auto_size_text/auto_size_text.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../alarm/alarm_bridge.dart';
@@ -71,11 +72,11 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
         actionLabel: '去開啟',
       ),
       _PermItem(
-        title: '通知設置',
-        desc: '開系統通知設置：懸浮通知／聲音／鎖屏顯示／各 Channel。',
+        title: '通知設定',
+        desc: '開啟系統通知設定：懸浮通知／聲音／鎖屏顯示／各通知頻道。',
         check: null,
         action: b.openNotificationSettings,
-        actionLabel: '去設置',
+        actionLabel: '去設定',
       ),
       _PermItem(
         title: '全屏通知',
@@ -105,7 +106,7 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
         action: b.openAppDetailsSettings,
         actionLabel: '去應用詳情',
         steps: const [
-          '開啟手機「設置」',
+          '開啟手機「設定」',
           '進入本 App「應用詳情」',
           '進入「通知管理」',
           '「鎖定螢幕通知顯示」選「允許」',
@@ -215,7 +216,8 @@ class _PermissionCheckScreenState extends State<PermissionCheckScreen> {
     }
   }
 
-  Future<void> _clearCrashLogs() async {    try {
+  Future<void> _clearCrashLogs() async {
+    try {
       final dirPath = await widget.bridge.getFilesDir();
       for (final name in const ['crash.log', 'crash_dart.log']) {
         final f = File('$dirPath/$name');

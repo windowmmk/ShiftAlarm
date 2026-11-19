@@ -27,6 +27,7 @@
 //     → 一律用兩次 `tester.pump()`。
 //   - 唔可以只靠 `takeException()` 判斷：pump 完要把它抽乾，免得同一個
 //     溢出同時令測試 framework 收工時再紅一次（重複噪音蓋過真正的報告）。
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

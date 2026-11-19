@@ -1,17 +1,20 @@
 // 產生 README 用的 demo 截圖（真實 UI 渲染）。
 //
-// 用法（由專案根目錄執行）：
-//   export NO_PROXY="localhost,127.0.0.1,::1"
-//   flutter test tool/gen_screenshots_test.dart
+// 用法（由專案根目錄執行，逐項執行以確保獨立視窗狀態）：
+//   flutter test tool/gen_screenshots_test.dart --plain-name home
+//   flutter test tool/gen_screenshots_test.dart --plain-name stats
+//   flutter test tool/gen_screenshots_test.dart --plain-name shifts
+//   flutter test tool/gen_screenshots_test.dart --plain-name settings
 // 產物：docs/screenshots/*.png
 //
-// 注意：本檔案置於 tool/ 目錄下，不參與常規單元測試與 CI 流水線。
+// 支援跨平台中文字型自動偵測（Linux NotoSansCJK / WenQuanYi 與 Windows Deng）。
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 library;
 
 import 'dart:io';
 import 'dart:ui' as ui;
 
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -22,24 +25,12 @@ import 'package:shiftalarm/domain/alarm_service.dart';
 import 'package:shiftalarm/domain/shift_store.dart';
 import 'package:shiftalarm/theme/app_theme.dart';
 import 'package:shiftalarm/ui/screens/home_screen.dart';
+import 'package:shiftalarm/ui/screens/settings_screen.dart';
 import 'package:shiftalarm/ui/screens/shift_manage_screen.dart';
 import 'package:shiftalarm/ui/screens/stats_screen.dart';
 
 const String _outDir = 'docs/screenshots';
-
-/// 進度標記檔：卡死時（進程唔會退出、log 都唔會 flush）仍然可以靠呢個檔
-/// 睇到最後行到邊一步，唔使靠估。
-final File _probe = File('tool/_progress.txt');
-
-void _mark(String s) {
-  try {
-    _probe.writeAsStringSync('$s\n', mode: FileMode.append);
-  } catch (_) {
-    // 探測用途，寫唔到就算
-  }
-}
-
-/// 截圖尺寸：主流手機 360×800，輸出 2 倍圖（720×1600）方便 README 縮放。
+const String _cjkFamily = 'CjkFallback';
 const double _w = 360.0;
 const double _h = 800.0;
 const double _pixelRatio = 2.0;
@@ -47,12 +38,14 @@ const double _pixelRatio = 2.0;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // 截圖測試單獨執行，拍完立即退出以釋放資源並確保畫面乾淨
   testWidgets('home', (tester) async {
     await _ensureFonts(tester);
     final store = await _makeStore();
-    await _shot(tester, '01-home',
-        HomeScreen(store: store, alarms: AlarmService(AlarmBridge())));
+    await _shot(
+      tester,
+      '01-home',
+      HomeScreen(store: store, alarms: AlarmService(AlarmBridge())),
+    );
     exit(0);
   });
 
@@ -66,128 +59,132 @@ void main() {
   testWidgets('shifts', (tester) async {
     await _ensureFonts(tester);
     final store = await _makeStore();
-    await _shot(tester, '03-shifts',
-        ShiftManageScreen(store: store, alarms: AlarmService(AlarmBridge())));
+    await _shot(
+      tester,
+      '03-shifts',
+      ShiftManageScreen(store: store, alarms: AlarmService(AlarmBridge())),
+    );
+    exit(0);
+  });
+
+  testWidgets('settings', (tester) async {
+    await _ensureFonts(tester);
+    final store = await _makeStore();
+    await _shot(
+      tester,
+      '04-settings',
+      SettingsScreen(store: store, alarms: AlarmService(AlarmBridge())),
+    );
     exit(0);
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Flutter SDK 自帶的 Material 字型路徑。
 String _materialFont(String name) {
   final root = Platform.environment['FLUTTER_ROOT'];
   if (root == null || root.isEmpty) {
-    throw StateError(
-        '讀唔到 FLUTTER_ROOT 環境變數，載唔到 Roboto。'
-        '要經 `flutter test` 跑，唔好直接用 `dart run`。');
+    throw StateError('讀不到 FLUTTER_ROOT 環境變數，請經由 `flutter test` 執行。');
   }
   return '$root/bin/cache/artifacts/material_fonts/$name';
 }
 
-/// 字型只需載一次（跨 test 共用同一個 isolate）。
+/// 跨平台尋找系統繁體中文字型（支援 Linux / macOS / Windows）。
+List<String> _findCjkFontPaths() {
+  final candidates = <List<String>>[
+    // Linux Noto Sans CJK (Ubuntu fonts-noto-cjk)
+    [
+      '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+      '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+    ],
+    [
+      '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+      '/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc',
+    ],
+    ['/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'],
+    ['/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'],
+    // Windows 等線
+    ['C:/Windows/Fonts/Deng.ttf', 'C:/Windows/Fonts/Dengb.ttf'],
+    // macOS PingFang
+    ['/System/Library/Fonts/PingFang.ttc'],
+  ];
+
+  for (final group in candidates) {
+    final existing = group.where((p) => File(p).existsSync()).toList();
+    if (existing.isNotEmpty) return existing;
+  }
+
+  // 環境變數覆寫（供 CI 自訂字型路徑）
+  final envPath = Platform.environment['SHIFTALARM_CJK_FONT'];
+  if (envPath != null && envPath.isNotEmpty && File(envPath).existsSync()) {
+    return [envPath];
+  }
+
+  throw StateError('找不到系統中文字型，請安裝 fonts-noto-cjk 或設定 SHIFTALARM_CJK_FONT。');
+}
+
 bool _fontsLoaded = false;
 
-/// ⚠️ **必須**包喺 `tester.runAsync` 入面：`FontLoader.load()` 內部會 await
-/// 真實嘅 platform channel，而 `testWidgets` 係 fake-async zone ——
-/// 直接喺 test body 或 `setUpAll` await 會**永久 deadlock**（實測卡死 4 分鐘以上，
-/// 唔係慢，係唔會返）。
 Future<void> _ensureFonts(WidgetTester tester) async {
   if (_fontsLoaded) return;
-  _mark('fonts:start');
   await tester.runAsync(() async {
-    _mark('fonts:runasync-enter');
-    await _loadFont('Roboto', _materialFont('roboto-regular.ttf'));
-    _mark('fonts:roboto');
-    await _loadFont('Deng', 'C:/Windows/Fonts/Deng.ttf');
-    _mark('fonts:deng');
-    // ⚠️ MaterialIcons 同 Roboto 一樣係測試環境**唔會**自動載入，
-    //    唔載入的話 AppBar／底部導航／輸入框全部變成方格（Icon 一個都畫唔到）。
-    await _loadFont('MaterialIcons', _materialFont('MaterialIcons-Regular.otf'));
-    _mark('fonts:icons');
-
-    // ⚠️ 同一 family 要連**粗體**一齊載：只載 regular 嘅話，
-    //    `FontWeight.w700` 嘅字喺 fallback 字型搵唔到對應字重，會退返 Ahem
-    //    （統計頁「返工／總工時／休息」三個粗體數字就係咁變黑方塊）。
-    //    用 `Dengb.ttf`（等線粗體）／`roboto-bold.ttf` 補齊。
-    //
-    //    順帶記錄試過但**冇用**嘅方法：`FontLoader('Ahem')` 灌真字型
-    //    —— 框架內建 Ahem 優先，蓋唔到。
     await _loadFontFamily('Roboto', [
       _materialFont('roboto-regular.ttf'),
       _materialFont('roboto-medium.ttf'),
       _materialFont('roboto-bold.ttf'),
     ]);
-    _mark('fonts:roboto-weights');
-    await _loadFontFamily('Deng', [
-      'C:/Windows/Fonts/Deng.ttf',
-      'C:/Windows/Fonts/Dengb.ttf',
-    ]);
-    _mark('fonts:deng-weights');
+    await _loadFontFamily(
+      'MaterialIcons',
+      [_materialFont('MaterialIcons-Regular.otf')],
+    );
+    await _loadFontFamily(_cjkFamily, _findCjkFontPaths());
   });
-  _mark('fonts:done');
   _fontsLoaded = true;
 }
 
-Future<void> _loadFont(String family, String path) =>
-    _loadFontFamily(family, [path]);
-
-/// 同一 family 可以載多個字重檔（Skia 會按字型檔自身嘅 OS/2 字重去匹配）。
 Future<void> _loadFontFamily(String family, List<String> paths) async {
   final loader = FontLoader(family);
   for (final path in paths) {
     final file = File(path);
     if (!file.existsSync()) {
-      throw StateError('字型檔案唔存在：$path');
+      throw StateError('字型檔案不存在：$path');
     }
     loader.addFont(
-        Future<ByteData>.value(ByteData.sublistView(file.readAsBytesSync())));
+      Future<ByteData>.value(ByteData.sublistView(file.readAsBytesSync())),
+    );
   }
   await loader.load();
 }
 
-/// 測試環境冇中文字型，要令每段文字都搵得到真字型。
-///
-/// ⚠️ 有**三層**要補，漏咗任何一層都會見到方格（Ahem）：
-///   1. `fontFamily` —— 一大批 `TextStyle` 係 `fontFamily: null`，測試環境會落到
-///      Ahem。`ThemeData.copyWith` **冇** `fontFamily` 參數（只有建構子有），
-///      所以要經 `TextTheme.apply(fontFamily: ...)` 落。
-///   2. `fontFamilyFallback` —— 加中文字型「等線」。
-///   3. `appBarTheme.titleTextStyle` —— **唔會**經過 `textTheme.apply`，
-///      所以要逐個 `copyWith`，唔改就見到 AppBar 標題係一排黑方塊。
 ThemeData _theme() {
   const latin = 'Roboto';
-  const cjk = 'Deng';
   final base = buildAppTheme();
   return base.copyWith(
     textTheme: base.textTheme
-        .apply(fontFamily: latin, fontFamilyFallback: const [cjk]),
+        .apply(fontFamily: latin, fontFamilyFallback: const [_cjkFamily]),
     primaryTextTheme: base.primaryTextTheme
-        .apply(fontFamily: latin, fontFamilyFallback: const [cjk]),
+        .apply(fontFamily: latin, fontFamilyFallback: const [_cjkFamily]),
     appBarTheme: base.appBarTheme.copyWith(
       titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
-          fontFamily: latin, fontFamilyFallback: const [cjk]),
+        fontFamily: latin,
+        fontFamilyFallback: const [_cjkFamily],
+      ),
       toolbarTextStyle: base.appBarTheme.toolbarTextStyle?.copyWith(
-          fontFamily: latin, fontFamilyFallback: const [cjk]),
+        fontFamily: latin,
+        fontFamilyFallback: const [_cjkFamily],
+      ),
     ),
   );
 }
 
-/// 造一份睇落真實的排班資料（唔係空月曆）。
 Future<ShiftStore> _makeStore() async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
   final store = ShiftStore(prefs);
   await store.load();
-  _mark('store:loaded');
 
-  final defs = ShiftStore.testDefaults();
-  for (final def in defs.values) {
+  for (final def in ShiftStore.testDefaults().values) {
     await store.addDef(def);
   }
-  _mark('store:defs');
 
-  // 內建只有 4 個班次，班次管理頁會大片留白；加多幾個令 demo 圖睇落係真實排班表。
   for (final extra in <ShiftDef>[
     ShiftDef(
       id: 'sOC',
@@ -196,7 +193,7 @@ Future<ShiftStore> _makeStore() async {
       startTime: '09:00',
       endTime: '18:00',
       alarms: [
-        ShiftAlarm(id: 'oc1', label: '開工前 15 分鐘', offsetMinutes: -15)
+        ShiftAlarm(id: 'oc1', label: '開工前 15 分鐘', offsetMinutes: -15),
       ],
     ),
     ShiftDef(
@@ -220,9 +217,7 @@ Future<ShiftStore> _makeStore() async {
   ]) {
     await store.addDef(extra);
   }
-  _mark('store:extra-defs');
 
-  // 早更×2 → 中更×2 → 夜更×2 → 休×1 嘅輪班節奏（睇得出規律又唔係死板）
   const pattern = <String?>['s06', 's06', 's12', 's12', 's18', 's18', null];
   const venues = <String>['A1', 'B2', 'C1', 'A2'];
 
@@ -232,22 +227,23 @@ Future<ShiftStore> _makeStore() async {
 
   for (var d = 1; d <= daysInMonth; d++) {
     final shiftId = pattern[(d - 1) % pattern.length];
-    if (shiftId == null) continue; // 休息日留空
+    if (shiftId == null) continue;
     final dd = d.toString().padLeft(2, '0');
-    await store.assign('${now.year}-$mm-$dd', shiftId,
-        note: venues[d % venues.length]);
+    await store.assign(
+      '${now.year}-$mm-$dd',
+      shiftId,
+      note: venues[d % venues.length],
+    );
   }
 
-  // 一兩條備註，等底部詳情區唔係空框
   await store.setRemark('${now.year}-$mm-08', '交接班提早 15 分鐘');
   await store.setRemark('${now.year}-$mm-16', '帶新人');
 
   return store;
 }
 
-/// 為 RenderParagraph 注入中文字型 fallback，確保測試環境截圖字體正常渲染。
 void _applyFontFallback(WidgetTester tester) {
-  const fallback = ['Deng'];
+  const fallback = [_cjkFamily];
   final paragraphs = <RenderParagraph>[];
   void collect(RenderObject node) {
     if (node is RenderParagraph) paragraphs.add(node);
@@ -263,11 +259,6 @@ void _applyFontFallback(WidgetTester tester) {
 InlineSpan _withFallback(InlineSpan span, List<String> fallback) {
   if (span is! TextSpan) return span;
   final base = span.style ?? const TextStyle();
-  // ⚠️ 淨係補 `fontFamilyFallback` **唔夠**：fallback 只喺「主字體冇呢個字形」
-  //    時才用。測試環境主字體係 Ahem，佢**有** ASCII 字形（就係嗰啲實心方塊），
-  //    所以數字／英文字母會照樣用 Ahem 畫方塊，只有中文因為 Ahem 冇字形才 fallback
-  //    到「等線」——正好對應「中文正常、數字係方塊」嘅現象。
-  //    所以主字體都要指定成有真數字字形嘅 Roboto。
   final style = base.fontFamily == null
       ? base.copyWith(fontFamily: 'Roboto', fontFamilyFallback: fallback)
       : base.copyWith(fontFamilyFallback: fallback);
@@ -282,37 +273,27 @@ InlineSpan _withFallback(InlineSpan span, List<String> fallback) {
   );
 }
 
-/// 泵一個畫面並截圖，寫到 `docs/screenshots/<name>.png`。
 Future<void> _shot(WidgetTester tester, String name, Widget child) async {
   tester.view.physicalSize = const Size(_w, _h);
   tester.view.devicePixelRatio = 1.0;
 
   final boundaryKey = GlobalKey();
-  _mark('$name:pumpWidget');
-  await tester.pumpWidget(MaterialApp(
-    theme: _theme(),
-    home: RepaintBoundary(key: boundaryKey, child: child),
-  ));
-  _mark('$name:pumped');
-  // 天色帶 30fps Timer：唔可以 pumpAndSettle
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: _theme(),
+      home: RepaintBoundary(key: boundaryKey, child: child),
+    ),
+  );
   await tester.pump();
   await tester.pump();
-  _mark('$name:pumped2');
-  // ⚠️ 只清一次：StatsScreen 若每幀都再拋，while 會變成無限循環
-  //    （試過：卡死 5 分鐘以上唔會返）。
-  final err = tester.takeException();
-  if (err != null) _mark('$name:exception ${err.runtimeType}');
-  _mark('$name:clean');
+  tester.takeException();
 
-  // 補字型 fallback（見 `_applyFontFallback` 註釋），再重排一次先截圖
   _applyFontFallback(tester);
   await tester.pump();
-  _mark('$name:font-patched');
 
   final boundary =
       boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
   final image = await boundary.toImage(pixelRatio: _pixelRatio);
-  _mark('$name:toImage ${image.width}x${image.height}');
   final data = await image.toByteData(format: ui.ImageByteFormat.png);
   final bytes =
       data!.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
@@ -322,9 +303,10 @@ Future<void> _shot(WidgetTester tester, String name, Widget child) async {
     out.parent.createSync(recursive: true);
   }
   out.writeAsBytesSync(bytes);
-  _mark('$name:written');
 
   // ignore: avoid_print
-  print('[SHOT] ${out.path} ${bytes.lengthInBytes} bytes '
-      '${image.width}x${image.height}');
+  print(
+    '[SHOT] ${out.path} ${bytes.lengthInBytes} bytes '
+    '${image.width}x${image.height}',
+  );
 }

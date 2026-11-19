@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
 /// 頂部微交互通知浮條（Top Notification Toast）

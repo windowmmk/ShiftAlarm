@@ -5,6 +5,7 @@
 // 在三種機型 × 三種底部 inset × 鍵盤開關的組合下都成立，並且主動用極端輸入弄壞它。
 //
 // ⚠️ 唔可以用 `pumpAndSettle()`：`OceanBand` 有 30fps 常駐 Timer，永遠唔會 settle。
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

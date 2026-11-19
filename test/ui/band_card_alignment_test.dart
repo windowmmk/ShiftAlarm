@@ -21,6 +21,7 @@
 //     → 一律用兩次 `tester.pump()`。
 //   - 要泵**真實嘅 `CalendarScreen`** 而唔係手砌兩張卡：只有行同一條
 //     `CalendarLayout` + `Center/ConstrainedBox/Padding` 鏈，先測得到對齊。
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

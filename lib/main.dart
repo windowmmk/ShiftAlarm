@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

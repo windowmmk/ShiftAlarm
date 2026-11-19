@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -63,3 +64,21 @@ jobs:
 
       - name: Build Android APK (Debug Verify)
         run: flutter build apk --debug --android-skip-build-dependency-validation
+
+      - name: Install CJK Fonts for Screenshot Verification
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+
+      - name: Render UI Screenshots
+        run: |
+          flutter test tool/gen_screenshots_test.dart --plain-name home
+          flutter test tool/gen_screenshots_test.dart --plain-name stats
+          flutter test tool/gen_screenshots_test.dart --plain-name shifts
+          flutter test tool/gen_screenshots_test.dart --plain-name settings
+
+      - name: Upload UI Screenshots Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: docs/screenshots/*.png

@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
 import '../../domain/alarm_service.dart';
@@ -8,7 +9,7 @@ import 'settings_screen.dart';
 import 'shift_manage_screen.dart';
 import 'stats_screen.dart';
 
-/// 底導航主頁：日曆／班次／統計／設置四個 tab，用 IndexedStack 保持狀態。
+/// 底部導覽主頁：日曆／班次／統計／設定四個頁籤，以 IndexedStack 保持各頁狀態。
 class HomeScreen extends StatefulWidget {
   final ShiftStore store;
   final AlarmService alarms;
@@ -72,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
               selectedIcon: Icon(Icons.settings),
-              label: '設置',
+              label: '設定',
             ),
           ],
         ),
