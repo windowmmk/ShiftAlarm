@@ -63,7 +63,7 @@ jobs:
         run: flutter build web --release --base-href "/ShiftAlarm/"
 
       - name: Build Android APK (Debug Verify)
-        run: flutter build apk --debug --android-skip-build-dependency-validation
+        run: flutter build apk --debug
 
       - name: Install CJK Fonts for Screenshot Verification
         run: |

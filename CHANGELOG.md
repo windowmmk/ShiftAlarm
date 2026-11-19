@@ -25,7 +25,7 @@
 ### 安全、測試與 CI/CD
 - **簽名金鑰移入 GitHub Secrets**：取消 `shiftalarm-release.jks` 的 Git 追蹤並移除工作流中的明文密碼，保留原簽名金鑰確保舊機可直接覆蓋升級。
 - **測試集分層整理**：將原本平鋪的 28 個測試檔整理至 `test/domain/`、`test/alarm/`、`test/ocean/` 與 `test/ui/`，並新增 UI 打磨與響應式回歸測試。
-- **自動化管線強化**：新增 `ci.yml`（靜態檢查＋單元／元件測試＋Web／Android 建置驗證），並改寫 `build-apk.yml` 自動讀取 `CHANGELOG.md` 作為發版日誌。
+- **自動化管線強化**：新增 `ci.yml`（靜態檢查＋單元／元件測試＋Web／Android 建置驗證），升級 Android 建置鏈至 AGP 9.3.1 / Gradle 9.5.0 / Kotlin 2.4.20（對齊 Flutter 3.50），並改寫 `build-apk.yml` 自動讀取 `CHANGELOG.md` 作為發版日誌。
 
 ## v3.6.3
 

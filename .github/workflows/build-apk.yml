@@ -49,7 +49,7 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/app/shiftalarm-release.jks
 
       - name: Build Release APK
-        run: flutter build apk --release --android-skip-build-dependency-validation
+        run: flutter build apk --release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
