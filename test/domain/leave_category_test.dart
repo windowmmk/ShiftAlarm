@@ -197,11 +197,7 @@ void main() {
         expect(find.text('進修假'), findsNothing);
         expect(find.text('6 小時', findRichText: true), findsOneWidget);
         expect(find.text('1日 · 100.0%'), findsOneWidget);
-        await tester.scrollUntilVisible(
-          find.text('A1'),
-          200,
-          scrollable: find.byType(Scrollable).last,
-        );
+        await tester.drag(find.byType(ListView), const Offset(0, -400));
         await tester.pumpAndSettle();
         expect(find.text('A1'), findsOneWidget);
       } finally {
