@@ -154,6 +154,8 @@ class ShiftAlarm {
 
 /// 班次定義模型，持久化為 shared_preferences JSON。
 class ShiftDef {
+  static const String leaveId = '__leave__';
+
   final String id;
   String name;
   String abbr;
@@ -161,6 +163,7 @@ class ShiftDef {
   String startTime;
   String endTime;
   List<ShiftAlarm> alarms;
+  bool isLeave;
 
   ShiftDef({
     required this.id,
@@ -170,6 +173,7 @@ class ShiftDef {
     required this.alarms,
     String? abbr,
     String? code,
+    this.isLeave = false,
   })  : abbr = abbr ?? truncateAbbr(name),
         code = code ?? '';
 
@@ -184,11 +188,13 @@ class ShiftDef {
         'startTime': startTime,
         'endTime': endTime,
         'alarms': alarms.map((a) => a.toJson()).toList(),
+        if (isLeave) 'isLeave': true,
       };
 
   /// 由 JSON 還原班次定義（全欄位採型別寬容讀取，防單筆壞資料中斷整份清單）。
   static ShiftDef fromJson(String id, Map<String, Object?> j) {
     final name = readJsonText(j['name']) ?? id;
+    final isLeave = (readJsonBool(j['isLeave']) ?? false) || id == leaveId;
     List<ShiftAlarm> alarms = [];
     final rawAlarms = j['alarms'];
     if (rawAlarms is List) {
@@ -202,7 +208,7 @@ class ShiftDef {
         }
       }
     }
-    if (alarms.isEmpty) {
+    if (alarms.isEmpty && !isLeave) {
       final adv = readJsonInt(j['advanceMinutes']) ?? 60;
       alarms = [
         ShiftAlarm(
@@ -222,6 +228,7 @@ class ShiftDef {
       alarms: alarms,
       abbr: readJsonText(j['abbr']) ?? truncateAbbr(name),
       code: readJsonText(j['code']) ?? '',
+      isLeave: isLeave,
     );
   }
 
@@ -233,6 +240,7 @@ class ShiftDef {
         alarms: alarms.map((a) => a.copy()).toList(),
         abbr: abbr,
         code: code,
+        isLeave: isLeave,
       );
 
   /// 班次時長（分鐘），委派 [shiftDurationMinutes] 維持全專案單一規則。

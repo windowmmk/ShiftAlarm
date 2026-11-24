@@ -95,18 +95,18 @@ vec3 renderSky(vec3 rd, vec3 sunDir) {
   // Zenith color:
   // Midday (午班): bright radiant sapphire azure
   // Dawn/Sunset: warm deep twilight
-  // Night (夜班): deep pitch dark midnight void
+  // Night (夜班): serene moonlit midnight indigo (calm, never pitch-black)
   vec3 zenithCol = mix(vec3(0.08, 0.16, 0.42), vec3(0.04, 0.28, 0.82), dayF);
-  zenithCol = mix(zenithCol, vec3(0.001, 0.002, 0.006), nightF);
+  zenithCol = mix(zenithCol, vec3(0.025, 0.055, 0.140), nightF);
 
   // Horizon color:
   // Midday (午班): bright clear azure sky mist
   // Dawn/Sunset: fiery golden-peach / crimson sunrise/sunset
-  // Night (夜班): deep obsidian night mist
+  // Night (夜班): soft moonlit coastal blue-teal mist
   vec3 sunriseSunsetHoriz = mix(vec3(1.0, 0.38, 0.12), vec3(1.0, 0.62, 0.28), clamp(sunDir.x * 0.5 + 0.5, 0.0, 1.0));
   vec3 dayHoriz = vec3(0.50, 0.80, 1.0);
   vec3 horizCol = mix(sunriseSunsetHoriz, dayHoriz, smoothstep(0.04, 0.32, sunElev));
-  horizCol = mix(horizCol, vec3(0.003, 0.006, 0.016), nightF);
+  horizCol = mix(horizCol, vec3(0.055, 0.125, 0.245), nightF);
 
   vec3 sky = mix(zenithCol, horizCol, pow(1.0 - zenithCos, 3.0));
 
@@ -114,16 +114,16 @@ vec3 renderSky(vec3 rd, vec3 sunDir) {
   float g = 0.80;
   float mie = (1.0 - g * g) / (4.0 * PI * pow(max(1.0 + g * g - 2.0 * g * sunCos, 0.0001), 1.5));
   vec3 sunTint = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.98, 0.92), smoothstep(-0.02, 0.25, sunElev));
-  sunTint = mix(sunTint, vec3(0.28, 0.50, 0.95), nightF);
-  // Suppress atmospheric haze at night so the sky stays deeply dark
-  sky += sunTint * mie * ((0.35 + 0.65 * uHaze) * (1.0 - nightF * 0.88));
+  sunTint = mix(sunTint, vec3(0.62, 0.78, 1.0), nightF);
+  // Gentle moonlit atmospheric glow at night
+  sky += sunTint * mie * ((0.35 + 0.65 * uHaze) * (1.0 - nightF * 0.45));
 
   // Clouds
   if (rd.y > 0.008 && uClouds > 0.01) {
     vec2 uv = rd.xz / max(rd.y, 0.03) * 0.24 + vec2(uTime * 0.015, uTime * 0.008);
     float n = fbm(uv);
     float cov = smoothstep(0.60 - uClouds * 0.35, 0.78, n) * smoothstep(0.01, 0.12, rd.y);
-    vec3 cloudCol = mix(vec3(0.18, 0.24, 0.38) * (1.0 - nightF * 0.92), sunTint * 0.95, (0.55 + 0.45 * max(sunCos, 0.0)) * (1.0 - nightF * 0.85));
+    vec3 cloudCol = mix(vec3(0.18, 0.24, 0.38) * (1.0 - nightF * 0.55), sunTint * 0.95, (0.55 + 0.45 * max(sunCos, 0.0)) * (1.0 - nightF * 0.50));
     sky = mix(sky, cloudCol, cov * 0.78);
   }
 

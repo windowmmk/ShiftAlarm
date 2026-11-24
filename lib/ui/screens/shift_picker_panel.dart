@@ -411,7 +411,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
               // 第二行：橫向排班卡片（點更即排，自動保存，高度固定 58px）
               SizedBox(
                 height: 58,
-                child: defs.length <= 4
+                child: defs.length <= 3
                     ? Row(
                         children: [
                           for (int i = 0; i < defs.length; i++) ...[
@@ -421,6 +421,8 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                                   t, defs[i], defs[i].id == currentId),
                             ),
                           ],
+                          const SizedBox(width: 6),
+                          Expanded(child: _leaveButton(t, currentId)),
                           const SizedBox(width: 6),
                           _clearButton(t, currentId),
                         ],
@@ -437,6 +439,11 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                                     t, defs[i], defs[i].id == currentId),
                               ),
                             ],
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              width: 76,
+                              child: _leaveButton(t, currentId),
+                            ),
                             const SizedBox(width: 6),
                             _clearButton(t, currentId),
                           ],
@@ -504,6 +511,137 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
         ),
       ),
     );
+  }
+
+  Widget _leaveButton(ShiftTokens t, String? currentId) {
+    final isSelected = currentId == ShiftDef.leaveId;
+    const leaveBg = Color(0xFFECFDF5);
+    const leaveFg = Color(0xFF047857);
+    const leaveBorder = Color(0xFFA7F3D0);
+    final currentLeaveName =
+        isSelected ? (widget.store.assignments[_key]?.note ?? '') : '';
+
+    return InkWell(
+      onTap: _saving ? null : _pickLeaveName,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: leaveBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? leaveFg : leaveBorder,
+            width: isSelected ? 2.0 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: leaveFg.withValues(alpha: 0.16),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  )
+                ]
+              : null,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '假期',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: leaveFg,
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                currentLeaveName.isNotEmpty ? currentLeaveName : '自訂名稱',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.normal,
+                  color: leaveFg.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickLeaveName() async {
+    final existing = widget.store.assignments[_key]?.shiftId == ShiftDef.leaveId
+        ? (widget.store.assignments[_key]?.note ?? '')
+        : '';
+    final ctrl = TextEditingController(text: existing);
+    const presets = ['年假', '病假', '補假', '事假', '婚假', '產假'];
+
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('排定假期'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final p in presets)
+                  ActionChip(
+                    label: Text(p),
+                    onPressed: () => Navigator.of(ctx).pop(p),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLength: 8,
+              decoration: const InputDecoration(
+                labelText: '或自訂假期名稱',
+                hintText: '例如：進修假、調休',
+                counterText: '',
+              ),
+              onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('確定'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (chosen == null || !mounted) return;
+
+    final leaveName = chosen.isEmpty ? '假期' : chosen;
+    setState(() {
+      _saving = true;
+      _selectedId = ShiftDef.leaveId;
+      _dirty = false;
+    });
+    try {
+      await widget.store.assign(_key, ShiftDef.leaveId, note: leaveName);
+      await widget.alarms.rescheduleAll(widget.store);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Widget _clearButton(ShiftTokens t, String? currentId) {

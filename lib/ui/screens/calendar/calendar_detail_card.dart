@@ -42,7 +42,15 @@ class CalendarDetailCard extends StatelessWidget {
     final holiday = holidayName(selectedDate);
     const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
     final weekdayName = weekdays[selectedDate.weekday % 7];
-    final slot = def != null ? t.slotForTime(def.startTime) : null;
+    final slot = def != null
+        ? (def.isLeave
+            ? const (
+                bg: Color(0xFFECFDF5),
+                fg: Color(0xFF047857),
+                border: Color(0xFFA7F3D0),
+              )
+            : t.slotForTime(def.startTime))
+        : null;
 
     return Center(
       child: ConstrainedBox(
@@ -161,7 +169,7 @@ class CalendarDetailCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        def.name,
+                        def.isLeave && note.isNotEmpty ? note : def.name,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -171,14 +179,16 @@ class CalendarDetailCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${def.startTime}–${def.endTime}',
+                      def.isLeave
+                          ? '全日休假（不計工時）'
+                          : '${def.startTime}–${def.endTime}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.normal,
                         color: t.neutralFg,
                       ),
                     ),
-                    if (note.isNotEmpty) ...[
+                    if (!def.isLeave && note.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       Icon(Icons.location_on, size: 14, color: t.brand),
                       const SizedBox(width: 2),

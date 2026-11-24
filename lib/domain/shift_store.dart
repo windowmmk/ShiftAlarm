@@ -305,7 +305,7 @@ class ShiftStore extends ChangeNotifier {
   /// 按開工時間排序的班次清單。
   List<ShiftDef> sortedDefs() {
     if (_cachedSortedDefs != null) return _cachedSortedDefs!;
-    final list = defs.values.toList();
+    final list = defs.values.where((d) => !d.isLeave).toList();
     int toMinutes(String hhmm) {
       final p = hhmm.split(':');
       final h = int.tryParse(p.isNotEmpty ? p[0] : '') ?? 0;
@@ -379,7 +379,25 @@ class ShiftStore extends ChangeNotifier {
     return affected;
   }
 
+  /// 取得內建「假期類」班次定義。
+  ShiftDef get leaveDef =>
+      defs[ShiftDef.leaveId] ??
+      ShiftDef(
+        id: ShiftDef.leaveId,
+        name: '假期',
+        abbr: '假期',
+        startTime: '00:00',
+        endTime: '00:00',
+        alarms: const [],
+        isLeave: true,
+      );
+
+  /// 指派某日班次；若為假期類且尚未註冊，會自動補上內建假期定義。
   Future<void> assign(String ymd, String shiftId, {String note = ''}) async {
+    if (shiftId == ShiftDef.leaveId && !defs.containsKey(ShiftDef.leaveId)) {
+      defs[ShiftDef.leaveId] = leaveDef;
+      await _saveDefs();
+    }
     if (!defs.containsKey(shiftId)) return;
     assignments[ymd] = ShiftAssignment(shiftId, note);
     await _saveAssignments();

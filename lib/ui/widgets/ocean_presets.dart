@@ -106,19 +106,19 @@ class OceanShaderPreset {
     nightGlow: 0.0,
   );
 
-  /// 夜班出發（21:30-04:59）：星夜深邃、月光、藍眼淚
+  /// 夜班出發（21:30-04:59）：靜謐月夜、柔和海面、藍眼淚（既夜晚亦不陰森）
   static const OceanShaderPreset night = OceanShaderPreset(
     sunElev: -16.0,
     sunAzimuth: 215.0,
-    windSpeed: 8.5,
-    swellHs: 1.7,
-    choppiness: 1.10,
-    turbidity: 0.16,
-    foam: 1.40,
-    haze: 0.18,
-    clouds: 0.14,
-    exposure: 0.82,
-    bloom: 0.85,
+    windSpeed: 7.2,
+    swellHs: 1.2,
+    choppiness: 0.95,
+    turbidity: 0.35,
+    foam: 1.15,
+    haze: 0.28,
+    clouds: 0.16,
+    exposure: 1.05,
+    bloom: 0.95,
     nightGlow: 1.0,
   );
 
