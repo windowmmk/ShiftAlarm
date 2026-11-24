@@ -97,7 +97,7 @@ vec3 renderSky(vec3 rd, vec3 sunDir) {
   // Dawn/Sunset: warm deep twilight
   // Night (夜班): serene moonlit slate-indigo (calm, never pitch-black)
   vec3 zenithCol = mix(vec3(0.08, 0.16, 0.42), vec3(0.04, 0.28, 0.82), dayF);
-  zenithCol = mix(zenithCol, vec3(0.028, 0.036, 0.068), nightF);
+  zenithCol = mix(zenithCol, vec3(0.018, 0.026, 0.052), nightF);
 
   // Horizon color:
   // Midday (午班): bright clear azure sky mist
@@ -106,7 +106,7 @@ vec3 renderSky(vec3 rd, vec3 sunDir) {
   vec3 sunriseSunsetHoriz = mix(vec3(1.0, 0.38, 0.12), vec3(1.0, 0.62, 0.28), clamp(sunDir.x * 0.5 + 0.5, 0.0, 1.0));
   vec3 dayHoriz = vec3(0.50, 0.80, 1.0);
   vec3 horizCol = mix(sunriseSunsetHoriz, dayHoriz, smoothstep(0.04, 0.32, sunElev));
-  horizCol = mix(horizCol, vec3(0.068, 0.086, 0.128), nightF);
+  horizCol = mix(horizCol, vec3(0.045, 0.064, 0.105), nightF);
 
   vec3 sky = mix(zenithCol, horizCol, pow(1.0 - zenithCos, 3.0));
 
@@ -147,7 +147,7 @@ vec3 renderSky(vec3 rd, vec3 sunDir) {
     vec3 moonDir = normalize(vec3(-0.45, 0.10, -1.0));
     float moonCos = clamp(dot(rd, moonDir), -1.0, 1.0);
     float moonDisc = smoothstep(0.99945, 0.99972, moonCos);
-    float moonHalo = pow(max(moonCos, 0.0), 120.0) * 0.55 + pow(max(moonCos, 0.0), 16.0) * 0.14;
+    float moonHalo = pow(max(moonCos, 0.0), 160.0) * 0.55 + pow(max(moonCos, 0.0), 28.0) * 0.10;
     sky += vec3(0.96, 0.95, 0.90) * (moonDisc * 1.9 + moonHalo * uBloom) * nightF;
   }
   return sky;

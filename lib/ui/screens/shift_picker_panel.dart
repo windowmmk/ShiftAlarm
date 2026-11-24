@@ -602,12 +602,13 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
               : null,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
                 '假期',
                 style: TextStyle(
                   fontSize: 13.5,
@@ -615,11 +616,8 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   color: kLeaveSlotColors.fg,
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
+              const SizedBox(height: 2),
+              Text(
                 currentLeaveName.isNotEmpty ? currentLeaveName : '自訂名稱',
                 style: TextStyle(
                   fontSize: 11,
@@ -627,8 +625,8 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                   color: kLeaveSlotColors.fg.withValues(alpha: 0.85),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -642,57 +640,11 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     final existing = widget.store.assignments[_key]?.shiftId == ShiftDef.leaveId
         ? (widget.store.assignments[_key]?.note ?? '')
         : '';
-    final ctrl = TextEditingController(text: existing);
-    const presets = ['年假', '病假', '補假', '事假', '婚假', '產假'];
 
     final chosen = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('排定假期'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final p in presets)
-                    ActionChip(
-                      label: Text(p),
-                      onPressed: () => Navigator.of(ctx).pop(p),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                maxLength: 8,
-                decoration: const InputDecoration(
-                  labelText: '或自訂假期名稱',
-                  hintText: '例如：進修假、調休',
-                  counterText: '',
-                ),
-                onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('確定'),
-          ),
-        ],
-      ),
+      builder: (_) => _LeaveNameDialog(initialName: existing),
     );
-    ctrl.dispose();
     if (chosen == null || !mounted) return;
 
     final leaveName = chosen.isEmpty ? '假期' : chosen;
@@ -766,6 +718,80 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LeaveNameDialog extends StatefulWidget {
+  final String initialName;
+
+  const _LeaveNameDialog({required this.initialName});
+
+  @override
+  State<_LeaveNameDialog> createState() => _LeaveNameDialogState();
+}
+
+class _LeaveNameDialogState extends State<_LeaveNameDialog> {
+  static const List<String> _presets = ['年假', '病假', '補假', '事假', '婚假', '產假'];
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('排定假期'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final p in _presets)
+                  ActionChip(
+                    label: Text(p),
+                    onPressed: () => Navigator.of(context).pop(p),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              maxLength: 8,
+              decoration: const InputDecoration(
+                labelText: '或自訂假期名稱',
+                hintText: '例如：進修假、調休',
+                counterText: '',
+              ),
+              onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),
+          child: const Text('確定'),
+        ),
+      ],
     );
   }
 }
