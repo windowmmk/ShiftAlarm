@@ -160,6 +160,10 @@ void main() {
       expect(store.assignments['2026-11-24']!.shiftId, 's06');
       expect(store.assignments['2026-11-24']!.note, isEmpty);
       expect(store.venues, isNot(contains('進修假')));
+
+      // 等待 showTopNotification 的 1.8s 自動收起計時器結束
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('StatsScreen 不將假期類計入返工日數或地點分佈，且 320x2.0x 零溢出',
@@ -193,6 +197,8 @@ void main() {
         expect(find.text('進修假'), findsNothing);
         expect(find.text('6 小時', findRichText: true), findsOneWidget);
         expect(find.text('1日 · 100.0%'), findsOneWidget);
+        await tester.scrollUntilVisible(find.text('A1'), 200);
+        await tester.pumpAndSettle();
         expect(find.text('A1'), findsOneWidget);
       } finally {
         FlutterError.onError = oldHandler;
