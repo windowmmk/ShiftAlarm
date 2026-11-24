@@ -128,9 +128,11 @@ void main() {
                   border: Border.all(color: kCardStroke, width: 1.2),
                 ),
                 child: CustomPaint(
-                  painter: OceanFallbackPainter(
+                  painter: const OceanFallbackPainter(
                     time: 2.0,
                     atmo: OceanAtmoState.night,
+                    surgeMultiplier: 0.0,
+                    surgeProgress: -1.0,
                     compact96: true,
                   ),
                   size: const Size(double.infinity, 96),

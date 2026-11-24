@@ -11,32 +11,10 @@ import 'package:shiftalarm/theme/app_theme.dart';
 import 'package:shiftalarm/ui/screens/shift_picker_panel.dart';
 import 'package:shiftalarm/ui/screens/stats_screen.dart';
 
-class _FakeBridge extends AlarmBridge {
-  final List<String> cancelledYmds = [];
-  int cancelCalls = 0;
-
-  @override
-  Future<void> cancel(int id) async {
-    cancelCalls++;
-  }
-
-  @override
-  Future<void> cancelPreAlert(int alarmId) async {}
-
-  @override
-  Future<void> schedule(AlarmSchedule schedule) async {}
-
-  @override
-  Future<void> scheduleGentle(GentleAlarmSchedule schedule) async {}
-
-  @override
-  Future<void> schedulePreAlert(PreAlertSchedule schedule) async {}
-}
-
 class _TrackingAlarmService extends AlarmService {
   final List<String> unassignedYmds = [];
 
-  _TrackingAlarmService() : super(_FakeBridge());
+  _TrackingAlarmService() : super(AlarmBridge());
 
   @override
   Future<void> onUnassigned(String ymd) async {
@@ -114,8 +92,12 @@ void main() {
       );
       final sa2 = exportConfigCode(store);
       final decodedCfg = decodeConfigText(sa2);
-      expect(decodedCfg.isSuccess, isTrue);
-      expect(decodedCfg.defs!.any((d) => d.id == ShiftDef.leaveId), isFalse);
+      expect(decodedCfg.crcVerified, isTrue);
+      final cfgShifts = decodedCfg.data['shifts'] as List;
+      expect(
+        cfgShifts.any((s) => (s as Map)['id'] == ShiftDef.leaveId),
+        isFalse,
+      );
 
       final sr2 = exportRosterCode(store, month: DateTime(2026, 11));
       final targetStore = await _makeStore();
