@@ -7,6 +7,6 @@ library;
 const bool kOpenSource = true;
 
 /// 應用程式版本資訊（與 pubspec.yaml 同步維護）
-const String kAppVersion = '3.7.0';
-const int kAppBuildNumber = 49;
+const String kAppVersion = '3.7.1';
+const int kAppBuildNumber = 50;
 const String kAppVersionDisplay = '版本 $kAppVersion (Build $kAppBuildNumber)';

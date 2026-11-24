@@ -1,7 +1,7 @@
 name: shiftalarm
 description: "專為輪班人士量身打造的極致隱私、純離線排班日曆與精確鬧鐘（Flutter / Android 原生整合 / Web PWA，支援 SA2/SR2 極簡二進制協議）"
 publish_to: 'none'
-version: 3.7.0+49
+version: 3.7.1+50
 
 environment:
   sdk: ^3.13.5
