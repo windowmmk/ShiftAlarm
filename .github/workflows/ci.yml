@@ -83,4 +83,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ui-screenshots
-          path: docs/screenshots/*.png
+          path: |
+            docs/screenshots/*.png
+            build/verify-shots/*.png

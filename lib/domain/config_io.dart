@@ -43,6 +43,7 @@ int computeCrc32(List<int> bytes) {
 /// 導出當前配置為可序列化的 Map（包含內部報文頭與數據體）
 Map<String, dynamic> exportConfig(ShiftStore store) {
   final nowTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final workDefs = store.defs.entries.where((e) => !e.value.isLeave).toList();
   return {
     'app': 'ShiftAlarm',
     'version': 1,
@@ -50,12 +51,11 @@ Map<String, dynamic> exportConfig(ShiftStore store) {
       'magic': 'SHIFTALARM_CONFIG',
       'version': 1,
       'timestamp': nowTs,
-      'shiftCount': store.defs.length,
+      'shiftCount': workDefs.length,
       'venueCount': store.venues.length,
     },
     'shifts': [
-      for (final e in store.defs.entries)
-        {'id': e.key, ...e.value.toJson()},
+      for (final e in workDefs) {'id': e.key, ...e.value.toJson()},
     ],
     'venues': List<String>.from(store.venues),
   };
@@ -80,7 +80,7 @@ Uint8List encodeCompactConfig(ShiftStore store) {
   final bb = BytesBuilder();
   bb.addByte(3); // protocol version 3
 
-  final defs = store.defs.values.toList();
+  final defs = store.defs.values.where((d) => !d.isLeave).toList();
   bb.addByte(defs.length.clamp(0, 255));
 
   for (var i = 0; i < defs.length; i++) {

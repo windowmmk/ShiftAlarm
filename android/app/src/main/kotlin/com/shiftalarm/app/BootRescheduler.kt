@@ -73,6 +73,9 @@ object BootRescheduler {
                 continue
             }
             val def = defs.optJSONObject(shiftId) ?: continue
+            if (shiftId == "__leave__" || def.optBoolean("isLeave", false)) {
+                continue
+            }
             val name = def.optString("name", "排班")
             if (!def.has("startTime") || def.isNull("startTime")) {
                 AlarmDebugLog.append(

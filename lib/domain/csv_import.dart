@@ -135,21 +135,31 @@ CsvImportResult parseRosterCsv(String text, Map<String, ShiftDef> defs) {
       continue;
     }
     final codeRaw = parts[1].trim();
-    // 先試代號（唔分大細楷），唔得再試舊時段格式
-    var shiftId = codeMap[codeRaw.toUpperCase()];
-    if (shiftId == null) {
-      final slotKey = normalizeSlot(codeRaw);
-      if (slotKey != null) shiftId = slotMap[slotKey];
+    // 優先辨識內建假期類，再按代號／舊時段格式對照
+    String? shiftId;
+    if (codeRaw == ShiftDef.leaveId ||
+        codeRaw == '假期' ||
+        codeRaw.toUpperCase() == 'LEAVE') {
+      shiftId = ShiftDef.leaveId;
+    } else {
+      shiftId = codeMap[codeRaw.toUpperCase()];
+      if (shiftId == null) {
+        final slotKey = normalizeSlot(codeRaw);
+        if (slotKey != null) shiftId = slotMap[slotKey];
+      }
     }
     if (shiftId == null) {
       errors.add('行 ${li + 1}：代號 $codeRaw 對唔到任何班次');
       continue;
     }
     var venue = parts.length > 2 ? parts[2].trim() : '';
-    // 場所超 4 單位：截到 ≤4 單位做場所，全文入備註（日曆格設計俾四個字）。
-    // 注意：用 abbrUnits（全形＝2），唔係 runes.length，否則中文字會超闊。
     var remark = '';
-    if (abbrUnits(venue) > 4) {
+    if (shiftId == ShiftDef.leaveId) {
+      if (venue.isEmpty) venue = '假期';
+      if (venue.length > 16) venue = venue.substring(0, 16);
+    } else if (abbrUnits(venue) > 4) {
+      // 場所超 4 單位：截到 ≤4 單位做場所，全文入備註（日曆格設計俾四個字）。
+      // 注意：用 abbrUnits（全形＝2），唔係 runes.length，否則中文字會超闊。
       remark = venue;
       venue = truncateAbbr(venue);
     }

@@ -50,8 +50,8 @@ class OceanFallbackPainter extends CustomPainter {
     final Color zenithCol;
     final Color horizonCol;
     if (night > 0.5) {
-      zenithCol = const Color(0xFF020409);
-      horizonCol = const Color(0xFF080F1E);
+      zenithCol = const Color(0xFF243452);
+      horizonCol = const Color(0xFF425B80);
     } else if (elev < 0.20) {
       if (atmo.sunAzimuth > 0) {
         zenithCol = const Color(0xFF2563EB);
@@ -144,7 +144,7 @@ class OceanFallbackPainter extends CustomPainter {
 
   (Color, Color) _waterGradientColors() {
     if (atmo.nightFactor > 0.5) {
-      return (const Color(0xFF040914), const Color(0xFF010308));
+      return (const Color(0xFF1E4468), const Color(0xFF15304D));
     }
     if (atmo.sunElevation < 0.20) {
       return (const Color(0xFF0284C7), const Color(0xFF082F49));
@@ -315,7 +315,7 @@ class OceanFallbackPainter extends CustomPainter {
       ..close();
 
     final waveColor = night > 0.5
-        ? const Color(0xFF1E3A8A).withValues(alpha: alpha * 0.75)
+        ? const Color(0xFF2B5B84).withValues(alpha: alpha * 0.70)
         : (elev < 0.20
             ? const Color(0xFF0369A1).withValues(alpha: alpha)
             : const Color(0xFF38BDF8).withValues(alpha: alpha));
@@ -323,8 +323,8 @@ class OceanFallbackPainter extends CustomPainter {
 
     final bool bioluminescent = night > 0.5 && atmo.nightGlow > 0.1;
     final Color foamColor =
-        (bioluminescent ? const Color(0xFF00F0FF) : Colors.white)
-            .withValues(alpha: bioluminescent ? 0.75 : 0.45);
+        (bioluminescent ? const Color(0xFF38BDF8) : Colors.white)
+            .withValues(alpha: bioluminescent ? 0.62 : 0.45);
     canvas.drawPath(
       foamPath,
       Paint()
@@ -403,8 +403,8 @@ class OceanFallbackPainter extends CustomPainter {
     final moonGlowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFE0E7FF).withValues(alpha: 0.30),
-          const Color(0xFFE0E7FF).withValues(alpha: 0.0),
+          const Color(0xFFFEF3C7).withValues(alpha: 0.36),
+          const Color(0xFFFEF3C7).withValues(alpha: 0.0),
         ],
       ).createShader(
         Rect.fromCircle(center: Offset(cx, cy), radius: glowRadius),
@@ -413,7 +413,7 @@ class OceanFallbackPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(cx, cy),
       radius * 0.80,
-      Paint()..color = const Color(0xFFEEF2FF),
+      Paint()..color = const Color(0xFFFFFBEB),
     );
 
     final starW = math.max(1, w.toInt());

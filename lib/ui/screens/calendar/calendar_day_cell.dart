@@ -134,14 +134,8 @@ class CalendarDayCell extends StatelessWidget {
         date.year == activeYear && date.month == activeMonth;
     final holiday = holidayName(date);
 
-    final slot = def != null
-        ? (def.isLeave
-            ? const (
-                bg: Color(0xFFECFDF5),
-                fg: Color(0xFF047857),
-                border: Color(0xFFA7F3D0),
-              )
-            : t.slotForTime(def.startTime))
+    final SlotColors? slot = def != null
+        ? (def.isLeave ? kLeaveSlotColors : t.slotForTime(def.startTime))
         : null;
     final baseFg = slot?.fg ?? t.neutralFg;
 
@@ -243,11 +237,9 @@ class CalendarDayCell extends StatelessWidget {
                         ? FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              truncateAbbr(
-                                def.isLeave && note.isNotEmpty
-                                    ? note
-                                    : def.abbr,
-                              ),
+                              def.isLeave && note.isNotEmpty
+                                  ? truncateAbbr(note, 6)
+                                  : truncateAbbr(def.abbr),
                               style: TextStyle(
                                 fontSize: 17.0,
                                 fontWeight: FontWeight.w600,

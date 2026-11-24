@@ -66,12 +66,15 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   }
 
   void _loadDay() {
-    _noteCtrl.text = widget.store.assignments[_key]?.note ?? '';
+    final assignment = widget.store.assignments[_key];
     _editingVenue = false;
-    _selectedId = widget.store.assignments[_key]?.shiftId;
+    _selectedId = assignment?.shiftId;
     if (_selectedId != null && !widget.store.defs.containsKey(_selectedId)) {
       _selectedId = null;
     }
+    // 假期類嘅 note 用嚟存自訂假期名稱，絕唔混入工作地點輸入欄
+    _noteCtrl.text =
+        _selectedId == ShiftDef.leaveId ? '' : (assignment?.note ?? '');
     _dirty = false;
   }
 
@@ -132,6 +135,10 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     final assignment = widget.store.assignments[_key];
 
     if (shiftId != null) {
+      if (shiftId == ShiftDef.leaveId) {
+        _dirty = false;
+        return;
+      }
       final def = widget.store.defs[shiftId];
       if (def == null) return;
       final changedShift = assignment?.shiftId != shiftId;
@@ -279,109 +286,164 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // 地點輸入欄（原頁面文本框輸入，無彈窗，與入備註方式完全一致）
+                    // 地點輸入欄（若當日為假期類則改為顯示假期名稱＋點擊修改）
                     Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: _editingVenue
-                            ? TextField(
-                                controller: _noteCtrl,
-                                focusNode: _venueFocus,
-                                maxLines: 1,
-                                maxLength: 4,
-                                inputFormatters: const [
-                                  AbbrUnitLengthFormatter(4)
-                                ],
-                                style: const TextStyle(fontSize: 13),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: t.neutralBg2,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                        color: t.brand, width: 1.5),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 6),
-                                  counterText: '',
-                                  isDense: true,
-                                  hintText: '輸入地點（如總部）',
-                                  prefixIcon: Icon(Icons.location_on,
-                                      size: 16, color: t.brand),
-                                  suffixIcon: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    icon: const Icon(Icons.check, size: 18),
-                                    onPressed: _saveInlineVenue,
+                      child: currentId == ShiftDef.leaveId
+                          ? GestureDetector(
+                              onTap: _saving ? null : _pickLeaveName,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                height: 36,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: kLeaveSlotColors.bg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: kLeaveSlotColors.border,
                                   ),
                                 ),
-                                onEditingComplete: _saveInlineVenue,
-                              )
-                            : GestureDetector(
-                                onTap: () {
-                                  setState(() => _editingVenue = true);
-                                  WidgetsBinding.instance
-                                      .addPostFrameCallback((_) {
-                                    if (mounted) _venueFocus.requestFocus();
-                                  });
-                                },
-                                behavior: HitTestBehavior.opaque,
-                                child: Container(
-                                  height: 36,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: note.isNotEmpty
-                                        ? t.brand.withValues(alpha: 0.12)
-                                        : t.neutralBg2,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: note.isNotEmpty
-                                          ? t.brand.withValues(alpha: 0.35)
-                                          : t.neutralStroke,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.beach_access_outlined,
+                                      size: 15,
+                                      color: kLeaveSlotColors.fg,
                                     ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.location_on,
-                                        size: 15,
-                                        color: note.isNotEmpty
-                                            ? t.brand
-                                            : t.neutralFg2,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          note.isNotEmpty
-                                              ? note
-                                              : '新增地點…',
-                                          style: TextStyle(
-                                            fontSize: 12.5,
-                                            fontWeight: note.isNotEmpty
-                                                ? FontWeight.w500
-                                                : FontWeight.normal,
-                                            color: note.isNotEmpty
-                                                ? t.brand
-                                                : t.neutralFg2,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        (assignment?.note ?? '').isNotEmpty
+                                            ? assignment!.note
+                                            : '假期',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: kLeaveSlotColors.fg,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      Icon(
-                                        note.isNotEmpty
-                                            ? Icons.edit
-                                            : Icons.add,
-                                        size: 13,
-                                        color: note.isNotEmpty
-                                            ? t.brand.withValues(alpha: 0.7)
-                                            : t.neutralFg2,
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                    Icon(
+                                      Icons.edit,
+                                      size: 13,
+                                      color: kLeaveSlotColors.fg
+                                          .withValues(alpha: 0.75),
+                                    ),
+                                  ],
                                 ),
                               ),
-                      ),
+                            )
+                          : SizedBox(
+                              height: 36,
+                              child: _editingVenue
+                                  ? TextField(
+                                      controller: _noteCtrl,
+                                      focusNode: _venueFocus,
+                                      maxLines: 1,
+                                      maxLength: 4,
+                                      inputFormatters: const [
+                                        AbbrUnitLengthFormatter(4)
+                                      ],
+                                      style: const TextStyle(fontSize: 13),
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: t.neutralBg2,
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          borderSide: BorderSide(
+                                              color: t.brand, width: 1.5),
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 6),
+                                        counterText: '',
+                                        isDense: true,
+                                        hintText: '輸入地點（如總部）',
+                                        prefixIcon: Icon(Icons.location_on,
+                                            size: 16, color: t.brand),
+                                        suffixIcon: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          icon:
+                                              const Icon(Icons.check, size: 18),
+                                          onPressed: _saveInlineVenue,
+                                        ),
+                                      ),
+                                      onEditingComplete: _saveInlineVenue,
+                                    )
+                                  : GestureDetector(
+                                      onTap: () {
+                                        setState(() => _editingVenue = true);
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                          if (mounted) {
+                                            _venueFocus.requestFocus();
+                                          }
+                                        });
+                                      },
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Container(
+                                        height: 36,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: note.isNotEmpty
+                                              ? t.brand.withValues(alpha: 0.12)
+                                              : t.neutralBg2,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: note.isNotEmpty
+                                                ? t.brand
+                                                    .withValues(alpha: 0.35)
+                                                : t.neutralStroke,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.location_on,
+                                              size: 15,
+                                              color: note.isNotEmpty
+                                                  ? t.brand
+                                                  : t.neutralFg2,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Expanded(
+                                              child: Text(
+                                                note.isNotEmpty
+                                                    ? note
+                                                    : '新增地點…',
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: note.isNotEmpty
+                                                      ? FontWeight.w500
+                                                      : FontWeight.normal,
+                                                  color: note.isNotEmpty
+                                                      ? t.brand
+                                                      : t.neutralFg2,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            Icon(
+                                              note.isNotEmpty
+                                                  ? Icons.edit
+                                                  : Icons.add,
+                                              size: 13,
+                                              color: note.isNotEmpty
+                                                  ? t.brand
+                                                      .withValues(alpha: 0.7)
+                                                  : t.neutralFg2,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                            ),
                     ),
                     const SizedBox(width: 10),
                     // 完成退出按鈕
@@ -515,9 +577,6 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
 
   Widget _leaveButton(ShiftTokens t, String? currentId) {
     final isSelected = currentId == ShiftDef.leaveId;
-    const leaveBg = Color(0xFFECFDF5);
-    const leaveFg = Color(0xFF047857);
-    const leaveBorder = Color(0xFFA7F3D0);
     final currentLeaveName =
         isSelected ? (widget.store.assignments[_key]?.note ?? '') : '';
 
@@ -526,16 +585,16 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         decoration: BoxDecoration(
-          color: leaveBg,
+          color: kLeaveSlotColors.bg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? leaveFg : leaveBorder,
+            color: isSelected ? kLeaveSlotColors.fg : kLeaveSlotColors.border,
             width: isSelected ? 2.0 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: leaveFg.withValues(alpha: 0.16),
+                    color: kLeaveSlotColors.fg.withValues(alpha: 0.16),
                     blurRadius: 4,
                     offset: const Offset(0, 1),
                   )
@@ -546,14 +605,14 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const FittedBox(
+            FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 '假期',
                 style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
-                  color: leaveFg,
+                  color: kLeaveSlotColors.fg,
                 ),
               ),
             ),
@@ -565,7 +624,7 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.normal,
-                  color: leaveFg.withValues(alpha: 0.85),
+                  color: kLeaveSlotColors.fg.withValues(alpha: 0.85),
                 ),
               ),
             ),
@@ -576,6 +635,10 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
   }
 
   Future<void> _pickLeaveName() async {
+    if (_editingVenue) {
+      _venueFocus.unfocus();
+      setState(() => _editingVenue = false);
+    }
     final existing = widget.store.assignments[_key]?.shiftId == ShiftDef.leaveId
         ? (widget.store.assignments[_key]?.note ?? '')
         : '';
@@ -586,34 +649,36 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('排定假期'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final p in presets)
-                  ActionChip(
-                    label: Text(p),
-                    onPressed: () => Navigator.of(ctx).pop(p),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLength: 8,
-              decoration: const InputDecoration(
-                labelText: '或自訂假期名稱',
-                hintText: '例如：進修假、調休',
-                counterText: '',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final p in presets)
+                    ActionChip(
+                      label: Text(p),
+                      onPressed: () => Navigator.of(ctx).pop(p),
+                    ),
+                ],
               ),
-              onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                maxLength: 8,
+                decoration: const InputDecoration(
+                  labelText: '或自訂假期名稱',
+                  hintText: '例如：進修假、調休',
+                  counterText: '',
+                ),
+                onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -634,11 +699,17 @@ class ShiftPickerPanelState extends State<ShiftPickerPanel> {
     setState(() {
       _saving = true;
       _selectedId = ShiftDef.leaveId;
+      _noteCtrl.text = '';
       _dirty = false;
     });
     try {
       await widget.store.assign(_key, ShiftDef.leaveId, note: leaveName);
-      await widget.alarms.rescheduleAll(widget.store);
+      try {
+        await widget.alarms.onUnassigned(_key);
+      } catch (_) {}
+      if (mounted) {
+        showTopNotification(context, '已排 $leaveName');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

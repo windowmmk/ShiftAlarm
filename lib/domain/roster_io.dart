@@ -85,10 +85,15 @@ Uint8List encodeCompactRoster(ShiftStore store, {DateTime? month}) {
     bb.addByte(d.clamp(1, 31));
 
     final def = store.defs[e.value.shiftId];
-    // 班次代號比對：代號為空時 fallback 使用「startTime-endTime」作為比對鍵值
-    final rawCode = (def?.code ?? '').trim();
-    final shiftKey =
-        rawCode.isNotEmpty ? rawCode : (def != null ? _slotKeyOf(def) : '');
+    // 假期類以保留代號寫入；工作班次則代號優先、為空時 fallback 至「startTime-endTime」
+    final String shiftKey;
+    if (def?.isLeave == true || e.value.shiftId == ShiftDef.leaveId) {
+      shiftKey = ShiftDef.leaveId;
+    } else {
+      final rawCode = (def?.code ?? '').trim();
+      shiftKey =
+          rawCode.isNotEmpty ? rawCode : (def != null ? _slotKeyOf(def) : '');
+    }
     final codeBytes = _truncateUtf8(shiftKey);
     bb.addByte(codeBytes.length);
     bb.add(codeBytes);
@@ -118,11 +123,15 @@ Map<String, dynamic> exportRoster(ShiftStore store, {DateTime? month}) {
     if (prefix == null || e.key.startsWith(prefix)) {
       final def = store.defs[e.value.shiftId];
       final remark = store.remarks[e.key] ?? '';
+      final isLeave =
+          def?.isLeave == true || e.value.shiftId == ShiftDef.leaveId;
       items.add({
         'date': e.key,
-        'code': def?.code ?? '',
-        'shiftName': def?.name ?? '',
-        'slot': def != null ? '${def.startTime}-${def.endTime}' : '',
+        'code': isLeave ? ShiftDef.leaveId : (def?.code ?? ''),
+        'shiftName': def?.name ?? (isLeave ? '假期' : ''),
+        'slot': (def != null && !isLeave)
+            ? '${def.startTime}-${def.endTime}'
+            : '',
         'venue': e.value.note,
         if (remark.isNotEmpty) 'remark': remark,
       });
@@ -254,7 +263,9 @@ DecodedRosterResult _parseCompactRosterPayload({
 
       String? shiftId;
       final key = code.trim();
-      if (key.isNotEmpty) {
+      if (key == ShiftDef.leaveId) {
+        shiftId = ShiftDef.leaveId;
+      } else if (key.isNotEmpty) {
         // 先按代號（唔分大細楷）
         shiftId = codeMap[key.toUpperCase()];
         // 再按「startTime-endTime」fallback（編碼端 code 為空時寫入嘅 key）
@@ -274,7 +285,10 @@ DecodedRosterResult _parseCompactRosterPayload({
         continue;
       }
 
-      if (abbrUnits(venue) > 4) {
+      // 假期類保留完整自訂假期名稱（最多 16 字元）；工作班次才截斷至 4 單位地點欄
+      if (shiftId == ShiftDef.leaveId) {
+        if (venue.length > 16) venue = venue.substring(0, 16);
+      } else if (abbrUnits(venue) > 4) {
         if (remark.isEmpty) remark = venue;
         venue = truncateAbbr(venue);
       }

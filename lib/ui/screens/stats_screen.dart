@@ -68,7 +68,7 @@ class _StatsScreenState extends State<StatsScreen> {
       final a = widget.store.assignments[ymd];
       if (a != null) {
         final def = widget.store.defs[a.shiftId];
-        if (def != null) {
+        if (def != null && !def.isLeave) {
           final slotIdx = slotIndexForTime(def.startTime).clamp(0, 3);
           usedNamesBySlot[slotIdx][def.name] =
               (usedNamesBySlot[slotIdx][def.name] ?? 0) + 1;

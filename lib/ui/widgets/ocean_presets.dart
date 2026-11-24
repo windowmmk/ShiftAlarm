@@ -110,16 +110,16 @@ class OceanShaderPreset {
   static const OceanShaderPreset night = OceanShaderPreset(
     sunElev: -16.0,
     sunAzimuth: 215.0,
-    windSpeed: 7.2,
-    swellHs: 1.2,
-    choppiness: 0.95,
-    turbidity: 0.35,
-    foam: 1.15,
-    haze: 0.28,
-    clouds: 0.16,
-    exposure: 1.05,
+    windSpeed: 6.5,
+    swellHs: 1.0,
+    choppiness: 0.85,
+    turbidity: 0.42,
+    foam: 1.05,
+    haze: 0.26,
+    clouds: 0.18,
+    exposure: 1.00,
     bloom: 0.95,
-    nightGlow: 1.0,
+    nightGlow: 0.85,
   );
 
   /// 晴朗午後（備用）

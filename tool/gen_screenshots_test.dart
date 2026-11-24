@@ -27,7 +27,12 @@ import 'package:shiftalarm/theme/app_theme.dart';
 import 'package:shiftalarm/ui/screens/home_screen.dart';
 import 'package:shiftalarm/ui/screens/settings_screen.dart';
 import 'package:shiftalarm/ui/screens/shift_manage_screen.dart';
+import 'package:shiftalarm/ui/screens/shift_picker_panel.dart';
 import 'package:shiftalarm/ui/screens/stats_screen.dart';
+import 'package:shiftalarm/ui/widgets/ocean_atmo_state.dart';
+import 'package:shiftalarm/ui/widgets/ocean_fallback_painter.dart';
+import 'package:shiftalarm/ui/widgets/ocean_presets.dart';
+import 'package:shiftalarm/ui/widgets/ocean_shader_controller.dart';
 
 const String _outDir = 'docs/screenshots';
 const String _cjkFamily = 'CjkFallback';
@@ -73,6 +78,127 @@ void main() {
       SettingsScreen(store: store, alarms: AlarmService(AlarmBridge())),
     );
   });
+
+  testWidgets('verify_night_and_leave', (tester) async {
+    await _ensureFonts(tester);
+    await tester.runAsync(() => OceanShaderController.load());
+
+    // 1. 驗證夜間海景（GLSL 主著色器 + 2D Fallback）視覺柔和不陰森
+    final nightCard = Scaffold(
+      backgroundColor: kCalendarPageBg,
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              '夜間海景預覽（GLSL Shader vs 2D Fallback）',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            const Text('1. GLSL Shader（夜班 21:30–04:59）：'),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                height: 96,
+                decoration: BoxDecoration(
+                  color: kOceanBandSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kCardStroke, width: 1.2),
+                ),
+                child: OceanShaderController.isAvailable
+                    ? CustomPaint(
+                        painter: _FixedNightShaderPainter(),
+                        size: const Size(double.infinity, 96),
+                      )
+                    : const Center(child: Text('Shader 不可用')),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('2. 2D 降級繪製器（夜間模式）：'),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                height: 96,
+                decoration: BoxDecoration(
+                  color: kOceanBandSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kCardStroke, width: 1.2),
+                ),
+                child: CustomPaint(
+                  painter: OceanFallbackPainter(
+                    time: 2.0,
+                    atmo: OceanAtmoState.night,
+                    compact96: true,
+                  ),
+                  size: const Size(double.infinity, 96),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await _shot(tester, '05-night-ocean', nightCard, outDir: 'build/verify-shots');
+
+    // 2. 驗證日曆格「進修假／年假」與底部 ShiftPickerPanel「假期」按鈕＋自訂假期名稱
+    final store = await _makeStore();
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    await store.assign('${now.year}-$mm-07', ShiftDef.leaveId, note: '年假');
+    await store.assign('${now.year}-$mm-$dd', ShiftDef.leaveId, note: '進修假');
+
+    final pickerPreview = Scaffold(
+      backgroundColor: kCalendarPageBg,
+      body: Column(
+        children: [
+          Expanded(
+            child: HomeScreen(store: store, alarms: AlarmService(AlarmBridge())),
+          ),
+          SizedBox(
+            height: 132,
+            child: ShiftPickerPanel(
+              initialDate: now,
+              store: store,
+              alarms: AlarmService(AlarmBridge()),
+              onClose: () {},
+            ),
+          ),
+        ],
+      ),
+    );
+    await _shot(
+      tester,
+      '06-leave-picker',
+      pickerPreview,
+      outDir: 'build/verify-shots',
+    );
+  });
+}
+
+class _FixedNightShaderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shader = OceanShaderController.createShader();
+    if (shader == null) return;
+    OceanShaderController.bindUniforms(
+      shader,
+      size: size,
+      elapsed: 2.5,
+      camDip: 0.0,
+      waveProgress: -1.0,
+      surgeIntensity: 0.0,
+      preset: OceanShaderPreset.night,
+    );
+    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
+    shader.dispose();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 String _findMaterialFont(String filename) {
@@ -326,7 +452,12 @@ InlineSpan _withFallback(InlineSpan span, List<String> fallback) {
   );
 }
 
-Future<void> _shot(WidgetTester tester, String name, Widget child) async {
+Future<void> _shot(
+  WidgetTester tester,
+  String name,
+  Widget child, {
+  String outDir = _outDir,
+}) async {
   tester.view.physicalSize = const Size(_w, _h);
   tester.view.devicePixelRatio = 1.0;
 
@@ -360,7 +491,7 @@ Future<void> _shot(WidgetTester tester, String name, Widget child) async {
     }
   });
 
-  final out = File('$_outDir/$name.png');
+  final out = File('$outDir/$name.png');
   if (!out.parent.existsSync()) {
     out.parent.createSync(recursive: true);
   }

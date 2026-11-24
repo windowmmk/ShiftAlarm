@@ -173,6 +173,13 @@ class SlotColors {
   const SlotColors(this.bg, this.fg, this.border);
 }
 
+/// 假期類柔霧鼠尾草綠配色（月曆格、詳情卡、排班列共用）
+const SlotColors kLeaveSlotColors = SlotColors(
+  Color(0xFFECFDF5),
+  Color(0xFF047857),
+  Color(0xFFA7F3D0),
+);
+
 /// 方便取用
 extension ShiftTokensContext on BuildContext {
   ShiftTokens get tokens => Theme.of(this).extension<ShiftTokens>()!;

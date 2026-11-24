@@ -42,14 +42,8 @@ class CalendarDetailCard extends StatelessWidget {
     final holiday = holidayName(selectedDate);
     const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
     final weekdayName = weekdays[selectedDate.weekday % 7];
-    final slot = def != null
-        ? (def.isLeave
-            ? const (
-                bg: Color(0xFFECFDF5),
-                fg: Color(0xFF047857),
-                border: Color(0xFFA7F3D0),
-              )
-            : t.slotForTime(def.startTime))
+    final SlotColors? slot = def != null
+        ? (def.isLeave ? kLeaveSlotColors : t.slotForTime(def.startTime))
         : null;
 
     return Center(

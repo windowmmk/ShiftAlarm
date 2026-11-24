@@ -408,9 +408,14 @@ class ShiftStore extends ChangeNotifier {
   Future<void> assignBatch(
     List<({String ymd, String shiftId, String note, String remark})> rows,
   ) async {
+    bool defsDirty = false;
     bool assignmentsDirty = false;
     bool remarksDirty = false;
     for (final r in rows) {
+      if (r.shiftId == ShiftDef.leaveId && !defs.containsKey(ShiftDef.leaveId)) {
+        defs[ShiftDef.leaveId] = leaveDef;
+        defsDirty = true;
+      }
       if (defs.containsKey(r.shiftId)) {
         assignments[r.ymd] = ShiftAssignment(r.shiftId, r.note);
         assignmentsDirty = true;
@@ -429,9 +434,10 @@ class ShiftStore extends ChangeNotifier {
         }
       }
     }
+    if (defsDirty) await _saveDefs();
     if (assignmentsDirty) await _saveAssignments();
     if (remarksDirty) await prefs.setString(_kRemarks, jsonEncode(remarks));
-    if (assignmentsDirty || remarksDirty) notifyListeners();
+    if (defsDirty || assignmentsDirty || remarksDirty) notifyListeners();
   }
 
   Future<void> unassign(String ymd) async {
@@ -512,9 +518,13 @@ class ShiftStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 配置導入用：整批替換班次定義（不清空現有排班指派）。
+  /// 配置導入用：整批替換班次定義（不清空現有排班指派與內建假期類）。
   Future<void> replaceAllDefs(Map<String, ShiftDef> newDefs) async {
     defs = Map<String, ShiftDef>.from(newDefs);
+    if (assignments.values.any((a) => a.shiftId == ShiftDef.leaveId) &&
+        !defs.containsKey(ShiftDef.leaveId)) {
+      defs[ShiftDef.leaveId] = leaveDef;
+    }
     _invalidateDefsCache();
     await _saveDefs();
     notifyListeners();
