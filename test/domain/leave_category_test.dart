@@ -155,7 +155,7 @@ void main() {
       expect(find.text('進修假'), findsWidgets);
 
       // 由「進修假」（6 單位）切換為一般工作班次，不應受地點 4 單位校驗阻擋
-      await tester.tap(find.text('早更'));
+      await tester.tap(find.textContaining('早更'));
       await tester.pumpAndSettle();
       expect(store.assignments['2026-11-24']!.shiftId, 's06');
       expect(store.assignments['2026-11-24']!.note, isEmpty);
@@ -191,7 +191,9 @@ void main() {
 
         expect(find.text('年假'), findsNothing);
         expect(find.text('進修假'), findsNothing);
-        expect(find.text('6 小時'), findsOneWidget);
+        expect(find.text('6 小時', findRichText: true), findsOneWidget);
+        expect(find.text('1日 · 100.0%'), findsOneWidget);
+        expect(find.text('A1'), findsOneWidget);
       } finally {
         FlutterError.onError = oldHandler;
         tester.view.resetPhysicalSize();
